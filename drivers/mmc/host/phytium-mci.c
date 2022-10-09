@@ -1540,6 +1540,7 @@ int phytium_mci_common_probe(struct phytium_mci_host *host)
 	mmc->ocr_avail_sdio = MMC_VDD_32_33 | MMC_VDD_33_34;
 	mmc->ocr_avail_sd = MMC_VDD_32_33 | MMC_VDD_33_34;
 	mmc->ocr_avail_mmc = MMC_VDD_165_195;
+	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34 | MMC_VDD_165_195;
 	mmc->caps |= host->caps;
 
 	if (mmc->caps & MMC_CAP_SDIO_IRQ) {
