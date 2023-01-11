@@ -1271,8 +1271,10 @@ static int phytium_nand_page_read_hwecc(struct mtd_info *mtd, struct nand_chip *
 	cond_delay(nfc_op->cle_ale_delay_ns);
 
 	ret = phytium_nfc_wait_op(chip, nfc_op->rdy_timeout_ms);
-	if (ret)
+	if (ret) {
+		kfree(nfc_op);
 		return ret;
+	}
 
 	cond_delay(nfc_op->rdy_delay_ns * 1000);
 
@@ -1483,6 +1485,7 @@ static int phytium_nand_page_write_hwecc(struct mtd_info *mtd, struct nand_chip 
 
 	cond_delay(nfc_op->rdy_delay_ns * 1000);
 out:
+	kfree(nfc_op);
 	return ret;
 }
 
