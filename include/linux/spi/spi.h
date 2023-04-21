@@ -146,6 +146,28 @@ struct spi_device {
 	u32			max_speed_hz;
 	u8			chip_select;
 	u8			bits_per_word;
+#define SPI_NO_TX		BIT(31)		/* No transmit wire */
+#define SPI_NO_RX		BIT(30)		/* No receive wire */
+	/*
+	 * TPM specification defines flow control over SPI. Client device
+	 * can insert a wait state on MISO when address is transmitted by
+	 * controller on MOSI. Detecting the wait state in software is only
+	 * possible for full duplex controllers. For controllers that support
+	 * only half-duplex, the wait state detection needs to be implemented
+	 * in hardware. TPM devices would set this flag when hardware flow
+	 * control is expected from SPI controller.
+	 */
+#define SPI_TPM_HW_FLOW		BIT(29)		/* TPM HW flow control */
+	/*
+	 * All bits defined above should be covered by SPI_MODE_KERNEL_MASK.
+	 * The SPI_MODE_KERNEL_MASK has the SPI_MODE_USER_MASK counterpart,
+	 * which is defined in 'include/uapi/linux/spi/spi.h'.
+	 * The bits defined here are from bit 31 downwards, while in
+	 * SPI_MODE_USER_MASK are from 0 upwards.
+	 * These bits must not overlap. A static assert check should make sure of that.
+	 * If adding extra bits, make sure to decrease the bit index below as well.
+	 */
+#define SPI_MODE_KERNEL_MASK	(~(BIT(29) - 1))
 	u16			mode;
 #define	SPI_CPHA	0x01			/* clock phase */
 #define	SPI_CPOL	0x02			/* clock polarity */
