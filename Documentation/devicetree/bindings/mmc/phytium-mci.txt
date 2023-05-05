@@ -9,6 +9,12 @@ Required properties:
 - clocks : phandles to input clocks.
 - clock-names : should be "phytium_mci_clk".
 - interrupts : mmc controller interrupt.
+- use-hold : enable hold registers.
+- clk-set : enable clock phase setiing.
+- clk-smpl-drv-25m : 25M clock phase setiing.
+- clk-smpl-drv-50m : 50M clock phase setiing.
+- clk-smpl-drv-66m : 66M clock phase setiing.
+- clk-smpl-drv-100m : 100M clock phase setiing.
 
 Examples:
 	- Within .dtsi:
@@ -31,6 +37,9 @@ Examples:
 		sd-uhs-sdr25;
 		sd-uhs-sdr50;
 		no-mmc;
+		use-hold;
+		clk-set;
+		clk-smpl-drv-50m = <0x0201>;
 		status = "ok";
 	};
 
