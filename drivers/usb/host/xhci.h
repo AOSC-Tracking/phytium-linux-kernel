@@ -1880,6 +1880,7 @@ struct xhci_hcd {
 #define XHCI_SNPS_BROKEN_SUSPEND    BIT_ULL(35)
 #define XHCI_DISABLE_SPARSE	BIT_ULL(38)
 #define XHCI_S1_SUSPEND_WAKEUP	BIT_ULL(39)
+#define XHCI_TRB_OVERFETCH	BIT_ULL(45)
 
 	unsigned int		num_active_eps;
 	unsigned int		limit_active_eps;
