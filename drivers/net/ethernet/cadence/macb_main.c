@@ -4293,6 +4293,75 @@ static void macb_probe_queues(void __iomem *mem,
 	*num_queues = hweight32(*queue_mask);
 }
 
+#ifdef CONFIG_ACPI
+static  int  macb_clk_acpi_init(struct platform_device *pdev, struct clk **pclk,
+				struct clk **hclk, struct clk **tx_clk,
+				struct clk **rx_clk, struct clk **tsu_clk)
+{
+	struct macb_platform_data *pdata;
+	int err;
+
+	pdata = dev_get_platdata(&pdev->dev);
+	if (pdata) {
+		*pclk = pdata->pclk;
+		*hclk = pdata->hclk;
+	} else {
+		*pclk = NULL;
+		*hclk = NULL;
+	}
+
+	*tx_clk = NULL;
+	*rx_clk = NULL;
+	*tsu_clk = NULL;
+
+	err = clk_prepare_enable(*pclk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable pclk (%d)\n", err);
+		return err;
+	}
+
+	err = clk_prepare_enable(*hclk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable hclk (%d)\n", err);
+		goto err_disable_pclk;
+	}
+
+	err = clk_prepare_enable(*tx_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable tx_clk (%d)\n", err);
+		goto err_disable_hclk;
+	}
+
+	err = clk_prepare_enable(*rx_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable rx_clk (%d)\n", err);
+		goto err_disable_txclk;
+	}
+
+	err = clk_prepare_enable(*tsu_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable tsu_clk (%d)\n", err);
+		goto err_disable_rxclk;
+	}
+
+	return 0;
+
+err_disable_rxclk:
+	clk_disable_unprepare(*rx_clk);
+
+err_disable_txclk:
+	clk_disable_unprepare(*tx_clk);
+
+err_disable_hclk:
+	clk_disable_unprepare(*hclk);
+
+err_disable_pclk:
+	clk_disable_unprepare(*pclk);
+
+	return err;
+}
+#endif
+
 static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
 			 struct clk **hclk, struct clk **tx_clk,
 			 struct clk **rx_clk, struct clk **tsu_clk)
@@ -5150,6 +5219,21 @@ static const struct macb_config phytium_gem1p0_config = {
 	.sel_clk_hw = phytium_gem1p0_sel_clk,
 };
 
+#ifdef CONFIG_ACPI
+static const struct macb_config phytium_gem1p0_acpi_config = {
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
+			MACB_CAPS_JUMBO |
+			MACB_CAPS_GEM_HAS_PTP |
+			MACB_CAPS_BD_RD_PREFETCH |
+			MACB_CAPS_SEL_CLK,
+	.dma_burst_length = 16,
+	.clk_init = macb_clk_acpi_init,
+	.init = macb_init,
+	.jumbo_max_len = 10240,
+	.sel_clk_hw = phytium_gem1p0_sel_clk,
+};
+#endif
+
 static const struct macb_config phytium_gem2p0_config = {
 	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
 			MACB_CAPS_JUMBO |
@@ -5189,7 +5273,7 @@ MODULE_DEVICE_TABLE(of, macb_dt_ids);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id macb_acpi_ids[] = {
-	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_gem1p0_config },
+	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_gem1p0_acpi_config },
 	{ }
 };
 
@@ -5242,7 +5326,7 @@ static int macb_probe(struct platform_device *pdev)
 			struct clk **) = macb_config->clk_init;
 	int (*init)(struct platform_device *) = macb_config->init;
 	struct device_node *np = pdev->dev.of_node;
-	struct clk *pclk, *hclk = NULL, *tx_clk = NULL, *rx_clk = NULL;
+	struct clk *pclk = NULL, *hclk = NULL, *tx_clk = NULL, *rx_clk = NULL;
 	struct clk *tsu_clk = NULL;
 	unsigned int queue_mask, num_queues;
 	bool native_io;
