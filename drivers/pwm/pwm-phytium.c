@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/time.h>
+#include <linux/acpi.h>
 
 #define REG_TCNT		0x00
 #define REG_TCTRL		0x04
@@ -183,7 +184,10 @@ static void pwm_phytium_set_periodns(struct pwm_chip *chip, unsigned int periodn
 	int div = our_chip->state.div;
 	u64 cycles;
 
-	cycles = clk_get_rate(our_chip->base_clk);
+	if (has_acpi_companion(chip->dev))
+		device_property_read_u64(chip->dev, "clock-frequency", &cycles);
+	else
+		cycles = clk_get_rate(our_chip->base_clk);
 	cycles *= (periodns / (div + 1));
 	do_div(cycles, NSEC_PER_SEC);
 
@@ -201,7 +205,10 @@ static void pwm_phytium_set_duty(struct pwm_chip *chip, unsigned int duty, int n
 	int div = our_chip->state.div;
 	u64 cycles;
 
-	cycles = clk_get_rate(our_chip->base_clk);
+	if (has_acpi_companion(chip->dev))
+		device_property_read_u64(chip->dev, "clock-frequency", &cycles);
+	else
+		cycles = clk_get_rate(our_chip->base_clk);
 	cycles *= (duty / (div + 1));
 	do_div(cycles, NSEC_PER_SEC);
 
@@ -219,7 +226,10 @@ static int pwm_phytium_set_dbcly(struct pwm_chip *chip, unsigned int updbcly, un
 	u64 dbcly, cycles, upcycles, dwcycles;
 
 	reg = readl(our_chip->base + REG_TPERIOD);
-	cycles = clk_get_rate(our_chip->base_clk);
+	if (has_acpi_companion(chip->dev))
+		device_property_read_u64(chip->dev, "clock-frequency", &cycles);
+	else
+		cycles = clk_get_rate(our_chip->base_clk);
 	dbcly &= 0x0;
 	if (updbcly) {
 		upcycles = cycles * updbcly;
@@ -402,17 +412,27 @@ static int pwm_phytium_probe_parameter(struct phytium_pwm_chip *priv,
 	int nb, ret, array_size;
 	unsigned int i;
 
-	nb = of_property_count_elems_of_size(np, "phytium,db",
+	if (has_acpi_companion(priv->chip.dev)) {
+		priv->num_parameters = 1;
+		array_size = sizeof(struct phytium_pwm_param) / sizeof(u32);
+		ret = fwnode_property_read_u32_array(dev_fwnode(priv->chip.dev),
+					"phytium,db", (u32 *)priv->parameter,
+					array_size);
+		if (ret < 0)
+			return ret;
+	} else {
+		nb = of_property_count_elems_of_size(np, "phytium,db",
 					     sizeof(struct phytium_pwm_param));
-	if (nb <= 0 || nb > MAX_PARAMETER)
-		return -EINVAL;
+		if (nb <= 0 || nb > MAX_PARAMETER)
+			return -EINVAL;
 
-	priv->num_parameters = nb;
-	array_size = nb * sizeof(struct phytium_pwm_param) / sizeof(u32);
-	ret = of_property_read_u32_array(np, "phytium,db",
-					 (u32 *)priv->parameter, array_size);
-	if (ret)
-		return ret;
+		priv->num_parameters = nb;
+		array_size = nb * sizeof(struct phytium_pwm_param) / sizeof(u32);
+		ret = of_property_read_u32_array(np, "phytium,db",
+					(u32 *)priv->parameter, array_size);
+		if (ret)
+			return ret;
+	}
 
 	for (i = 0; i < priv->num_parameters; i++) {
 		if (priv->parameter[i].cntmod > 1 ||
@@ -446,14 +466,8 @@ static int pwm_phytium_probe(struct platform_device *pdev)
 	if (pdev->dev.of_node) {
 		chip->chip.of_xlate = of_pwm_xlate_with_flags;
 		chip->chip.of_pwm_n_cells = 3;
-	} else {
-		if (!pdev->dev.platform_data) {
-			dev_err(&pdev->dev, "no platform data specified\n");
-			return -EINVAL;
-		}
-		memcpy(&chip->variant,
-			pdev->dev.platform_data, sizeof(chip->variant));
 	}
+
 	ret = pwm_phytium_probe_parameter(chip, np);
 	if (ret) {
 		dev_err(dev, "failed to set parameter\n");
@@ -464,20 +478,25 @@ static int pwm_phytium_probe(struct platform_device *pdev)
 	chip->base1 = devm_ioremap_resource(&pdev->dev, res);
 	chip->base = (chip->base1 + 0x400);
 
-	if (IS_ERR(chip->base)) {
-		dev_err(dev, "failed to get base_addr\n");
-		return PTR_ERR(chip->base);
-	}
-	chip->base_clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(chip->base_clk)) {
-		dev_err(dev, "failed to get clk\n");
-		return PTR_ERR(chip->base_clk);
-	}
+	if (!has_acpi_companion(&pdev->dev)) {
+		if (IS_ERR(chip->base)) {
+			dev_err(dev, "failed to get base_addr\n");
+			return PTR_ERR(chip->base);
+		}
 
-	ret = clk_prepare_enable(chip->base_clk);
-	if (ret < 0) {
-		dev_err(dev, "failed to enable clk\n");
-		return ret;
+		if (pdev->dev.of_node) {
+			chip->base_clk = devm_clk_get(&pdev->dev, NULL);
+			if (IS_ERR(chip->base_clk)) {
+				dev_err(dev, "failed to get clk\n");
+				return PTR_ERR(chip->base_clk);
+			}
+
+			ret = clk_prepare_enable(chip->base_clk);
+			if (ret < 0) {
+				dev_err(dev, "failed to enable clk\n");
+				return ret;
+			}
+		}
 	}
 
 	platform_set_drvdata(pdev, chip);
@@ -544,11 +563,22 @@ static const struct of_device_id phytium_pwm_matches[] = {
 };
 MODULE_DEVICE_TABLE(of, phytium_pwm_matches);
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id phytium_pwm_acpi_matches[] = {
+	{ "PHYT0029", 0 },
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, phytium_pwm_acpi_matches);
+#endif
+
 static struct platform_driver pwm_phytium_driver = {
 	.driver = {
 		.name = "phytium-pwm",
 		.pm = &phytium_pwm_dev_pm_ops,
 		.of_match_table = phytium_pwm_matches,
+#ifdef CONFIG_ACPI
+		.acpi_match_table = phytium_pwm_acpi_matches,
+#endif
 	},
 	.probe = pwm_phytium_probe,
 	.remove = pwm_phytium_remove,
