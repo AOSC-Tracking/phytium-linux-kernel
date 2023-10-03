@@ -17551,6 +17551,9 @@ F:	drivers/usb/phytium/phytium_usb_v2*
 F:	drivers/usb/typec/role-switch-phytium.c
 F:	drivers/w1/masters/phytium_w1.c
 F:	drivers/staging/phytium-npu/*
+F:	include/linux/array_size.h
+F:	include/linux/phyt.h
+F:	include/phyt/*
 F:	sound/pci/hda/hda_phytium.*
 F:	sound/soc/codecs/phytium-codec-v2.*
 F:	sound/soc/phytium/*
