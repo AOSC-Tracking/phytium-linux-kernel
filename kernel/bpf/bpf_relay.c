@@ -420,7 +420,7 @@ static const struct file_operations relay_ebpf_fops = {
 	.read  = relay_ebpf_read,
 };
 
-__diag_push();
+__bpf_kfunc_start_defs();
 
 /* Write data of size size__sz to relay channel of index.
  * WARNING: This kfunc can be deprecated at ANY time in the future.
@@ -454,7 +454,7 @@ out:
 	rcu_read_unlock();
 	return ret;
 }
-__diag_pop()
+__bpf_kfunc_end_defs();
 
 BTF_KFUNCS_START(bpf_relay_kfunc_ids)
 BTF_ID_FLAGS(func, bpf_anolis_relay_write, KF_TRUSTED_ARGS)
