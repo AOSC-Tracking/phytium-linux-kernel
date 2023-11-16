@@ -104,6 +104,7 @@
 #define MCI_UHS_REG_EXT	0x108 /* the UHS register extension */
 #define MCI_EMMC_DDR_REG	0x10C /* the EMMC DDR reg */
 #define MCI_ENABLE_SHIFT	0x110 /* the enable phase shift reg */
+#define MCI_CLK_DIVIDER	0x114 /* CLK DIVIDER */
 #define MCI_DATA		0x200 /* the data FIFO access */
 
 /* Command register defines */

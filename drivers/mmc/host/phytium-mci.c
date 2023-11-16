@@ -235,8 +235,12 @@ static void phytium_mci_set_clk(struct phytium_mci_host *host, struct mmc_ios *i
 			}
 		}
 
-		dev_dbg(host->dev, "UHS_REG_EXT ext: %x, CLKDIV: %x\n",
-			readl(host->base + MCI_UHS_REG_EXT), readl(host->base + MCI_CLKDIV));
+		if (div >= 2)
+			writel(((2 * (div & 0xff)) & 0xffff), host->base + MCI_CLK_DIVIDER);
+
+		dev_dbg(host->dev, "UHS_REG_EXT ext: %x, CLKDIV: %x MCI_CLK_DIVIDER %x %x\n",
+			readl(host->base + MCI_UHS_REG_EXT), readl(host->base + MCI_CLKDIV),
+			readl(host->base + MCI_CLK_DIVIDER), ((2 * (div & 0xff)) & 0xffff));
 
 		sdr_set_bits(host->base + MCI_CLKENA, MCI_CLKENA_CCLK_ENABLE);
 
