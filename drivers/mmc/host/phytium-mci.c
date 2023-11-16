@@ -64,6 +64,7 @@ static void phytium_mci_init_adma_table(struct phytium_mci_host *host,
 					 struct phytium_mci_dma *dma);
 static void phytium_mci_init_hw(struct phytium_mci_host *host);
 static int phytium_mci_get_cd(struct mmc_host *mmc);
+static int phytium_mci_get_ro(struct mmc_host *mmc);
 static int phytium_mci_err_irq(struct phytium_mci_host *host, u32 dmac_events, u32 events);
 
 static void sdr_set_bits(void __iomem *reg, u32 bs)
@@ -1420,6 +1421,20 @@ static int phytium_mci_get_cd(struct mmc_host *mmc)
 	return 1;
 }
 
+static int phytium_mci_get_ro(struct mmc_host *mmc)
+{
+	struct phytium_mci_host *host = mmc_priv(mmc);
+	u32 status;
+
+	status = readl(host->base + MCI_CARD_WRTPRT);
+
+	dev_dbg(host->dev, "mci_get_ro status %d\n", status);
+	if ((status & 0x1) == 0x1)
+		return 1;
+
+	return 0;
+}
+
 static int phytium_mci_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct phytium_mci_host *host = mmc_priv(mmc);
@@ -1513,6 +1528,7 @@ static struct mmc_host_ops phytium_mci_ops = {
 	.request = phytium_mci_ops_request,
 	.set_ios = phytium_mci_ops_set_ios,
 	.get_cd = phytium_mci_get_cd,
+	.get_ro = phytium_mci_get_ro,
 	.enable_sdio_irq = phytium_mci_enable_sdio_irq,
 	.ack_sdio_irq = phytium_mci_ack_sdio_irq,
 	.card_busy = phytium_mci_card_busy,
