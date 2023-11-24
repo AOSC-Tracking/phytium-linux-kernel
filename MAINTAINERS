@@ -17494,6 +17494,8 @@ F:	drivers/mfd/phytium_px210_i2s_lsd.c
 F:	drivers/mfd/phytium_px210_i2s_mmd.c
 F:	drivers/misc/phytium-snoop-ctrl.c
 F:	drivers/mmc/host/phytium-mci*
+F:	drivers/mmc/host/phytium-mci-plat-v2.c
+F:	drivers/mmc/host/phytium-mci-v2*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/mtd/parsers/acpipart_core.c
