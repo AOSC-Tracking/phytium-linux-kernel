@@ -2083,6 +2083,7 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc, int spee
 					speed == USB_SPEED_FULL ? "" : "micro");
 			break;
 		}
+		fallthrough;
 	/* fall through */
 	case USB_SPEED_LOW:
 		if (usb_endpoint_xfer_int(&desc) || usb_endpoint_xfer_isoc(&desc)) {
