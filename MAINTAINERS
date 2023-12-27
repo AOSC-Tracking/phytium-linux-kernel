@@ -1871,6 +1871,7 @@ F:	Documentation/devicetree/bindings/mailbox/phytium-mailbox.txt
 F:	Documentation/devicetree/bindings/media/phytium-jpeg.txt
 F:	Documentation/devicetree/bindings/mmc/phytium-mci.txt
 F:	Documentation/devicetree/bindings/net/can/phytium-can.txt
+F:	Documentation/devicetree/bindings/net/phytmac.txt
 F:	Documentation/devicetree/bindings/pci/phytium,phytium-pcie-ep.txt
 F:	Documentation/devicetree/bindings/pwm/pwm-phytium.txt
 F:	Documentation/devicetree/bindings/rng/phytium-rng.txt
@@ -1902,6 +1903,7 @@ F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/mtd/spi-nor/phytium-quadspi.c
 F:	drivers/net/can/phytium/*
+F:	drivers/net/ethernet/phytium/*
 F:	drivers/pci/controller/pcie-phytium*
 F:	drivers/perf/phyt_ps2364_ddr_pmu.c
 F:	drivers/perf/phyt_ps2364_pcie_pmu.c
