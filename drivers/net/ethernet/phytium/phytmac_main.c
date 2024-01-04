@@ -983,12 +983,17 @@ static void phytmac_rx_clean(struct phytmac_queue *queue)
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	unsigned int index, space;
 	struct phytmac_rx_buffer *rx_buf_info;
+	unsigned int rx_unclean = 0;
 
 	space = CIRC_SPACE(queue->rx_head, queue->rx_tail,
 			   pdata->rx_ring_size);
 
+	if (space < DEFAULT_RX_DESC_MIN_FREE)
+		return;
+
+	index = queue->rx_head & (pdata->rx_ring_size - 1);
+
 	while (space > 0) {
-		index = queue->rx_head & (pdata->rx_ring_size - 1);
 		rx_buf_info = &queue->rx_buffer_info[index];
 
 		if (!phytmac_alloc_mapped_page(pdata, rx_buf_info))
@@ -1001,16 +1006,20 @@ static void phytmac_rx_clean(struct phytmac_queue *queue)
 
 		hw_if->rx_map(queue, index, rx_buf_info->addr + rx_buf_info->page_offset);
 
-		queue->rx_head++;
-		if (queue->rx_head >= pdata->rx_ring_size)
-			queue->rx_head &= (pdata->rx_ring_size - 1);
-
+		index = (index + 1) & (pdata->rx_ring_size - 1);
+		rx_unclean++;
 		space--;
 	}
 
 	queue->rx_next_to_alloc = queue->rx_head;
 	/* make newly descriptor to hardware */
 	wmb();
+	hw_if->rx_clean(queue, rx_unclean);
+	/* make newly descriptor to hardware */
+	wmb();
+	queue->rx_head += rx_unclean;
+	if (queue->rx_head >= pdata->rx_ring_size)
+		queue->rx_head &= (pdata->rx_ring_size - 1);
 }
 
 static int phytmac_rx(struct phytmac_queue *queue, struct napi_struct *napi,
@@ -1132,7 +1141,7 @@ static int phytmac_tx_clean(struct phytmac_queue *queue, int budget)
 		if (!hw_if->tx_complete(desc))
 			break;
 
-		  /* Process all buffers of the current transmitted frame */
+		/* Process all buffers of the current transmitted frame */
 		for (;; head++) {
 			tx_skb = phytmac_get_tx_skb(queue, head);
 			skb = tx_skb->skb;
