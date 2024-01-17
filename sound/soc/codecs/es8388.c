@@ -424,11 +424,16 @@ static const struct snd_soc_dapm_route es8388_dapm_routes[] = {
 	{ "ROUT2", NULL, "Right Out 2" },
 };
 
-static int es8388_mute(struct snd_soc_dai *dai, int mute)
+static int es8388_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
-	return snd_soc_component_update_bits(dai->component, ES8388_DACCONTROL3,
-			ES8388_DACCONTROL3_DACMUTE,
-			mute ? ES8388_DACCONTROL3_DACMUTE : 0);
+	if (direction)
+		return snd_soc_component_update_bits(dai->component, ES8388_ADCCONTROL7,
+				ES8388_ADCCONTROL7_ADC_MUTE,
+				mute ? ES8388_ADCCONTROL7_ADC_MUTE : 0);
+	else
+		return snd_soc_component_update_bits(dai->component, ES8388_DACCONTROL3,
+				ES8388_DACCONTROL3_DACMUTE,
+				mute ? ES8388_DACCONTROL3_DACMUTE : 0);
 }
 
 static int es8388_startup(struct snd_pcm_substream *substream,
@@ -667,7 +672,7 @@ static int es8388_set_bias_level(struct snd_soc_component *component,
 static const struct snd_soc_dai_ops es8388_dai_ops = {
 	.startup	= es8388_startup,
 	.hw_params	= es8388_hw_params,
-	.digital_mute	= es8388_mute,
+	.mute_stream	= es8388_mute,
 	.set_sysclk	= es8388_set_sysclk,
 	.set_fmt	= es8388_set_dai_fmt,
 };
