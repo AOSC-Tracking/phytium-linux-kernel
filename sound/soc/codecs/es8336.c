@@ -31,6 +31,8 @@
 #include <linux/regmap.h>
 #include "es8336.h"
 
+#define ES8336_MUTE (1 << 5)
+
 static struct snd_soc_component *es8336_component;
 
 static const struct reg_default es8336_reg_defaults[] = {
@@ -666,23 +668,24 @@ static int es8336_pcm_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int es8336_mute(struct snd_soc_dai *dai, int mute)
+static int es8336_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
 	struct snd_soc_component *component = dai->component;
 	struct es8336_priv *es8336 = snd_soc_component_get_drvdata(component);
 
 	es8336->muted = mute;
-	if (mute) {
+	if (!es8336->hp_inserted)
+		es8336_enable_spk(es8336, true);
+	else
 		es8336_enable_spk(es8336, false);
-		msleep(100);
-		snd_soc_component_write(component, ES8336_DAC_SET1_REG30, 0x20);
-	} else if (dai->playback_active) {
-		snd_soc_component_write(component, ES8336_DAC_SET1_REG30, 0x00);
-		msleep(130);
-		if (!es8336->hp_inserted)
-			es8336_enable_spk(es8336, true);
-	}
-	return 0;
+	if (direction)
+		return snd_soc_component_update_bits(dai->component, ES8336_ADC_MUTE_REG26,
+				ES8336_MUTE,
+				mute ? ES8336_MUTE : 0);
+	else
+		return snd_soc_component_update_bits(dai->component, ES8336_DAC_SET1_REG30,
+				ES8336_MUTE,
+				mute ? ES8336_MUTE : 0);
 }
 
 static int es8336_set_bias_level(struct snd_soc_component *component,
@@ -731,7 +734,7 @@ static const struct snd_soc_dai_ops es8336_ops = {
 	.hw_params = es8336_pcm_hw_params,
 	.set_fmt = es8336_set_dai_fmt,
 	.set_sysclk = es8336_set_dai_sysclk,
-	.digital_mute = es8336_mute,
+	.mute_stream = es8336_mute,
 	.shutdown = es8336_pcm_shutdown,
 };
 
