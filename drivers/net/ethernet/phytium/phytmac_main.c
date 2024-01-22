@@ -694,8 +694,7 @@ static void phytmac_rx_clean(struct phytmac_queue *queue)
 			}
 
 			paddr = dma_map_single(pdata->dev, skb->data,
-					       pdata->rx_buffer_len, DMA_FROM_DEVICE);
-
+						pdata->rx_buffer_len, DMA_FROM_DEVICE);
 			if (dma_mapping_error(pdata->dev, paddr)) {
 				dev_kfree_skb(skb);
 				break;
@@ -835,22 +834,25 @@ static int phytmac_tx_clean(struct phytmac_queue *queue, int budget)
 		struct sk_buff *skb;
 
 		desc = phytmac_get_tx_desc(queue, head);
-
 		/* make newly desc to cpu */
 		rmb();
-
 		if (!hw_if->tx_complete(desc))
 			break;
 
-		  /* Process all buffers of the current transmitted frame */
+		/* Process all buffers of the current transmitted frame */
 		for (;; head++) {
 			tx_skb = phytmac_get_tx_skb(queue, head);
 			skb = tx_skb->skb;
+
 			if (skb) {
 				complete = 1;
-				if (IS_REACHABLE(CONFIG_PHYTMAC_ENABLE_PTP))
-					if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP))
+				if (IS_REACHABLE(CONFIG_PHYTMAC_ENABLE_PTP)) {
+					if (unlikely(skb_shinfo(skb)->tx_flags &
+						     SKBTX_HW_TSTAMP) &&
+						     !phytmac_ptp_one_step(skb)) {
 						phytmac_ptp_txstamp(queue, skb, desc);
+					}
+				}
 
 				if (netif_msg_drv(pdata))
 					netdev_info(pdata->ndev, "desc %u (data %p) tx complete\n",
@@ -975,7 +977,7 @@ static int phytmac_add_fcs(struct sk_buff **skb, struct net_device *ndev)
 
 	if ((ndev->features & NETIF_F_HW_CSUM) ||
 	    !((*skb)->ip_summed != CHECKSUM_PARTIAL) ||
-	    skb_shinfo(*skb)->gso_size)
+	    skb_shinfo(*skb)->gso_size || phytmac_ptp_one_step(*skb))
 		return 0;
 
 	if (padlen <= 0) {
@@ -1060,7 +1062,9 @@ static int phytmac_packet_info(struct phytmac *pdata,
 	packet->desc_cnt = desc_cnt;
 
 	if ((!(pdata->ndev->features & NETIF_F_HW_CSUM)) &&
-	    skb->ip_summed != CHECKSUM_PARTIAL && !is_lso)
+	    skb->ip_summed != CHECKSUM_PARTIAL &&
+	    !is_lso &&
+	    !phytmac_ptp_one_step(skb))
 		packet->nocrc = 1;
 	else
 		packet->nocrc = 0;
@@ -1092,7 +1096,6 @@ static unsigned int phytmac_tx_map(struct phytmac *pdata,
 
 	offset = 0;
 	tx_tail = queue->tx_tail;
-
 	while (len) {
 		tx_skb = phytmac_get_tx_skb(queue, tx_tail);
 
@@ -1244,111 +1247,57 @@ tx_return:
 	return ret;
 }
 
-static void phytmac_mac_config(struct net_device *ndev)
+static int phytmac_fixedlink_phy_connect(struct fwnode_handle *fwnode)
 {
-	struct phytmac *pdata = netdev_priv(ndev);
-	struct phytmac_hw_if *hw_if = pdata->hw_if;
-	unsigned long flags;
+	struct fwnode_handle *dn;
+	u8 pl_cfg_link_an_mode = 0;
 
-	if (netif_msg_link(pdata))
-		netdev_info(pdata->ndev, "mac config interface:%s, mode:%d\n",
-			    phy_modes(pdata->phy_interface), pdata->use_mii);
+	/* Fixed links is handled without needing a PHY */
+	dn = fwnode_get_named_child_node(fwnode, "fixed-link");
+	if (dn || fwnode_property_present(fwnode, "fixed-link"))
+		pl_cfg_link_an_mode = MLO_AN_FIXED;
+	fwnode_handle_put(dn);
 
-	spin_lock_irqsave(&pdata->lock, flags);
-	hw_if->mac_config(pdata, !pdata->use_mii);
-	spin_unlock_irqrestore(&pdata->lock, flags);
+	if (pl_cfg_link_an_mode == MLO_AN_FIXED)
+		return 0;
+	return -ENODEV;
 }
 
-static void phytmac_handle_link_change(struct net_device *ndev)
+static int phytmac_phylink_connect(struct phytmac *pdata)
 {
-	struct phytmac *pdata = netdev_priv(ndev);
-	struct phy_device *phydev = ndev->phydev;
-	struct phytmac_hw_if *hw_if = pdata->hw_if;
-	unsigned long flags;
-	int err, link_change = 0;
-
-	if (netif_msg_link(pdata))
-		netdev_info(ndev, "link up interface:%s, speed:%d, duplex:%s\n",
-			    phy_modes(pdata->phy_interface), phydev->speed,
-			    phydev->duplex ? "full-duplex" : "half-duplex");
-
-	spin_lock_irqsave(&pdata->lock, flags);
-	if (phydev->link) {
-		if (pdata->speed != phydev->speed ||
-		    pdata->duplex != phydev->duplex) {
-			hw_if->mac_linkup(pdata, pdata->phy_interface,
-							  phydev->speed, phydev->duplex);
-			pdata->speed = phydev->speed;
-			pdata->duplex = phydev->duplex;
-			link_change = 1;
-		}
-	}
-
-	if (phydev->link != pdata->link) {
-		if (!phydev->link) {
-			pdata->speed = 0;
-			pdata->duplex = -1;
-		}
-		pdata->link = phydev->link;
-
-		link_change = 1;
-	}
-
-	spin_unlock_irqrestore(&pdata->lock, flags);
-
-	if (link_change) {
-		if (phydev->link) {
-			netif_carrier_on(ndev);
-			netdev_info(ndev, "link up %d/%s\n",
-				    phydev->speed,
-				    phydev->duplex == DUPLEX_FULL ?
-				    "Full" : "Half");
-
-			if (pdata->use_ncsi) {
-				err = ncsi_start_dev(pdata->ncsidev);
-				if (err)
-					netdev_err(ndev, "Ncsi start dev failed, error:%d\n", err);
-			}
-		} else {
-			if (pdata->use_ncsi)
-				ncsi_stop_dev(pdata->ncsidev);
-
-			netif_carrier_off(ndev);
-			netdev_info(ndev, "link down\n");
-		}
-	}
-}
-
-static int phytmac_phylink_connect(struct net_device *ndev)
-{
-	struct phytmac *pdata = netdev_priv(ndev);
+	struct net_device *ndev = pdata->ndev;
 	struct phy_device *phydev;
-	int ret;
+	struct fwnode_handle *fwnode = dev_fwnode(pdata->dev);
+	struct device_node *of_node = dev_of_node(pdata->dev);
+	int ret = 0;
 
-	phydev = phy_find_first(pdata->mii_bus);
-	if (!phydev) {
-		netdev_err(pdata->ndev, "no PHY found\n");
-		ret = -ENXIO;
-		goto err_phy;
+	if (of_node)
+		ret = phylink_of_phy_connect(pdata->phylink, of_node, 0);
+
+	if (!of_node && fwnode)
+		ret = phytmac_fixedlink_phy_connect(fwnode);
+
+	if (!fwnode || ret) {
+		if (pdata->mii_bus) {
+			phydev = phy_find_first(pdata->mii_bus);
+			if (!phydev) {
+				dev_err(pdata->dev, "no PHY found\n");
+				return -ENXIO;
+			}
+			/* attach the mac to the phy */
+			ret = phylink_connect_phy(pdata->phylink, phydev);
+		} else {
+			netdev_err(ndev, "Not mii register\n");
+			return -ENXIO;
+		}
 	}
 
-	phydev->irq = PHY_POLL;
-	ret = phy_connect_direct(ndev, phydev, &phytmac_handle_link_change,
-				 pdata->phy_interface);
 	if (ret) {
-		netdev_err(ndev, "Could not attach to PHY\n");
-		goto err_phy;
+		netdev_err(ndev, "Could not attach PHY (%d)\n", ret);
+		return ret;
 	}
-
-	phydev->supported &= PHY_GBIT_FEATURES;
-	phydev->advertising = phydev->supported;
 
 	return 0;
-
-err_phy:
-	phydev = NULL;
-
-	return ret;
 }
 
 void phytmac_pcs_link_up(struct phytmac *pdata)
@@ -1361,27 +1310,85 @@ void phytmac_pcs_link_up(struct phytmac *pdata)
 	hw_if->pcs_linkup(pdata, pdata->phy_interface, pdata->speed, pdata->duplex);
 }
 
-static void phytmac_mac_link_up(struct net_device *ndev,
-				phy_interface_t interface)
+static void phytmac_mac_config(struct net_device *ndev, unsigned int mode,
+			       const struct phylink_link_state *state)
+{
+	struct phytmac *pdata = netdev_priv(ndev);
+	struct phytmac_hw_if *hw_if = pdata->hw_if;
+	unsigned long flags;
+
+	if (netif_msg_link(pdata)) {
+		netdev_info(pdata->ndev, "mac config interface=%s, mode=%d\n",
+			    phy_modes(state->interface), mode);
+	}
+
+	spin_lock_irqsave(&pdata->lock, flags);
+	hw_if->mac_config(pdata, mode, state);
+	spin_unlock_irqrestore(&pdata->lock, flags);
+}
+
+static void phytmac_mac_link_down(struct net_device *ndev, unsigned int mode,
+				  phy_interface_t interface)
 {
 	struct phytmac *pdata = netdev_priv(ndev);
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	struct phytmac_queue *queue;
-	struct phy_device *phy = ndev->phydev;
+	unsigned int q;
+	unsigned long flags;
+
+	if (netif_msg_link(pdata)) {
+		netdev_info(ndev, "link down interface:%s, mode=%d\n",
+			    phy_modes(interface), mode);
+	}
+
+	if (pdata->use_ncsi)
+		ncsi_stop_dev(pdata->ncsidev);
+
+	spin_lock_irqsave(&pdata->lock, flags);
+	for (q = 0, queue = pdata->queues; q < pdata->queues_num; ++q, ++queue) {
+		hw_if->disable_irq(pdata, queue->index, pdata->rx_irq_mask | pdata->tx_irq_mask);
+		hw_if->clear_irq(pdata, queue->index, pdata->rx_irq_mask | pdata->tx_irq_mask);
+	}
+
+	/* Disable Rx and Tx */
+	hw_if->enable_network(pdata, false, PHYTMAC_RX | PHYTMAC_TX);
+	spin_unlock_irqrestore(&pdata->lock, flags);
+
+	netif_tx_stop_all_queues(ndev);
+}
+
+static void phytmac_mac_link_up(struct net_device *ndev,
+					unsigned int mode, phy_interface_t interface,
+					struct phy_device *phy)
+{
+	struct phytmac *pdata = netdev_priv(ndev);
+	struct phytmac_hw_if *hw_if = pdata->hw_if;
+	struct phytmac_queue *queue;
 	unsigned long flags;
 	unsigned int q;
 	int ret;
 
+	if (phy) {
+		pdata->speed = phy->speed;
+		pdata->duplex = phy->duplex;
+	} else {
+		if (interface == PHY_INTERFACE_MODE_SGMII) {
+			pdata->speed = SPEED_1000;
+			pdata->duplex = DUPLEX_FULL;
+		} else if (interface == PHY_INTERFACE_MODE_USXGMII) {
+			pdata->speed = SPEED_10000;
+			pdata->duplex = DUPLEX_FULL;
+		}
+	}
+
 	if (netif_msg_link(pdata))
-		netdev_info(ndev, "link up interface:%s, speed:%d, duplex:%s\n",
-			    phy_modes(pdata->phy_interface), phy->speed,
-			    phy->duplex ? "full-duplex" : "half-duplex");
+		netdev_info(pdata->ndev, "link up interface:%s, speed:%d, duplex:%s\n",
+			    phy_modes(interface), pdata->speed, pdata->duplex ?
+						"full-duplex" : "half-duplex");
 
 	spin_lock_irqsave(&pdata->lock, flags);
 
-	hw_if->mac_linkup(pdata, pdata->phy_interface, pdata->speed, pdata->duplex);
-
-	hw_if->enable_pause(pdata, true);
+	hw_if->mac_linkup(pdata, interface, pdata->speed, pdata->duplex);
 
 	phytmac_init_ring(pdata);
 
@@ -1396,7 +1403,7 @@ static void phytmac_mac_link_up(struct net_device *ndev,
 		/* Start the NCSI device */
 		ret = ncsi_start_dev(pdata->ncsidev);
 		if (ret) {
-			netdev_err(pdata->ndev, "Ncsi start dev failed, error:%d\n", ret);
+			netdev_err(pdata->ndev, "Ncsi start dev failed (error %d)\n", ret);
 			return;
 		}
 	}
@@ -1408,8 +1415,6 @@ int phytmac_mdio_register(struct phytmac *pdata)
 {
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	int ret;
-
-	hw_if->enable_mdio_control(pdata, true);
 
 	pdata->mii_bus = mdiobus_alloc();
 	if (!pdata->mii_bus) {
@@ -1435,12 +1440,104 @@ int phytmac_mdio_register(struct phytmac *pdata)
 	pdata->mii_bus->priv = pdata;
 	pdata->mii_bus->parent = pdata->dev;
 
-	return mdiobus_register(pdata->mii_bus);
+	hw_if->enable_mdio_control(pdata, 1);
 
+	return mdiobus_register(pdata->mii_bus);
 free_mdio:
-	if (pdata->mii_bus)
-		mdiobus_free(pdata->mii_bus);
+	mdiobus_free(pdata->mii_bus);
 	return ret;
+}
+
+static void phytmac_pcs_get_state(struct net_device *ndev,
+				  struct phylink_link_state *state)
+{
+	struct phytmac *pdata = netdev_priv(ndev);
+	struct phytmac_hw_if *hw_if = pdata->hw_if;
+
+	state->link = hw_if->get_link(pdata, state->interface);
+}
+
+static void phytmac_validate(struct net_device *ndev,
+			     unsigned long *supported,
+			     struct phylink_link_state *state)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
+	struct phytmac *pdata = netdev_priv(ndev);
+
+	if (state->interface != PHY_INTERFACE_MODE_SGMII &&
+	    state->interface != PHY_INTERFACE_MODE_2500BASEX &&
+	    state->interface != PHY_INTERFACE_MODE_USXGMII &&
+	    !phy_interface_mode_is_rgmii(state->interface)) {
+		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
+		return;
+	}
+
+	phylink_set_port_modes(mask);
+	phylink_set(mask, Autoneg);
+	phylink_set(mask, Asym_Pause);
+
+	if (state->interface == PHY_INTERFACE_MODE_USXGMII) {
+		pdata->speed = state->speed;
+		pdata->duplex = state->duplex;
+		if (pdata->speed == SPEED_5000) {
+			phylink_set(mask, 5000baseT_Full);
+		} else {
+			phylink_set(mask, 10000baseCR_Full);
+			phylink_set(mask, 10000baseER_Full);
+			phylink_set(mask, 10000baseKR_Full);
+			phylink_set(mask, 10000baseLR_Full);
+			phylink_set(mask, 10000baseLRM_Full);
+			phylink_set(mask, 10000baseSR_Full);
+			phylink_set(mask, 10000baseT_Full);
+		}
+	}
+
+	if (state->interface == PHY_INTERFACE_MODE_2500BASEX)
+		phylink_set(mask, 2500baseX_Full);
+
+	if (state->interface == PHY_INTERFACE_MODE_1000BASEX ||
+	    state->interface == PHY_INTERFACE_MODE_SGMII ||
+	    phy_interface_mode_is_rgmii(state->interface)) {
+		phylink_set(mask, 1000baseT_Full);
+		phylink_set(mask, 1000baseX_Full);
+		phylink_set(mask, 1000baseT_Half);
+		phylink_set(mask, 10baseT_Half);
+		phylink_set(mask, 10baseT_Full);
+		phylink_set(mask, 100baseT_Half);
+		phylink_set(mask, 100baseT_Full);
+	}
+
+	bitmap_and(supported, supported, mask, __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_and(state->advertising, state->advertising, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+}
+
+static const struct phylink_mac_ops phytmac_phylink_ops = {
+	.validate = phytmac_validate,
+	.mac_config = phytmac_mac_config,
+	.mac_link_down = phytmac_mac_link_down,
+	.mac_link_up = phytmac_mac_link_up,
+};
+
+static int phytmac_phylink_create(struct phytmac *pdata)
+{
+	struct fwnode_handle *fw_node = dev_fwnode(pdata->dev);
+
+	pdata->phylink = phylink_create(pdata->ndev, fw_node,
+					pdata->phy_interface, &phytmac_phylink_ops);
+	if (IS_ERR(pdata->phylink)) {
+		dev_err(pdata->dev, "Could not create a phylink instance (%ld)\n",
+			PTR_ERR(pdata->phylink));
+		return PTR_ERR(pdata->phylink);
+	}
+
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_SGMII ||
+	    pdata->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
+	    pdata->phy_interface == PHY_INTERFACE_MODE_2500BASEX ||
+	    pdata->phy_interface == PHY_INTERFACE_MODE_USXGMII)
+		phylink_fixed_state_cb(pdata->phylink, &phytmac_pcs_get_state);
+
+	return 0;
 }
 
 static int phytmac_open(struct net_device *ndev)
@@ -1451,7 +1548,8 @@ static int phytmac_open(struct net_device *ndev)
 	unsigned int q = 0;
 	int ret;
 
-	dev_dbg(pdata->dev, "open\n");
+	if (netif_msg_probe(pdata))
+		dev_dbg(pdata->dev, "open\n");
 
 	/* phytmac_powerup */
 	if (pdata->power_state == PHYTMAC_POWEROFF)
@@ -1480,18 +1578,13 @@ static int phytmac_open(struct net_device *ndev)
 			netdev_err(ndev, "MDIO bus registration failed\n");
 			goto err_mdio_register;
 		}
-
-		ret = phytmac_phylink_connect(pdata->ndev);
-		if (ret) {
-			netdev_err(pdata->ndev, "phylink connet failed, error:%d)\n", ret);
-			goto err_mdio_register;
-		}
 	}
 
-	phytmac_mac_config(pdata->ndev);
-
-	if (pdata->link)
-		netif_carrier_on(pdata->ndev);
+	ret = phytmac_phylink_create(pdata);
+	if (ret) {
+		netdev_err(ndev, "phytmac phylink create failed(error %d)\n", ret);
+		goto err_mdio_register;
+	}
 
 	ret = netif_set_real_num_tx_queues(ndev, pdata->queues_num);
 	if (ret) {
@@ -1507,9 +1600,9 @@ static int phytmac_open(struct net_device *ndev)
 	/* RX buffers initialization */
 	ret = phytmac_alloc_resource(pdata);
 	if (ret) {
-		netdev_err(ndev, "Unable to allocate DMA memory, error:%d\n",
+		netdev_err(ndev, "Unable to allocate DMA memory (error %d)\n",
 			   ret);
-		goto reset_hw;
+		goto err_mdio_register;
 	}
 
 	for (queue = pdata->queues; q < pdata->queues_num; ++q) {
@@ -1521,22 +1614,25 @@ static int phytmac_open(struct net_device *ndev)
 	phytmac_init_ring(pdata);
 	hw_if->init_hw(pdata);
 
-	if (ndev->phydev)
-		phy_start(ndev->phydev);
+	ret = phytmac_phylink_connect(pdata);
+	if (ret) {
+		netdev_err(ndev, "phylink connet failed,(error %d)\n",
+			   ret);
+		goto err_mdio_register;
+	}
 
-	if (pdata->phy_interface == PHY_INTERFACE_MODE_USXGMII)
-		phytmac_pcs_link_up(pdata);
+	phylink_start(pdata->phylink);
 
-	phytmac_mac_link_up(ndev, pdata->phy_interface);
+	phytmac_pcs_link_up(pdata);
 
 	netif_tx_start_all_queues(pdata->ndev);
 
 	if (IS_REACHABLE(CONFIG_PHYTMAC_ENABLE_PTP)) {
 		ret = phytmac_ptp_register(pdata);
 		if (ret) {
-			netdev_err(ndev, "ptp register failed, error:%d\n",
+			netdev_err(ndev, "ptp register failed, (error %d)\n",
 				   ret);
-			goto reset_hw;
+			goto err_mdio_register;
 		}
 
 		phytmac_ptp_init(pdata->ndev);
@@ -1555,7 +1651,6 @@ reset_hw:
 		++queue;
 	}
 	phytmac_free_resource(pdata);
-
 	return ret;
 }
 
@@ -1577,8 +1672,8 @@ static int phytmac_close(struct net_device *ndev)
 		napi_disable(&queue->rx_napi);
 	}
 
-	if (ndev->phydev)
-		phy_stop(ndev->phydev);
+	phylink_stop(pdata->phylink);
+	phylink_disconnect_phy(pdata->phylink);
 
 	netif_carrier_off(ndev);
 
@@ -1600,8 +1695,8 @@ static int phytmac_close(struct net_device *ndev)
 
 static int phytmac_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct phy_device *phydev = dev->phydev;
-	int ret;
+	struct phytmac *pdata = netdev_priv(dev);
+	int ret = 0;
 
 	if (!netif_running(dev))
 		return -EINVAL;
@@ -1610,7 +1705,7 @@ static int phytmac_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCGMIIPHY:
 	case SIOCGMIIREG:
 	case SIOCSMIIREG:
-		ret = phy_mii_ioctl(phydev, rq, cmd);
+		ret = phylink_mii_ioctl(pdata->phylink, rq, cmd);
 		break;
 #ifdef CONFIG_PHYTMAC_ENABLE_PTP
 	case SIOCSHWTSTAMP:
@@ -1624,11 +1719,11 @@ static int phytmac_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 
-static int phytmac_set_features(struct net_device *netdev,
-				netdev_features_t features)
+static inline int phytmac_set_features(struct net_device *netdev,
+				       netdev_features_t features)
 {
 	struct phytmac *pdata = netdev_priv(netdev);
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
@@ -1753,7 +1848,7 @@ static int phytmac_init(struct phytmac *pdata)
 
 			if (ret) {
 				dev_err(pdata->dev,
-					"Unable to request IRQ %d, error:%d\n",
+					"Unable to request IRQ %d (error %d)\n",
 					queue->irq, ret);
 				return ret;
 			}
@@ -1765,7 +1860,7 @@ static int phytmac_init(struct phytmac *pdata)
 				       IRQF_SHARED, ndev->name, pdata);
 		if (ret) {
 			dev_err(pdata->dev,
-				"Unable to request INTX IRQ %d, error:%d\n",
+				"Unable to request INTX IRQ %d (error %d)\n",
 				pdata->queue_irq[0], ret);
 			return ret;
 		}
@@ -1865,11 +1960,6 @@ int phytmac_drv_probe(struct phytmac *pdata)
 		goto err_out_free_netdev;
 	}
 
-	pdata->wol = 0;
-	if (device_property_read_bool(pdata->dev, "magic-packet"))
-		pdata->wol |= PHYTMAC_WAKE_MAGIC;
-	device_init_wakeup(pdata->dev, pdata->wol & PHYTMAC_WAKE_MAGIC);
-
 	if (netif_msg_probe(pdata))
 		dev_dbg(pdata->dev, "probe success!Phytium %s at 0x%08lx irq %d (%pM)\n",
 			"MAC", ndev->base_addr, ndev->irq, ndev->dev_addr);
@@ -1877,8 +1967,7 @@ int phytmac_drv_probe(struct phytmac *pdata)
 	return 0;
 
 err_out_free_netdev:
-	if (ndev)
-		free_netdev(ndev);
+	free_netdev(ndev);
 
 	return ret;
 }
@@ -1889,15 +1978,18 @@ int phytmac_drv_remove(struct phytmac *pdata)
 	struct net_device *ndev = pdata->ndev;
 
 	if (ndev) {
-		if (ndev->phydev)
-			phy_disconnect(ndev->phydev);
 		if (pdata->use_ncsi && pdata->ncsidev)
 			ncsi_unregister_dev(pdata->ncsidev);
-		if (pdata->use_mii && pdata->mii_bus)
-			mdiobus_unregister(pdata->mii_bus);
+
 		unregister_netdev(ndev);
-		if (pdata->use_mii && pdata->mii_bus)
+
+		if (pdata->use_mii && pdata->mii_bus) {
+			mdiobus_unregister(pdata->mii_bus);
 			mdiobus_free(pdata->mii_bus);
+		}
+
+		if (pdata->phylink)
+			phylink_destroy(pdata->phylink);
 	}
 
 	return 0;
@@ -1910,7 +2002,6 @@ int phytmac_drv_suspend(struct phytmac *pdata)
 	unsigned long flags;
 	struct phytmac_queue *queue;
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
-	struct net_device *ndev = pdata->ndev;
 
 	if (!netif_running(pdata->ndev))
 		return 0;
@@ -1932,8 +2023,7 @@ int phytmac_drv_suspend(struct phytmac *pdata)
 		hw_if->set_wol(pdata, pdata->wol);
 	} else {
 		rtnl_lock();
-		if (ndev->phydev)
-			phy_stop(ndev->phydev);
+		phylink_stop(pdata->phylink);
 		rtnl_unlock();
 		spin_lock_irqsave(&pdata->lock, flags);
 		hw_if->reset_hw(pdata);
@@ -1951,7 +2041,6 @@ int phytmac_drv_resume(struct phytmac *pdata)
 	struct phytmac_queue *queue;
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	struct ethtool_rx_fs_item *item;
-	struct net_device *ndev = pdata->ndev;
 
 	if (!netif_running(pdata->ndev))
 		return 0;
@@ -1962,11 +2051,10 @@ int phytmac_drv_resume(struct phytmac *pdata)
 	if (hw_if->init_msg_ring)
 		hw_if->init_msg_ring(pdata);
 
-	if (pdata->wol && ndev->phydev) {
+	if (pdata->wol) {
 		hw_if->set_wol(pdata, 0);
 		rtnl_lock();
-		if (ndev->phydev)
-			phy_stop(ndev->phydev);
+		phylink_stop(pdata->phylink);
 		rtnl_unlock();
 	}
 
@@ -1983,8 +2071,7 @@ int phytmac_drv_resume(struct phytmac *pdata)
 		hw_if->add_fdir_entry(pdata, &item->fs);
 
 	rtnl_lock();
-	if (ndev->phydev)
-		phy_start(ndev->phydev);
+	phylink_start(pdata->phylink);
 	rtnl_unlock();
 
 	netif_device_attach(pdata->ndev);

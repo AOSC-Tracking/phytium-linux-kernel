@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
-
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef _PHYTMAC_V2_H
 #define _PHYTMAC_V2_H
 

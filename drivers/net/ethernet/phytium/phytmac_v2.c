@@ -138,7 +138,6 @@ static int phytmac_init_hw(struct phytmac *pdata)
 	u16 cmd_id, cmd_subid;
 	struct phytmac_dma_info dma;
 	struct phytmac_eth_info eth;
-	struct phytmac_hw_if *hw_if = pdata->hw_if;
 
 	phytmac_set_mac_addr(pdata, pdata->ndev->dev_addr);
 
@@ -190,9 +189,6 @@ static int phytmac_init_hw(struct phytmac *pdata)
 	eth.index = 0;
 	eth.etype = (uint16_t)ETH_P_IP;
 	phytmac_msg_send(pdata, cmd_id, cmd_subid, (void *)&eth, sizeof(eth), 1);
-
-	if (pdata->link && pdata->phy_interface == PHY_INTERFACE_MODE_USXGMII)
-		hw_if->pcs_linkup(pdata, pdata->phy_interface, pdata->speed, pdata->duplex);
 
 	return 0;
 }
@@ -766,7 +762,8 @@ static unsigned int phytmac_get_irq(struct phytmac *pdata, int queue_index)
 	return status;
 }
 
-static void phytmac_interface_config(struct phytmac *pdata, unsigned int mode)
+static void phytmac_interface_config(struct phytmac *pdata, unsigned int mode,
+				     const struct phylink_link_state *state)
 {
 	struct phytmac_interface_info para;
 	u16 cmd_id, cmd_subid;
@@ -774,10 +771,10 @@ static void phytmac_interface_config(struct phytmac *pdata, unsigned int mode)
 	memset(&para, 0, sizeof(para));
 	cmd_id = PHYTMAC_MSG_CMD_SET;
 	cmd_subid = PHYTMAC_MSG_CMD_SET_MAC_CONFIG;
-	para.interface = pdata->phy_interface;
+	para.interface = state->interface;
 	para.autoneg = (mode == MLO_AN_FIXED ? 0 : 1);
-	para.speed = pdata->speed;
-	para.duplex = pdata->duplex;
+	para.speed = state->speed;
+	para.duplex = state->duplex;
 	pdata->autoneg = para.autoneg;
 	phytmac_msg_send(pdata, cmd_id, cmd_subid, (void *)(&para), sizeof(para), 1);
 }

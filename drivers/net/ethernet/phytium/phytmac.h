@@ -421,7 +421,6 @@ struct phytmac {
 	struct phylink			*phylink;
 	int				pause;
 	phy_interface_t			phy_interface;
-	int				link;
 	int				speed;
 	int				duplex;
 	int				autoneg;
@@ -462,7 +461,8 @@ struct phytmac_hw_if {
 	void (*get_regs)(struct phytmac *pdata, u32 *reg_buff);
 	int (*set_speed)(struct phytmac *pdata);
 
-	void (*mac_config)(struct phytmac *pdata, u32 mode);
+	void (*mac_config)(struct phytmac *pdata, u32 mode,
+			   const struct phylink_link_state *state);
 	int (*mac_linkup)(struct phytmac *pdata, phy_interface_t interface,
 			  int speed, int duplex);
 	int (*mac_linkdown)(struct phytmac *pdata);
