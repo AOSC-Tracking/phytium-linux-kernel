@@ -1718,7 +1718,14 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	}
 
 	vma->vm_private_data = vdev;
+#ifdef CONFIG_ARM64
+	if (vfio_pci_is_vga(pdev))
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+	else
+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#else
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
 	vma->vm_pgoff = (pci_resource_start(pdev, index) >> PAGE_SHIFT) + pgoff;
 
 	/*

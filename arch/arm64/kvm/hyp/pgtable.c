@@ -479,9 +479,15 @@ struct stage2_map_data {
 static int stage2_map_set_prot_attr(enum kvm_pgtable_prot prot,
 				    struct stage2_map_data *data)
 {
-	bool device = prot & KVM_PGTABLE_PROT_DEVICE;
-	kvm_pte_t attr = device ? PAGE_S2_MEMATTR(DEVICE_nGnRE) :
-			    PAGE_S2_MEMATTR(NORMAL);
+	bool device = (prot & KVM_PGTABLE_PROT_DEVICE_VGA) || (prot & KVM_PGTABLE_PROT_DEVICE);
+	kvm_pte_t attr;
+
+	if (prot & KVM_PGTABLE_PROT_DEVICE_VGA)
+		attr = PAGE_S2_MEMATTR(NORMAL_NC);
+	else if (prot & KVM_PGTABLE_PROT_DEVICE)
+		attr = PAGE_S2_MEMATTR(DEVICE_nGnRE);
+	else
+		attr = PAGE_S2_MEMATTR(NORMAL);
 	u32 sh = KVM_PTE_LEAF_ATTR_LO_S2_SH_IS;
 
 	if (!(prot & KVM_PGTABLE_PROT_X))
