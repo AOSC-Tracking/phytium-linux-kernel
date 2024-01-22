@@ -183,17 +183,6 @@ static int phytmac_plat_probe(struct platform_device *pdev)
 	else
 		pdata->phy_interface = ret;
 
-	if (!pdata->use_mii && pdata->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-		pdata->link = 1;
-		pdata->speed = SPEED_1000;
-		pdata->duplex = DUPLEX_FULL;
-	}
-	if (!pdata->use_mii && pdata->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
-		pdata->link = 1;
-		pdata->speed = SPEED_10000;
-		pdata->duplex = DUPLEX_FULL;
-	}
-
 	ret = phytmac_drv_probe(pdata);
 	if (ret)
 		goto err_mem;

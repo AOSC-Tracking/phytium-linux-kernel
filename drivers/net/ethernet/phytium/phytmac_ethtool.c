@@ -104,11 +104,10 @@ static int phytmac_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 	struct phytmac *pdata = netdev_priv(ndev);
 	int ret;
 
-	if (!ndev->phydev) {
-		netdev_err(ndev, "fixed link interface not supported set link\n");
-		ret = -EOPNOTSUPP;
+	ret = phylink_ethtool_set_wol(pdata->phylink, wol);
+
+	if (!ret || ret != -EOPNOTSUPP)
 		return ret;
-	}
 
 	pdata->wol = 0;
 
@@ -120,8 +119,6 @@ static int phytmac_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 		pdata->wol |= PHYTMAC_WAKE_UCAST;
 	if (wol->wolopts & WAKE_MCAST)
 		pdata->wol |= PHYTMAC_WAKE_MCAST;
-
-	phy_ethtool_set_wol(ndev->phydev, wol);
 
 	device_set_wakeup_enable(pdata->dev, pdata->wol ? 1 : 0);
 

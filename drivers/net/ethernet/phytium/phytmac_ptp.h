@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Phytium Ethernet Controller driver
  *
@@ -7,7 +7,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #ifndef _PHYTMAC_PTP_H
 #define _PHYTMAC_PTP_H
 
@@ -20,6 +19,7 @@ enum ptp_msgtype {
 	PTP_MSGTYPE_PDELAY_RESP,
 };
 
+bool phytmac_ptp_one_step(struct sk_buff *skb);
 int phytmac_ptp_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts);
 int phytmac_ptp_settime(struct ptp_clock_info *ptp,
 			const struct timespec64 *ts);
@@ -38,6 +38,10 @@ void phytmac_ptp_init(struct net_device *ndev);
 int phytmac_ptp_get_ts_config(struct net_device *dev, struct ifreq *rq);
 int phytmac_ptp_set_ts_config(struct net_device *dev, struct ifreq *ifr, int cmd);
 #else
+static inline bool phytmac_ptp_one_step(struct sk_buff *skb)
+{
+	return 1;
+}
 
 static inline void phytmac_ptp_rxstamp(struct phytmac *pdata, struct sk_buff *skb,
 				       struct phytmac_dma_desc *desc) {}

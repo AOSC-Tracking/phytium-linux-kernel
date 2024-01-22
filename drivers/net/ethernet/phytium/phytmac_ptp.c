@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/*
+/**
  * 1588 PTP support for Phytium GMAC device.
  *
  */
-
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/device.h>
@@ -18,6 +17,78 @@
 #include <linux/spinlock.h>
 #include "phytmac.h"
 #include "phytmac_ptp.h"
+
+static int phytmac_ptp_parse_header(struct sk_buff *skb, unsigned int type,
+				    u8 *p_flag_field, u8 *p_msgtype)
+{
+	unsigned int offset = 0;
+	u8 *data = skb_mac_header(skb);
+
+	switch (type & PTP_CLASS_VMASK) {
+	case PTP_CLASS_V1:
+	case PTP_CLASS_V2:
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	if (type & PTP_CLASS_VLAN)
+		offset += VLAN_HLEN;
+
+	switch (type & PTP_CLASS_PMASK) {
+	case PTP_CLASS_IPV4:
+		offset += ETH_HLEN + IPV4_HLEN(data + offset) + UDP_HLEN;
+		break;
+	case PTP_CLASS_IPV6:
+		offset += ETH_HLEN + IP6_HLEN + UDP_HLEN;
+		break;
+	case PTP_CLASS_L2:
+		offset += ETH_HLEN;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	/* Ensure that the entire header is present in this packet. */
+	/* PTP header is 34 bytes. */
+	if (offset + 34 > skb->len)
+		return -EINVAL;
+
+	*p_flag_field = data[offset + 6];
+	*p_msgtype = data[offset] & 0x0f;
+
+	return 0;
+}
+
+bool phytmac_ptp_one_step(struct sk_buff *skb)
+{
+	unsigned int ptp_class;
+	u8 msgtype;
+	u8 flag_field;
+	int ret = 0;
+
+	/* No need to parse packet if PTP TS is not involved */
+	if (likely(!(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP)))
+		goto not_oss;
+
+	/* Identify and return whether PTP one step sync is being processed */
+	ptp_class = ptp_classify_raw(skb);
+	if (ptp_class == PTP_CLASS_NONE)
+		goto not_oss;
+
+	ret = phytmac_ptp_parse_header(skb, ptp_class, &flag_field, &msgtype);
+	if (ret)
+		goto not_oss;
+
+	if (flag_field & 0x2)
+		goto not_oss;
+
+	if (msgtype == PTP_MSGTYPE_SYNC)
+		return true;
+
+not_oss:
+	return false;
+}
 
 int phytmac_ptp_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
 {

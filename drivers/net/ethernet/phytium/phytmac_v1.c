@@ -373,8 +373,6 @@ static int phytmac_init_hw(struct phytmac *pdata)
 	config = PHYTMAC_SET_BITS(config, MCD, 6);
 	netdev_dbg(pdata->ndev, "phytmac configure NetConfig with 0x%08x\n",
 		   config);
-	if (pdata->phy_interface == PHY_INTERFACE_MODE_SGMII)
-		config |= PHYTMAC_BIT(SGMII_EN) | PHYTMAC_BIT(PCS_EN);
 	PHYTMAC_WRITE(pdata, PHYTMAC_NCONFIG, config);
 
 	/* init dma */
@@ -402,11 +400,6 @@ static int phytmac_init_hw(struct phytmac *pdata)
 
 	if (pdata->capacities & PHYTMAC_CAPS_TAILPTR)
 		PHYTMAC_WRITE(pdata, PHYTMAC_TAIL_ENABLE, 0x80000001);
-
-	if (netif_msg_link(pdata))
-		netdev_info(pdata->ndev, "pcs link up, interface:%s, speed:%d, duplex:%d\n",
-			    phy_modes(pdata->phy_interface), pdata->speed, pdata->duplex);
-
 	return 0;
 }
 
@@ -1012,7 +1005,8 @@ static void phytmac_clear_rx_desc(struct phytmac_queue *queue, int begin, int en
 	}
 }
 
-static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mode)
+static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mode,
+					 const struct phylink_link_state *state)
 {
 	u32 old_ctrl, old_config;
 	u32 ctrl, config, usxctl;
@@ -1022,31 +1016,30 @@ static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mod
 	ctrl = old_ctrl;
 	config = old_config;
 
-	if (pdata->speed == SPEED_10000)
+	if (state->speed == SPEED_10000)
 		PHYTMAC_WRITE(pdata, PHYTMAC_HCONFIG, PHYTMAC_SPEED_10000M);
-	else if (pdata->speed == SPEED_5000)
+	else if (state->speed == SPEED_5000)
 		PHYTMAC_WRITE(pdata, PHYTMAC_HCONFIG, PHYTMAC_SPEED_5000M);
-	else if (pdata->speed == SPEED_2500)
+	else if (state->speed == SPEED_2500)
 		PHYTMAC_WRITE(pdata, PHYTMAC_HCONFIG, PHYTMAC_SPEED_2500M);
-	else if (pdata->speed == SPEED_1000)
+	else if (state->speed == SPEED_1000)
 		PHYTMAC_WRITE(pdata, PHYTMAC_HCONFIG, PHYTMAC_SPEED_1000M);
-	else if (pdata->speed == SPEED_100 || pdata->speed == SPEED_10)
+	else if (state->speed == SPEED_100 || state->speed == SPEED_10)
 		PHYTMAC_WRITE(pdata, PHYTMAC_HCONFIG, PHYTMAC_SPEED_100M);
 
 	config &= ~(PHYTMAC_BIT(SGMII_EN) | PHYTMAC_BIT(PCS_EN)
 		    | PHYTMAC_BIT(SPEED) | PHYTMAC_BIT(FD) | PHYTMAC_BIT(GM_EN));
 	ctrl &= ~(PHYTMAC_BIT(HIGHSPEED) | PHYTMAC_BIT(2PT5G));
 
-	if (pdata->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-	    pdata->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
+	    state->interface == PHY_INTERFACE_MODE_2500BASEX) {
 		config |= PHYTMAC_BIT(SGMII_EN) | PHYTMAC_BIT(PCS_EN);
-		}
-	else if (pdata->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
+	} else if (state->interface == PHY_INTERFACE_MODE_USXGMII) {
 		usxctl = PHYTMAC_READ(pdata, PHYTMAC_USXCTRL);
-		if (pdata->speed == SPEED_10000) {
+		if (state->speed == SPEED_10000) {
 			usxctl = PHYTMAC_SET_BITS(usxctl, SERDES_RATE, PHYTMAC_SERDES_RATE_10G);
 			usxctl = PHYTMAC_SET_BITS(usxctl, USX_SPEED, PHYTMAC_SPEED_10000M);
-		} else if (pdata->speed == SPEED_5000) {
+		} else if (state->speed == SPEED_5000) {
 			usxctl = PHYTMAC_SET_BITS(usxctl, SERDES_RATE, PHYTMAC_SERDES_RATE_5G);
 			usxctl = PHYTMAC_SET_BITS(usxctl, USX_SPEED, PHYTMAC_SPEED_5000M);
 		}
@@ -1057,7 +1050,7 @@ static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mod
 		ctrl |= PHYTMAC_BIT(HIGHSPEED);
 	}
 
-	if (pdata->duplex)
+	if (state->duplex)
 		config |= PHYTMAC_BIT(FD);
 
 	if (old_ctrl ^ ctrl)
@@ -1067,8 +1060,8 @@ static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mod
 		PHYTMAC_WRITE(pdata, PHYTMAC_NCONFIG, config);
 
 	/* Disable AN for SGMII fixed link configuration, enable otherwise.*/
-	if (pdata->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-	    pdata->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
+	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
+	    state->interface == PHY_INTERFACE_MODE_2500BASEX)
 		phytmac_enable_autoneg(pdata, mode == MLO_AN_FIXED ? 0 : 1);
 }
 
