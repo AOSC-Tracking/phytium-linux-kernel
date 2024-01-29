@@ -456,9 +456,9 @@ out:
 }
 __diag_pop()
 
-BTF_SET8_START(bpf_relay_kfunc_ids)
+BTF_KFUNCS_START(bpf_relay_kfunc_ids)
 BTF_ID_FLAGS(func, bpf_anolis_relay_write, KF_TRUSTED_ARGS)
-BTF_SET8_END(bpf_relay_kfunc_ids)
+BTF_KFUNCS_END(bpf_relay_kfunc_ids)
 
 static const struct btf_kfunc_id_set bpf_relay_kfunc_set = {
 	.owner = THIS_MODULE,
