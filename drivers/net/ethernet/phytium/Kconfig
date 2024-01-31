@@ -20,7 +20,6 @@ if NET_VENDOR_PHYTIUM
 config PHYTMAC
 	tristate "Phytium GMAC support"
 	depends on HAS_DMA
-	#depends on PTP_1588_CLOCK_OPTIONAL
 	select PHYLINK
 	select CRC32
 	help
@@ -55,19 +54,5 @@ config PHYTMAC_PCI
 
 		To compile this driver as a module, choose M here: the module
 		will be called phytmac_pci.
-
-#config PHYTMAC_1P0
-#       bool "Phytmac 1p0 support"
-#        depends on PHYTMAC
-#	default y
-#        help
-#          To compile this driver as a module, choose M here: the module
-
-#config PHYTMAC_2P0
-#        bool "Phytmac 2p0 support"
-#        depends on PHYTMAC
-#	default y
-#        help
-#          To compile this driver as a module, choose M here: the module
 
 endif # NET_VENDOR_PHYTIUM

@@ -38,10 +38,10 @@ static const u32 fixedlink[][5] = {
 };
 
 static const struct property_entry fl_properties[][2] = {
-	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[0]), {}},
-	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[1]), {}},
-	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[2]), {}},
-	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[3]), {}},
+	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[0]), {} },
+	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[1]), {} },
+	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[2]), {} },
+	{PROPERTY_ENTRY_U32_ARRAY("fixed-link", fixedlink[3]), {} },
 };
 
 static int phytmac_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
