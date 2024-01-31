@@ -149,16 +149,14 @@ static int phytmac_enable_network(struct phytmac *pdata, int enable, int rx_tx)
 
 static int phytmac_enable_autoneg(struct phytmac *pdata, int enable)
 {
-	u32 ctrl, old_ctrl;
+	u32 value = PHYTMAC_READ(pdata, PHYTMAC_PCSCTRL);
 
 	if (enable)
-		ctrl |= PHYTMAC_BIT(AUTONEG);
+		value |= PHYTMAC_BIT(AUTONEG);
 	else
-		ctrl &= ~PHYTMAC_BIT(AUTONEG);
+		value &= ~PHYTMAC_BIT(AUTONEG);
 
-	old_ctrl = PHYTMAC_READ(pdata, PHYTMAC_PCSCTRL);
-	if (old_ctrl != ctrl)
-		PHYTMAC_WRITE(pdata, PHYTMAC_PCSCTRL, ctrl);
+	PHYTMAC_WRITE(pdata, PHYTMAC_PCSCTRL, value);
 
 	return 0;
 }
