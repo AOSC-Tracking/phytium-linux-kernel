@@ -133,12 +133,14 @@
 #define MCI_CNTRL_CONTROLLER_RESET	(0x1 << 0) /* RW */
 #define MCI_CNTRL_FIFO_RESET		(0x1 << 1) /* RW */
 #define MCI_CNTRL_DMA_RESET			(0x1 << 2) /* RW */
-#define MCI_CNTRL_RES				(0x1 << 3) /*  */
+#define MCI_CNTRL_DRV_SHIFT_EN		(0x1 << 3) /*  */
 #define MCI_CNTRL_INT_ENABLE		(0x1 << 4) /* RW */
 #define MCI_CNTRL_DMA_ENABLE		(0x1 << 5) /* RW */
 #define MCI_CNTRL_READ_WAIT			(0x1 << 6) /* RW */
 #define MCI_CNTRL_SEND_IRQ_RESPONSE	(0x1 << 7) /* RW */
 #define MCI_CNTRL_ABORT_READ_DATA	(0x1 << 8) /* RW */
+#define MCI_CNTRL_START_BIT_MODE	(0x1 << 9) /* RW */
+#define MCI_CNTRL_CRC_SERIAL_DATA	(0x1 << 10) /* RW */
 #define MCI_CNTRL_ENDIAN			(0x1 << 11) /* RW */
 //#define MCI_CNTRL_CARD_VOLTAGE_A	(0xF << 16) /* RW */
 //#define MCI_CNTRL_CARD_VOLTAGE_B	(0xF << 20) /* RW */
