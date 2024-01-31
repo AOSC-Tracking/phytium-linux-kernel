@@ -46,7 +46,7 @@ static const u32 data_ints_mask = MCI_INT_MASK_DTO | MCI_INT_MASK_DCRC | MCI_INT
 				  MCI_INT_MASK_SBE_BCI;
 static const u32 cmd_err_ints_mask = MCI_INT_MASK_RTO | MCI_INT_MASK_RCRC | MCI_INT_MASK_RE |
 				     MCI_INT_MASK_DCRC | MCI_INT_MASK_DRTO |
-				     MCI_MASKED_INTS_SBE_BCI;
+				     MCI_MASKED_INTS_SBE_BCI | MCI_MASKED_INTS_EBE;
 
 static const u32 dmac_ints_mask = MCI_DMAC_INT_ENA_FBE | MCI_DMAC_INT_ENA_DU |
 				  MCI_DMAC_INT_ENA_NIS | MCI_DMAC_INT_ENA_AIS;
@@ -188,7 +188,7 @@ static void phytium_mci_set_clk(struct phytium_mci_host *host, struct mmc_ios *i
 			host->clk_rate, ios->clock);
 
 		if (ios->clock >= 25000000)
-			tmp_ext_reg = 0x202;
+			tmp_ext_reg = 0x102;
 		else if (ios->clock == 400000)
 			tmp_ext_reg = 0x502;
 		else
@@ -234,6 +234,17 @@ static void phytium_mci_set_clk(struct phytium_mci_host *host, struct mmc_ios *i
 				writel((drv << 8) | (sample << 16) | (div & 0xff),
 						host->base + MCI_CLKDIV);
 			}
+		}
+
+		if (!(readl(host->base + MCI_CLKDIV) & 0xff00) &&
+			(ios->timing == MMC_TIMING_MMC_DDR52 ||
+			ios->timing == MMC_TIMING_MMC_HS400 ||
+			ios->timing == MMC_TIMING_UHS_DDR50)) {
+			sdr_set_bits(host->base + MCI_CNTRL, MCI_CNTRL_CRC_SERIAL_DATA);
+			sdr_set_bits(host->base + MCI_CNTRL, MCI_CNTRL_DRV_SHIFT_EN);
+		} else {
+			sdr_clr_bits(host->base + MCI_CNTRL, MCI_CNTRL_CRC_SERIAL_DATA);
+			sdr_clr_bits(host->base + MCI_CNTRL, MCI_CNTRL_DRV_SHIFT_EN);
 		}
 
 		if (div >= 2)
@@ -1271,6 +1282,7 @@ static void phytium_mci_init_hw(struct phytium_mci_host *host)
 	sdr_set_bits(host->base + MCI_CLKENA, MCI_CLKENA_CCLK_ENABLE);
 	sdr_set_bits(host->base + MCI_UHS_REG_EXT, MCI_EXT_CLK_ENABLE);
 	sdr_clr_bits(host->base + MCI_UHS_REG, MCI_UHS_REG_VOLT);
+	sdr_clr_bits(host->base + MCI_EMMC_DDR_REG, MCI_EMMC_DDR_CYCLE);
 
 	phytium_mci_reset_hw(host);
 
@@ -1373,8 +1385,13 @@ static void phytium_mci_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct phytium_mci_host *host = mmc_priv(mmc);
 
-	if (ios->timing == MMC_TIMING_MMC_DDR52 || ios->timing == MMC_TIMING_UHS_DDR50)
+	if (ios->timing == MMC_TIMING_MMC_DDR52 ||
+		ios->timing == MMC_TIMING_MMC_HS400 ||
+		ios->timing == MMC_TIMING_UHS_DDR50) {
 		sdr_set_bits(host->base + MCI_UHS_REG, MCI_UHS_REG_DDR);
+		sdr_set_bits(host->base + MCI_CNTRL, MCI_CNTRL_START_BIT_MODE);
+		sdr_clr_bits(host->base + MCI_EMMC_DDR_REG, MCI_EMMC_DDR_CYCLE);
+	}
 	else
 		sdr_clr_bits(host->base + MCI_UHS_REG, MCI_UHS_REG_DDR);
 
