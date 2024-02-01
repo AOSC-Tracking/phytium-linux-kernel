@@ -898,6 +898,7 @@ static unsigned int phytmac_rx_clean_desc(struct phytmac_queue *queue, u32 count
 	while (count) {
 		desc = phytmac_get_rx_desc(queue, index);
 		desc->desc0 &= ~PHYTMAC_BIT(RX_USED);
+		dma_wmb();
 		index--;
 		count--;
 	}

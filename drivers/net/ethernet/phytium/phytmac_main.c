@@ -362,7 +362,7 @@ static int phytmac_alloc_tx_resource(struct phytmac *pdata)
 				    q, size, (unsigned long)queue->tx_ring_addr);
 
 		size = pdata->tx_ring_size * sizeof(struct phytmac_tx_skb);
-		queue->tx_skb = kmalloc(size, GFP_KERNEL);
+		queue->tx_skb = kzalloc(size, GFP_KERNEL);
 		if (!queue->tx_skb)
 			goto err;
 
@@ -1335,6 +1335,8 @@ static void phytmac_mac_link_down(struct net_device *ndev, unsigned int mode,
 	struct phytmac_queue *queue;
 	unsigned int q;
 	unsigned long flags;
+	struct phytmac_tx_skb *tx_skb;
+	int i;
 
 	if (netif_msg_link(pdata)) {
 		netdev_info(ndev, "link down interface:%s, mode=%d\n",
@@ -1352,6 +1354,16 @@ static void phytmac_mac_link_down(struct net_device *ndev, unsigned int mode,
 
 	/* Disable Rx and Tx */
 	hw_if->enable_network(pdata, false, PHYTMAC_RX | PHYTMAC_TX);
+
+	/* Tx clean */
+	for (q = 0, queue = pdata->queues; q < pdata->queues_num; ++q, ++queue) {
+		for (i = 0; i < pdata->tx_ring_size; i++) {
+			tx_skb = phytmac_get_tx_skb(queue, i);
+			if (tx_skb)
+				phytmac_tx_unmap(pdata, tx_skb, 0);
+		}
+	}
+
 	spin_unlock_irqrestore(&pdata->lock, flags);
 
 	netif_tx_stop_all_queues(ndev);
