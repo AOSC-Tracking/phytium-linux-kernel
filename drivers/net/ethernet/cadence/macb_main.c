@@ -3448,6 +3448,72 @@ static int gem_set_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd)
 	return ret;
 }
 
+static int macb_get_link_ksettings(struct net_device *ndev,
+				   struct ethtool_link_ksettings *kset)
+{
+	int ret = 0;
+	struct macb *bp = netdev_priv(ndev);
+	u32 supported = 0;
+	u32 advertising = 0;
+
+	if (!ndev->phydev) {
+		if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
+		    bp->phy_interface == PHY_INTERFACE_MODE_XGMII) {
+			supported = SUPPORTED_10000baseT_Full
+				| SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_10000baseT_Full
+				| ADVERTISED_FIBRE | ADVERTISED_Pause;
+			kset->base.port = PORT_FIBRE;
+			kset->base.transceiver = XCVR_INTERNAL;
+		} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+			supported = SUPPORTED_2500baseX_Full | SUPPORTED_1000baseT_Full
+				| SUPPORTED_100baseT_Full | SUPPORTED_10baseT_Full
+				| SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_2500baseX_Full | ADVERTISED_1000baseT_Full
+				| ADVERTISED_100baseT_Full | ADVERTISED_10baseT_Full
+				| ADVERTISED_FIBRE | ADVERTISED_Pause;
+			kset->base.port = PORT_FIBRE;
+			kset->base.transceiver = XCVR_INTERNAL;
+		}  else if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII) {
+			supported = SUPPORTED_1000baseT_Full | SUPPORTED_100baseT_Full
+				| SUPPORTED_10baseT_Full | SUPPORTED_TP;
+			advertising = ADVERTISED_1000baseT_Full | ADVERTISED_100baseT_Full
+				| ADVERTISED_10baseT_Full | ADVERTISED_TP;
+		} else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII) {
+			supported = SUPPORTED_100baseT_Full
+				| SUPPORTED_10baseT_Full | SUPPORTED_TP;
+			advertising = ADVERTISED_100baseT_Full
+				| ADVERTISED_10baseT_Full | ADVERTISED_TP;
+		}
+
+		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.supported,
+							supported);
+		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.advertising,
+							advertising);
+		kset->base.speed = bp->speed;
+		kset->base.duplex = bp->duplex;
+	} else {
+		phy_ethtool_get_link_ksettings(ndev, kset);
+	}
+
+	return ret;
+}
+
+static int macb_set_link_ksettings(struct net_device *ndev,
+				   const struct ethtool_link_ksettings *kset)
+{
+	int ret = 0;
+
+	if (!ndev->phydev) {
+		netdev_err(ndev, "fixed link interface not supported set link\n");
+		ret = -EOPNOTSUPP;
+	} else {
+		phy_ethtool_set_link_ksettings(ndev, kset);
+	}
+
+	return ret;
+}
+
 static const struct ethtool_ops macb_ethtool_ops = {
 	.get_regs_len		= macb_get_regs_len,
 	.get_regs		= macb_get_regs,
@@ -3469,8 +3535,8 @@ static const struct ethtool_ops gem_ethtool_ops = {
 	.get_ethtool_stats	= gem_get_ethtool_stats,
 	.get_strings		= gem_get_ethtool_strings,
 	.get_sset_count		= gem_get_sset_count,
-	.get_link_ksettings     = phy_ethtool_get_link_ksettings,
-	.set_link_ksettings     = phy_ethtool_set_link_ksettings,
+	.get_link_ksettings     = macb_get_link_ksettings,
+	.set_link_ksettings     = macb_set_link_ksettings,
 	.get_ringparam		= macb_get_ringparam,
 	.set_ringparam		= macb_set_ringparam,
 	.get_rxnfc			= gem_get_rxnfc,
