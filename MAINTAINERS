@@ -1867,6 +1867,7 @@ F:	Documentation/devicetree/bindings/input/phytium-keypad.txt
 F:	Documentation/devicetree/bindings/interrupt-controller/phytium,ixic.txt
 F:	Documentation/devicetree/bindings/ipmi/phytium,bt-bmc.txt
 F:	Documentation/devicetree/bindings/ipmi/phytium,kcs-bmc.txt
+F:	Documentation/devicetree/bindings/leds/phytnet_led.yaml
 F:	Documentation/devicetree/bindings/mailbox/phytium-mailbox.txt
 F:	Documentation/devicetree/bindings/media/phytium-jpeg.txt
 F:	Documentation/devicetree/bindings/mmc/phytium-mci.txt
