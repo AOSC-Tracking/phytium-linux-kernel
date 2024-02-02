@@ -1883,6 +1883,7 @@ F:	Documentation/devicetree/bindings/w1/phytium-w1.txt
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
+F:	drivers/char/phytnetled/*
 F:	drivers/dma/phytium/phytium-ddmac.c
 F:	drivers/edac/phytium_edac.c
 F:	drivers/gpio/gpio-phytium*
