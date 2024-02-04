@@ -260,7 +260,8 @@ static int __init efi_rtc_probe(struct platform_device *dev)
 	/* First check if the RTC is usable */
 	if (efi.get_time(&eft, &cap) != EFI_SUCCESS)
 		return -ENODEV;
-
+	device_set_wakeup_capable(&dev->dev, true);
+	device_set_wakeup_enable(&dev->dev, true);
 	rtc = devm_rtc_device_register(&dev->dev, "rtc-efi", &efi_rtc_ops,
 					THIS_MODULE);
 	if (IS_ERR(rtc))
