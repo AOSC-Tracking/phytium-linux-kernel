@@ -902,7 +902,6 @@ static void phytium_jpeg_irq_res_change(struct phytium_jpeg_dev *jpeg_dev,
 					ulong delay)
 {
 	dev_info(jpeg_dev->dev, "Source resolution is changed, resetting\n");
-	set_bit(VIDEO_RES_CHANGE, &jpeg_dev->status);
 
 	phytium_jpeg_off(jpeg_dev);
 
@@ -1119,6 +1118,7 @@ static irqreturn_t phytium_jpeg_timer30_irq(int irq, void *arg)
 	/* call SE to poweroff JPEG Engine */
 	arm_smccc_smc(0xc300fff4, 0x9, 0x2, 0x80000020, 0, 0, 0, 0, &res);
 
+	set_bit(VIDEO_RES_CHANGE, &jpeg_dev->status);
 	/* set JPEG Engine's status is poweroff */
 	set_bit(VIDEO_POWEROFF, &jpeg_dev->status);
 	dev_info(jpeg_dev->dev, "timer30 set jpeg status 0x%lx\n", jpeg_dev->status);
