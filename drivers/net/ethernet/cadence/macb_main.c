@@ -106,6 +106,8 @@ struct sifive_fu540_macb_mgmt {
 
 #define MACB_MDIO_TIMEOUT	1000000 /* in usecs */
 
+static void macb_tx_unmap(struct macb *bp, struct macb_tx_skb *tx_skb);
+
 /* DMA buffer descriptor might be different size
  * depends on hardware configuration:
  *
@@ -769,9 +771,11 @@ static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
 {
 	struct net_device *ndev = to_net_dev(config->dev);
 	struct macb *bp = netdev_priv(ndev);
+	struct macb_tx_skb *tx_skb;
 	struct macb_queue *queue;
 	unsigned int q;
 	u32 ctrl;
+	int i;
 
 	if (bp->use_ncsi)
 		ncsi_stop_dev(bp->ndev);
@@ -784,6 +788,16 @@ static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
 	/* Disable Rx and Tx */
 	ctrl = macb_readl(bp, NCR) & ~(MACB_BIT(RE) | MACB_BIT(TE)) & ~(MACB_BIT(2PT5G));
 	macb_writel(bp, NCR, ctrl);
+
+	/* Tx clean */
+	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
+		for (i = 0; i < bp->tx_ring_size; i++) {
+			tx_skb = macb_tx_skb(queue, i);
+			/* free unsent skb buffers */
+			if (tx_skb)
+				macb_tx_unmap(bp, tx_skb);
+		}
+	}
 
 	netif_tx_stop_all_queues(ndev);
 }
