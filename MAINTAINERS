@@ -1907,8 +1907,8 @@ F:	drivers/mtd/spi-nor/phytium-quadspi.c
 F:	drivers/net/can/phytium/*
 F:	drivers/net/ethernet/phytium/*
 F:	drivers/pci/controller/pcie-phytium*
-F:	drivers/perf/phyt_ps2364_pcie_pmu.c
 F:	drivers/perf/phytium/*
+F:	drivers/perf/phytium/phytium_pcie_pmu.c
 F:	drivers/pwm/pwm-phytium.c
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-dma.c
