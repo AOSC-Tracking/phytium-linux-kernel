@@ -102,4 +102,6 @@ config ARM_SPE_PMU
 	  Extension, which provides periodic sampling of operations in
 	  the CPU pipeline and reports this via the perf AUX interface.
 
+source "drivers/perf/phytium/Kconfig"
+
 endmenu
