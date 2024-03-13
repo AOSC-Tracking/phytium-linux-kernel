@@ -150,10 +150,17 @@ static void phytium_mci_send_cmd(struct phytium_mci_host *host, u32 cmd, u32 arg
 
 static void phytium_mci_update_cmd11(struct phytium_mci_host *host, u32 cmd)
 {
+	int rc;
+	u32 data;
+
 	writel(MCI_CMD_START | cmd, host->base + MCI_CMD);
 
-	while (readl(host->base + MCI_CMD) & MCI_CMD_START)
-		cpu_relax();
+	rc = readl_relaxed_poll_timeout(host->base + MCI_CMD,
+					 data,
+					 !(data & MCI_CMD_START),
+					 0, 100 * 1000);
+	if (rc == -ETIMEDOUT)
+		pr_debug("%s %d, timeout mci_cmd: 0x%08x\n", __func__, __LINE__, data);
 }
 
 static void phytium_mci_set_clk(struct phytium_mci_host *host, struct mmc_ios *ios)
