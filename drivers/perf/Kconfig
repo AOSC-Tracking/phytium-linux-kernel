@@ -132,4 +132,6 @@ config ARM_SPE_PMU
 
 source "drivers/perf/hisilicon/Kconfig"
 
+source "drivers/perf/phytium/Kconfig"
+
 endmenu
