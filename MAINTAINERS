@@ -17436,6 +17436,7 @@ F:	Documentation/devicetree/bindings/gpu/phytium,dc.yaml
 F:	drivers/hwmon/tacho-phytium.c
 F:	Documentation/devicetree/bindings/hwlock/phytium,hwspinlock.yaml
 F:	Documentation/devicetree/bindings/hwmon/phytium,tacho.yaml
+F:	Documentation/devicetree/bindings/i2c/phytium,i2c-2.0.yaml
 F:	Documentation/devicetree/bindings/i2c/phytium,i2c.yaml
 F:	Documentation/devicetree/bindings/i3c/phytium,i3c-master.yaml
 F:	Documentation/devicetree/bindings/media/phytium,jpeg.yaml
