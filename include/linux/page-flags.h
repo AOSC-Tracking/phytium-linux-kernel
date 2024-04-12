@@ -191,6 +191,11 @@ enum pageflags {
 	/* At least one page in this folio has the hwpoison flag set */
 	PG_has_hwpoisoned = PG_error,
 	PG_large_rmappable = PG_workingset, /* anon or file-backed */
+
+#ifdef CONFIG_PSWIOTLB
+	/* check if pswiotlb is sync already */
+	PG_pswiotlbsync,
+#endif
 };
 
 #define PAGEFLAGS_MASK		((1UL << NR_PAGEFLAGS) - 1)
