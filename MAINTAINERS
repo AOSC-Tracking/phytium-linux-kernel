@@ -17543,6 +17543,7 @@ F:	kernel/dma/phytium/Kconfig
 F:	kernel/dma/phytium/Makefile
 F:	kernel/dma/phytium/pswiotlb-direct.c
 F:	kernel/dma/phytium/pswiotlb-dma.h
+F:	kernel/dma/phytium/pswiotlb-iommu.c
 F:	kernel/dma/phytium/pswiotlb-mapping.c
 F:	kernel/dma/phytium/pswiotlb.c
 

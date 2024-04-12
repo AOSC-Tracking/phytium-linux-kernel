@@ -66,8 +66,8 @@ void pswiotlb_sync_single_for_cpu(struct device *dev, int nid, phys_addr_t tlb_a
 dma_addr_t pswiotlb_map(struct device *dev, int nid, phys_addr_t phys,
 		size_t size, enum dma_data_direction dir, unsigned long attrs);
 void pswiotlb_store_local_node(struct pci_dev *dev, struct pci_bus *bus);
-void iommu_dma_unmap_sg_pswiotlb(struct device *dev, struct scatterlist *sg,
-		int nents, enum dma_data_direction dir, unsigned long attrs);
+void iommu_dma_unmap_sg_pswiotlb(struct device *dev, struct scatterlist *sg, unsigned long iova,
+			size_t mapped, int nents, enum dma_data_direction dir, unsigned long attrs);
 #ifdef CONFIG_PSWIOTLB
 
 /**
