@@ -70,6 +70,7 @@
  */
 #define DMA_ATTR_PRIVILEGED		(1UL << 9)
 
+#define DMA_MAPPING_ERROR     (~(dma_addr_t)0)
 /*
  * A dma_addr_t can hold any valid DMA or bus address for the platform.
  * It can be given to a device to use as a DMA source or target.  A CPU cannot
@@ -222,6 +223,13 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
 	return NULL;
 }
 #endif
+
+static inline unsigned int dma_get_min_align_mask(struct device *dev)
+{
+	if (dev->dma_parms)
+		return dev->dma_parms->min_align_mask;
+	return 0;
+}
 
 static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 					      size_t size,

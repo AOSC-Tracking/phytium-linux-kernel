@@ -750,6 +750,7 @@ struct device_dma_parameters {
 	 * sg limitations.
 	 */
 	unsigned int max_segment_size;
+	unsigned int min_align_mask;
 	unsigned long segment_boundary_mask;
 };
 
@@ -938,6 +939,8 @@ struct dev_links_info {
  * @dma_pools:	Dma pools (if dma'ble device).
  * @dma_mem:	Internal for coherent mem override.
  * @cma_area:	Contiguous memory area for dma allocations
+ * @dma_p_io_tlb_mem: Phytium Software IO TLB allocator.  Not for driver use.
+ * @dma_uses_p_io_tlb: %true if device has used the Phytium software IO TLB.
  * @archdata:	For arch-specific additions.
  * @of_node:	Associated device tree node.
  * @fwnode:	Associated device node supplied by platform firmware.
@@ -1004,6 +1007,9 @@ struct device {
 
 #ifdef CONFIG_NUMA
 	int		numa_node;	/* NUMA node this device is close to */
+#ifdef CONFIG_PSWIOTLB
+	int     local_node; /* NUMA node this device is really belong to */
+#endif
 #endif
 	const struct dma_map_ops *dma_ops;
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
@@ -1024,6 +1030,10 @@ struct device {
 #ifdef CONFIG_DMA_CMA
 	struct cma *cma_area;		/* contiguous memory area for dma
 					   allocations */
+#endif
+#ifdef CONFIG_PSWIOTLB
+	struct p_io_tlb_mem *dma_p_io_tlb_mem;
+	bool dma_uses_p_io_tlb;
 #endif
 	/* arch specific additions */
 	struct dev_archdata	archdata;

@@ -19,6 +19,9 @@
 #include <linux/irqdomain.h>
 #include <linux/pm_runtime.h>
 #include "pci.h"
+#ifdef CONFIG_PSWIOTLB
+#include <linux/pswiotlb.h>
+#endif
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
@@ -2494,6 +2497,13 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 
 	pci_set_dma_max_seg_size(dev, 65536);
 	pci_set_dma_seg_boundary(dev, 0xffffffff);
+#ifdef CONFIG_PSWIOTLB
+	if ((pswiotlb_force_disable != true) &&
+		is_phytium_ps23064_socs()) {
+		pswiotlb_store_local_node(dev, bus);
+		pci_set_dma_seg_boundary(dev, 0xffffffffffff);
+	}
+#endif
 
 	/* Fix up broken headers */
 	pci_fixup_device(pci_fixup_header, dev);
