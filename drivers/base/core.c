@@ -27,6 +27,10 @@
 #include <linux/sched/signal.h>
 #include <linux/sysfs.h>
 
+#ifdef CONFIG_PSWIOTLB
+#include <linux/pswiotlb.h>
+#endif
+
 #include "base.h"
 #include "power/power.h"
 
@@ -1688,6 +1692,11 @@ void device_initialize(struct device *dev)
 	INIT_LIST_HEAD(&dev->links.consumers);
 	INIT_LIST_HEAD(&dev->links.suppliers);
 	dev->links.status = DL_DEV_NO_DRIVER;
+#ifdef CONFIG_PSWIOTLB
+	if ((pswiotlb_force_disable != true) &&
+		is_phytium_ps23064_socs())
+		pswiotlb_dev_init(dev);
+#endif
 }
 EXPORT_SYMBOL_GPL(device_initialize);
 

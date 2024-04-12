@@ -131,6 +131,11 @@ enum pageflags {
 
 	/* non-lru isolated movable page */
 	PG_isolated = PG_reclaim,
+
+#ifdef CONFIG_PSWIOTLB
+	/* check if pswiotlb is sync already */
+	PG_pswiotlbsync,
+#endif
 };
 
 #ifndef __GENERATING_BOUNDS_H

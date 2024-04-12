@@ -1941,6 +1941,11 @@ F:	drivers/w1/masters/phytium_w1.c
 F:	sound/pci/hda/hda_phytium.*
 F:	sound/soc/codec/phytium-codec-v2*
 F:	sound/soc/phytium/*
+F:	include/linux/pswiotlb.h
+F:	include/trace/events/pswiotlb.h
+F:	kernel/dma/phytium/Kconfig
+F:	kernel/dma/phytium/Makefile
+F:	kernel/dma/phytium/pswiotlb.c
 
 ARM/PLEB SUPPORT
 M:	Peter Chubb <pleb@gelato.unsw.edu.au>
