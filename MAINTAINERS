@@ -17539,6 +17539,8 @@ F:	sound/soc/codecs/phytium-codec-v2.*
 F:	sound/soc/phytium/*
 F:	include/linux/pswiotlb.h
 F:	include/trace/events/pswiotlb.h
+F:	kernel/dma/Kconfig
+F:	kernel/dma/Makefile
 F:	kernel/dma/phytium/Kconfig
 F:	kernel/dma/phytium/Makefile
 F:	kernel/dma/phytium/pswiotlb-direct.c
