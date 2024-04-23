@@ -17506,6 +17506,7 @@ F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-mci-plat-v2.c
 F:	drivers/mmc/host/phytium-mci-v2*
 F:	drivers/mmc/host/phytium-sdci.*
+F:	drivers/mtd/maps/phytium_lbc.c
 F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/mtd/parsers/acpipart_core.c
 F:	drivers/net/can/phytium/*
