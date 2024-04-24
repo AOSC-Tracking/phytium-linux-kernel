@@ -18,6 +18,9 @@
 #include <linux/psci.h>
 #include <linux/cpu.h>
 #include <linux/cpuhotplug.h>
+#include <linux/ktime.h>
+#include <asm/cacheflush.h>
+#include <linux/processor.h>
 
 #include "remoteproc_internal.h"
 
@@ -30,10 +33,16 @@
 #define AFFINITY_INFO               0xc4000004
 #define MIGRATE                     0xc4000005
 
+#define REMOTE_PROC_STOP            0x0001U
+
+/* wait for 1s */
+#define HOMO_MAX_WAIT_TIME_NS	(1000 * NSEC_PER_MSEC)
+
 /* Resource table for the homo remote processors */
 struct homo_resource_table {
 	unsigned int version;
 	unsigned int num;
+	/* use bit0 of reserved[0] as stop flag */
 	unsigned int reserved[2];
 	unsigned int offset[RPROC_RESOURCE_ENTRIES];
 
@@ -63,6 +72,16 @@ static struct work_struct workqueue;
 
 #define MPIDR_TO_SGI_AFFINITY(cluster_id, level)        (MPIDR_AFFINITY_LEVEL(cluster_id, level) << ICC_SGI1R_AFFINITY_## level ## _SHIFT)
 
+static bool homo_rproc_wait_cpuoff(struct rproc *rproc, ktime_t stop)
+{
+	int err = 0;
+	struct homo_rproc *priv = rproc->priv;
+
+	err = psci_ops.affinity_info(cpu_logical_map(priv->cpu), 0);
+
+	return (err == 1) || ktime_after(ktime_get(), stop);
+}
+
 void gicv3_ipi_send_single(int irq, u64 mpidr)
 {
 	u16 tlist = 0;
@@ -84,6 +103,20 @@ void gicv3_ipi_send_single(int irq, u64 mpidr)
 
 	/* Force the above writes to ICC_SGI1R_EL1 to be executed */
 	isb();
+}
+
+static void homo_rproc_write_stop_flag(struct homo_resource_table *table_ptr)
+{
+	unsigned int *flag = table_ptr->reserved;
+
+	*flag |= REMOTE_PROC_STOP;
+}
+
+static void homo_rproc_clear_stop_flag(struct homo_resource_table *table_ptr)
+{
+	unsigned int *flag = table_ptr->reserved;
+
+	*flag &= ~REMOTE_PROC_STOP;
 }
 
 static void homo_rproc_vq_irq(struct work_struct *work)
@@ -120,12 +153,32 @@ static int homo_rproc_start(struct rproc *rproc)
 
 static int homo_rproc_stop(struct rproc *rproc)
 {
-	int err;
 	struct homo_rproc *priv = rproc->priv;
+	ktime_t stop;
 
-	err = psci_ops.affinity_info(cpu_logical_map(priv->cpu), 0);
-	if (err == 1)
-		add_cpu(priv->cpu);
+	if (!priv || !priv->rsc) {
+		dev_err(&rproc->dev, "cannot find resource table!\n");
+		return -1;
+	}
+
+	homo_rproc_write_stop_flag(priv->rsc);
+	__flush_dcache_area(rproc->table_ptr, rproc->table_sz);
+
+	gicv3_ipi_send_single(priv->irq, cpu_logical_map(priv->cpu));
+
+	stop = ktime_add_ns(ktime_get(), HOMO_MAX_WAIT_TIME_NS);
+
+	spin_until_cond(homo_rproc_wait_cpuoff(rproc, stop));
+
+	if (ktime_after(ktime_get(), stop)) {
+		dev_err(&rproc->dev, "wait remote processor stop timeout!\n");
+		return -1;
+	}
+
+	add_cpu(priv->cpu);
+
+	homo_rproc_clear_stop_flag(priv->rsc);
+	__flush_dcache_area(rproc->table_ptr, rproc->table_sz);
 
 	return 0;
 }
