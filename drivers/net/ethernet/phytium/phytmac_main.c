@@ -1408,6 +1408,7 @@ static void phytmac_mac_config(struct net_device *ndev, unsigned int mode,
 	struct phytmac *pdata = netdev_priv(ndev);
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	unsigned long flags;
+	bool rx_pause;
 
 	if (netif_msg_link(pdata)) {
 		netdev_info(pdata->ndev, "mac config interface=%s, mode=%d\n",
@@ -1416,9 +1417,15 @@ static void phytmac_mac_config(struct net_device *ndev, unsigned int mode,
 
 	pdata->speed = state->speed;
 	pdata->duplex = state->duplex;
+	rx_pause = !!(state->pause & MLO_PAUSE_RX);
 
 	spin_lock_irqsave(&pdata->lock, flags);
 	hw_if->mac_config(pdata, mode, state);
+
+	if (rx_pause != pdata->pause) {
+		hw_if->enable_pause(pdata, rx_pause);
+		pdata->pause = rx_pause;
+	}
 	spin_unlock_irqrestore(&pdata->lock, flags);
 }
 
