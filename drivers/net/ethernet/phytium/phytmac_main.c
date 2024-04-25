@@ -1414,6 +1414,9 @@ static void phytmac_mac_config(struct net_device *ndev, unsigned int mode,
 			    phy_modes(state->interface), mode);
 	}
 
+	pdata->speed = state->speed;
+	pdata->duplex = state->duplex;
+
 	spin_lock_irqsave(&pdata->lock, flags);
 	hw_if->mac_config(pdata, mode, state);
 	spin_unlock_irqrestore(&pdata->lock, flags);
@@ -1475,20 +1478,6 @@ static void phytmac_mac_link_up(struct net_device *ndev,
 	unsigned long flags;
 	unsigned int q;
 	int ret;
-
-	if (phy) {
-		pdata->speed = phy->speed;
-		pdata->duplex = phy->duplex;
-	} else {
-		if (interface == PHY_INTERFACE_MODE_SGMII ||
-		    interface == PHY_INTERFACE_MODE_1000BASEX) {
-			pdata->speed = SPEED_1000;
-			pdata->duplex = DUPLEX_FULL;
-		} else if (interface == PHY_INTERFACE_MODE_USXGMII) {
-			pdata->speed = SPEED_10000;
-			pdata->duplex = DUPLEX_FULL;
-		}
-	}
 
 	if (netif_msg_link(pdata))
 		netdev_info(pdata->ndev, "link up interface:%s, speed:%d, duplex:%s\n",
