@@ -15,7 +15,7 @@
 
 #define DRV_NAME "phytium_usb"
 
-#define HOST_GENERIC_EP_CONTROLL 0x00
+#define HOST_GENERIC_EP_CONTROL 0x00
 #define HOST_GENERIC_EP_ISOC 0x01
 #define HOST_GENERIC_EP_BULK 0x02
 #define HOST_GENERIC_EP_INT 0x03
@@ -799,7 +799,7 @@ static void hostStartReq(struct HOST_CTRL *priv, struct HOST_REQ *req)
 			case USB_ENDPOINT_XFER_CONTROL:
 				usbReq = getNextReq(hostEp);
 
-				priv->in[HOST_GENERIC_EP_CONTROLL].scheduledUsbHEp = hostEp;
+				priv->in[HOST_GENERIC_EP_CONTROL].scheduledUsbHEp = hostEp;
 				priv->ep0State = HOST_EP0_STAGE_SETUP;
 				hostEpPriv->currentHwEp = hostEpPriv->genericHwEp;
 				hostEpPriv->genericHwEp->scheduledUsbHEp = hostEp;
@@ -984,7 +984,7 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 	if (!priv)
 		return ret;
 
-	hwEp = isIn ? &priv->in[HOST_GENERIC_EP_CONTROLL] : &priv->out[HOST_GENERIC_EP_CONTROLL];
+	hwEp = isIn ? &priv->in[HOST_GENERIC_EP_CONTROL] : &priv->out[HOST_GENERIC_EP_CONTROL];
 	hostEp = hwEp->scheduledUsbHEp;
 	usbHEpPriv = (struct HOST_EP_PRIV *)hostEp->hcPriv;
 
@@ -1020,13 +1020,13 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 		switch (priv->ep0State) {
 		case HOST_EP0_STAGE_IN:
 			pr_debug("Ep0 Data IN\n");
-			usbHEpPriv->currentHwEp = &priv->out[HOST_GENERIC_EP_CONTROLL];
+			usbHEpPriv->currentHwEp = &priv->out[HOST_GENERIC_EP_CONTROL];
 			usbReq->actualLength = length;
 			priv->ep0State = HOST_EP0_STAGE_STATUSOUT;
 			break;
 		case HOST_EP0_STAGE_OUT:
 			pr_debug("Ep0 Data OUT\n");
-			usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROLL];
+			usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROL];
 			usbReq->actualLength = length;
 			priv->ep0State = HOST_EP0_STAGE_STATUSIN;
 			break;
@@ -1035,12 +1035,12 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 			if (!usbReq->setup->wLength) {
 				pr_debug("EP0_STAGE_STATUSIN\n");
 				priv->ep0State = HOST_EP0_STAGE_STATUSIN;
-				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROLL];
+				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROL];
 				break;
 			} else if (usbReq->setup->bRequestType & USB_DIR_IN) {
 				pr_debug("EP0_STAGE_STAGE_IN\n");
 				priv->ep0State = HOST_EP0_STAGE_IN;
-				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROLL];
+				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROL];
 				nextStage = 1;
 				break;
 			}
