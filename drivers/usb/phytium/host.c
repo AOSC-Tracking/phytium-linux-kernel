@@ -1317,7 +1317,7 @@ static int hc_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 			usb_endpoint_dir_in(host_ep_desc));
 	if (req->epNum > MAX_INSTANCE_EP_NUM) {
 		pr_err("Not enough endpoint resource for remap\n");
-		dump_ep_remap_pool(priv, usb_endpoint_dir_in(host_ep_desc));
+		dump_ep_remap_pool(priv, usb_endpoint_num(host_ep_desc));
 		req->epNum = MAX_INSTANCE_EP_NUM;
 	}
 
