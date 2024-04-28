@@ -1070,7 +1070,7 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 		scheduleNextTransfer(priv, usbReq, hwEp);
 	}
 
-	return 0;
+	return ret;
 }
 
 static void updateTimeIntTransfer(struct list_head *head, struct HOST_EP_PRIV *lastFinished)
