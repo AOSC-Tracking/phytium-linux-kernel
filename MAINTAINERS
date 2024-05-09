@@ -17516,6 +17516,7 @@ F:	drivers/tty/serial/phytium-uart.c
 F:	drivers/usb/phytium/*
 F:	drivers/w1/masters/phytium_w1.c
 F:	sound/pci/hda/hda_phytium.*
+F:	sound/soc/codecs/phytium-codec-v2.*
 F:	sound/soc/phytium/*
 
 QAT DRIVER
