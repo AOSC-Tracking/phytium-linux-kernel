@@ -261,9 +261,6 @@ static inline bool acpi_gicc_is_usable(struct acpi_madt_generic_interrupt *gicc)
 	return gicc->flags & (ACPI_MADT_ENABLED | ACPI_MADT_GICC_CPU_CAPABLE);
 }
 
-/* the following numa functions are architecture-dependent */
-void acpi_numa_slit_init (struct acpi_table_slit *slit);
-
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_LOONGARCH)
 void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
 #else
@@ -285,8 +282,6 @@ void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
 static inline void
 acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
 #endif
-
-int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
 
 #ifndef PHYS_CPUID_INVALID
 typedef u32 phys_cpuid_t;
