@@ -5264,6 +5264,7 @@ static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,zynqmp-gem", .data = &zynqmp_config},
 	{ .compatible = "cdns,zynq-gem", .data = &zynq_config },
 	{ .compatible = "sifive,fu540-c000-gem", .data = &fu540_c000_config },
+	{ .compatible = "cdns,phytium-gem", .data = &phytium_gem1p0_config }, /* old version */
 	{ .compatible = "cdns,phytium-gem-1.0", .data = &phytium_gem1p0_config },
 	{ .compatible = "cdns,phytium-gem-2.0", .data = &phytium_gem2p0_config },
 	{ /* sentinel */ }
