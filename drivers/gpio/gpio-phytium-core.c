@@ -130,11 +130,10 @@ int phytium_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
 
 	raw_spin_lock_irqsave(&gpio->lock, flags);
 
+	phytium_gpio_set(gc, offset, value);
 	writel(readl(ddr) | BIT(loc.offset), ddr);
 
 	raw_spin_unlock_irqrestore(&gpio->lock, flags);
-
-	phytium_gpio_set(gc, offset, value);
 
 	return 0;
 }
