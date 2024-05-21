@@ -3119,5 +3119,6 @@
 #define PCI_VENDOR_ID_NCUBE		0x10ff
 
 #define PCI_VENDOR_ID_PHYTIUM		0x1db7
+#define PCI_DEVICE_ID_PHYTIUM_PE220X	0xdc3e
 
 #endif /* _LINUX_PCI_IDS_H */

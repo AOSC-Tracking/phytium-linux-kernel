@@ -556,6 +556,10 @@ int pci_iov_init(struct pci_dev *dev)
 	if (!pci_is_pcie(dev))
 		return -ENODEV;
 
+	if ((dev->vendor == PCI_VENDOR_ID_PHYTIUM)
+		&& (dev->device == PCI_DEVICE_ID_PHYTIUM_PE220X))
+		return -ENODEV;
+
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_SRIOV);
 	if (pos)
 		return sriov_init(dev, pos);
