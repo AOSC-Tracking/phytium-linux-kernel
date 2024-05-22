@@ -45,7 +45,7 @@
 #define MAX_PIXEL_CLOCK         (1920 * 1080 * 60)   /* 1920 x 1080 x 60Hz */
 
 #define SOURCE_RESOLUTION_DETECT_TIMEOUT    msecs_to_jiffies(500)
-#define RESOLUTION_CHANGE_DELAY             msecs_to_jiffies(50)
+#define RESOLUTION_CHANGE_DELAY             msecs_to_jiffies(250)
 #define INVALID_RESOLUTION_DELAY            msecs_to_jiffies(250)
 #define STOP_TIMEOUT                        msecs_to_jiffies(1000)
 
@@ -128,6 +128,7 @@ struct phytium_jpeg_dev {
 	unsigned int frame_rate;
 	void __iomem *timer30_addr;
 	void __iomem *timer31_addr;
+	struct v4l2_ctrl_handler ctrl_handler;
 };
 
 struct phytium_jpeg_config {
