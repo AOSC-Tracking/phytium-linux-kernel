@@ -421,6 +421,32 @@ err:
 	return ret;
 }
 
+/*
+ * free the resources when init fail
+ */
+static void homo_core_of_exit(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+
+	platform_set_drvdata(pdev, NULL);
+	devres_release_group(dev, homo_core_of_init);
+}
+
+static void homo_cluster_of_exit(struct platform_device *pdev)
+{
+	struct rproc *rproc;
+	struct platform_device *cpdev;
+	int i;
+
+	for(i = 0; i < homo_rproc_num; i++) {
+		rproc = g_homo_rproc[i]->rproc;
+		cpdev = to_platform_device(rproc->dev.parent);
+		homo_core_of_exit(cpdev);
+	}
+
+	homo_rproc_num = 0;
+}
+
 static int homo_cluster_of_init(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -455,6 +481,7 @@ static int homo_cluster_of_init(struct platform_device *pdev)
 	return 0;
 
 fail:
+	homo_cluster_of_exit(pdev);
 	return ret;
 }
 
