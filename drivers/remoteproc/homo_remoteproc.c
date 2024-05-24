@@ -66,7 +66,7 @@ struct homo_rproc {
 
 	int irq;
 	int cpu;
-	int rproc_irq;
+	int mapped_irq;
 };
 
 static struct homo_rproc *g_homo_rproc[RPROC_CORE_MAX_NUM];
@@ -79,7 +79,7 @@ static int homo_find_rproc_offset_irq(int rproc_irq)
 	int i;
 
 	for(i = 0; i < homo_rproc_num; i++) {
-		if (g_homo_rproc[i]->rproc_irq == rproc_irq) {
+		if (g_homo_rproc[i]->mapped_irq == rproc_irq) {
 			return i;
 		}
 	}
@@ -269,7 +269,7 @@ static int homo_rproc_starting_cpu(unsigned int cpu)
 	int irq;
 
 	for(i = 0; i < homo_rproc_num; i++) {
-		irq = g_homo_rproc[i]->rproc_irq;
+		irq = g_homo_rproc[i]->mapped_irq;
 		enable_percpu_irq(irq, irq_get_trigger_type(irq));
 	}
 	return 0;
@@ -281,7 +281,7 @@ static int homo_rproc_dying_cpu(unsigned int cpu)
 	int irq;
 
 	for(i = 0; i < homo_rproc_num; i++) {
-		irq = g_homo_rproc[i]->rproc_irq;
+		irq = g_homo_rproc[i]->mapped_irq;
 		disable_percpu_irq(irq);
 	}
 	return 0;
@@ -382,7 +382,7 @@ static int homo_core_of_init(struct platform_device *pdev)
 		goto err;
 	}
 
-	priv->rproc_irq = rproc_irq;
+	priv->mapped_irq = rproc_irq;
 
 	ret = request_percpu_irq(rproc_irq, homo_rproc_irq_handler, "homo-rproc-ipi", &cpu_number);
 	if (ret) {
