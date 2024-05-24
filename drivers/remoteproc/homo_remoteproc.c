@@ -21,10 +21,13 @@
 #include <linux/ktime.h>
 #include <asm/cacheflush.h>
 #include <linux/processor.h>
+#include <linux/of_device.h>
 
 #include "remoteproc_internal.h"
 
 #define RPROC_RESOURCE_ENTRIES      8
+
+#define RPROC_CORE_MAX_NUM          2
 
 #define PSCI_VERSION                0x84000000
 #define CPU_SUSPEND                 0xc4000001
@@ -64,12 +67,40 @@ struct homo_rproc {
 
 	int irq;
 	int cpu;
+	int rproc_irq;
 };
 
-static int homo_rproc_irq;
-static struct homo_rproc *g_priv;
+static struct homo_rproc *g_homo_rproc[RPROC_CORE_MAX_NUM];
+static int homo_rproc_num;
+static int homo_rproc_offset;
 
 #define MPIDR_TO_SGI_AFFINITY(cluster_id, level)        (MPIDR_AFFINITY_LEVEL(cluster_id, level) << ICC_SGI1R_AFFINITY_## level ## _SHIFT)
+
+static int homo_find_rproc_offset_cpu(int cpu)
+{
+	int i;
+
+	for(i = 0; i < homo_rproc_num; i++) {
+		if (g_homo_rproc[i]->cpu == cpu) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+static int homo_find_rproc_offset_irq(int rproc_irq)
+{
+	int i;
+
+	for(i = 0; i < homo_rproc_num; i++) {
+		if (g_homo_rproc[i]->rproc_irq == rproc_irq) {
+			return i;
+		}
+	}
+
+	return -1;
+}
 
 static bool homo_rproc_wait_cpuoff(struct rproc *rproc, ktime_t stop)
 {
@@ -124,10 +155,14 @@ static int homo_rproc_start(struct rproc *rproc)
 	struct homo_rproc *priv = rproc->priv;
 	int phys_cpuid = cpu_logical_map(priv->cpu);
 	struct arm_smccc_res smc_res;
+	int offset;
 
 	err = psci_ops.affinity_info(phys_cpuid, 0);
 	if (err == 0)
 		remove_cpu(priv->cpu);
+
+	offset = homo_find_rproc_offset_cpu(priv->cpu);
+	homo_rproc_offset = offset;
 
 	priv->rsc = (struct homo_resource_table *)rproc->table_ptr;
 
@@ -227,39 +262,60 @@ static void __iomem *homo_ioremap_prot(phys_addr_t addr, size_t size, pgprot_t p
 
 static irqreturn_t homo_rproc_irq_handler(int irq, void *data)
 {
-	struct homo_rproc *priv = g_priv;
-	struct homo_resource_table *rsc = priv->rsc;
-	struct rproc *rproc = priv->rproc;
+	int offset;
+	struct homo_rproc *priv;
+	struct homo_resource_table *rsc;
+	struct rproc *rproc;
+
+	offset = homo_find_rproc_offset_irq(irq);
+	priv = g_homo_rproc[offset];
+	rsc = priv->rsc;
+	rproc = priv->rproc;
 
 	rproc_vq_interrupt(rproc, rsc->rpmsg_vring0.notifyid);
-
 	return IRQ_HANDLED;
 }
 
 static int homo_rproc_starting_cpu(unsigned int cpu)
 {
-	enable_percpu_irq(homo_rproc_irq, irq_get_trigger_type(homo_rproc_irq));
+	int i;
+	int irq;
+
+	for(i = 0; i < homo_rproc_num; i++) {
+		irq = g_homo_rproc[i]->rproc_irq;
+		enable_percpu_irq(irq, irq_get_trigger_type(irq));
+	}
 	return 0;
 }
 
 static int homo_rproc_dying_cpu(unsigned int cpu)
 {
-	disable_percpu_irq(homo_rproc_irq);
+	int i;
+	int irq;
+
+	for(i = 0; i < homo_rproc_num; i++) {
+		irq = g_homo_rproc[i]->rproc_irq;
+		disable_percpu_irq(irq);
+	}
 	return 0;
 }
 
-static int homo_rproc_probe(struct platform_device *pdev)
+static int homo_core_of_init(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node, *p;
+	struct device_node *np = dev_of_node(dev), *p;
 	struct device_node *np_mem;
 	struct resource res;
+	struct homo_rproc *priv;
+	unsigned int ipi, cpu;
+	int ret;
+	struct of_phandle_args oirq;
+	int rproc_irq;
 	struct rproc *rproc;
 	const char *fw_name;
-	struct homo_rproc *priv;
-	int ret;
-	unsigned int ipi, cpu;
-	struct of_phandle_args oirq;
+
+	if (!devres_open_group(dev, homo_core_of_init, GFP_KERNEL))
+		return -ENOMEM;
 
 	ret = rproc_of_parse_firmware(dev, 0, &fw_name);
 	if (ret) {
@@ -276,7 +332,7 @@ static int homo_rproc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rproc);
 
-	priv = g_priv = rproc->priv;
+	priv = g_homo_rproc[homo_rproc_num] = rproc->priv;
 	priv->rproc = rproc;
 
 	/* The following values can be modified through devicetree 'homo_rproc' node */
@@ -327,41 +383,117 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	p = of_irq_find_parent(np);
 	if (p == NULL) {
 		ret = -EINVAL;
-		goto err;
+		goto err_free;
 	}
 
 	oirq.np = p;
 	oirq.args_count = 1;
 	oirq.args[0] = ipi;
-	homo_rproc_irq = irq_create_of_mapping(&oirq);
-	if (homo_rproc_irq <= 0) {
+	rproc_irq = irq_create_of_mapping(&oirq);
+	if (rproc_irq <= 0) {
 		ret = -EINVAL;
 		goto err;
 	}
 
-	ret = request_percpu_irq(homo_rproc_irq, homo_rproc_irq_handler, "homo-rproc-ipi", &cpu_number);
+	priv->rproc_irq = rproc_irq;
+
+	ret = request_percpu_irq(rproc_irq, homo_rproc_irq_handler, "homo-rproc-ipi", &cpu_number);
 	if (ret) {
 		dev_err(dev, "failed to request percpu irq, status = %d\n", ret);
-		goto err;
-	}
-
-	ret = cpuhp_setup_state(CPUHP_AP_HOMO_RPROC_STARTING, "remoteproc/homo_rproc:starting", homo_rproc_starting_cpu, homo_rproc_dying_cpu);
-	if (ret) {
-		dev_err(dev, "cpuhp setup state failed, status = %d\n", ret);
-		goto err;
+		goto err_free;
 	}
 
 	ret = rproc_add(rproc);
 	if (ret) {
 		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n", ret);
-		goto err;
+		goto err_free;
+	}
+
+	devres_close_group(dev, homo_core_of_init);
+
+	return 0;
+
+err_free:
+	vunmap((void *)((unsigned long)priv->addr & PAGE_MASK));
+
+err:
+	devres_release_group(dev, homo_core_of_init);
+	return ret;
+}
+
+static int homo_cluster_of_init(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct device_node *np = dev_of_node(dev);
+	struct platform_device *cpdev;
+	struct device_node *child;
+	int ret;
+
+	for_each_available_child_of_node(np, child) {
+		const char *node_name = child->name;
+		cpdev = of_find_device_by_node(child);
+		if (!cpdev) {
+			ret = -ENODEV;
+			dev_err(dev, "could not get core platform device for node %s\n", node_name);
+			of_node_put(child);
+			goto fail;
+		}
+
+		ret = homo_core_of_init(cpdev);
+		if (ret) {
+			dev_err(dev, "homo_core_of_init failed, ret = %d\n",
+				ret);
+			put_device(&cpdev->dev);
+			of_node_put(child);
+			goto fail;
+		}
+
+		homo_rproc_num++;
+		put_device(&cpdev->dev);
 	}
 
 	return 0;
 
-err:
-	vunmap((void *)((unsigned long)priv->addr & PAGE_MASK));
+fail:
 	return ret;
+}
+
+static int homo_rproc_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
+	int ret;
+	int num_cores;
+
+	num_cores = of_get_available_child_count(np);
+
+	dev_info(dev, "num_cores = %d\n", num_cores);
+
+	if (num_cores > RPROC_CORE_MAX_NUM) {
+		dev_err(dev, "core number (%d) out of range\n", num_cores);
+		return -ENODEV;
+	}
+
+	ret = devm_of_platform_populate(dev);
+	if (ret) {
+		dev_err(dev, "devm_of_platform_populate failed, ret = %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = homo_cluster_of_init(pdev);
+	if (ret) {
+		dev_err(dev, "homo_cluster_of_init failed, ret = %d\n", ret);
+		return ret;
+	}
+
+	ret = cpuhp_setup_state(CPUHP_AP_HOMO_RPROC_STARTING, "remoteproc/homo_rproc:starting", homo_rproc_starting_cpu, homo_rproc_dying_cpu);
+	if (ret) {
+		dev_err(dev, "cpuhp setup state failed, status = %d\n", ret);
+		return ret;
+	}
+
+	return 0;
 }
 
 static int homo_rproc_remove(struct platform_device *pdev)
