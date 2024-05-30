@@ -58,15 +58,56 @@ extern void pswiotlb_tbl_unmap_single(struct device *hwdev,
 				     enum dma_data_direction dir,
 				     unsigned long attrs);
 
-void pswiotlb_sync_single_for_device(struct device *dev, int nid, phys_addr_t tlb_addr,
-		size_t size, enum dma_data_direction dir);
-void pswiotlb_sync_single_for_cpu(struct device *dev, int nid, phys_addr_t tlb_addr,
-		size_t size, enum dma_data_direction dir);
+void pswiotlb_sync_single_for_device(struct device *dev, int nid,
+			phys_addr_t tlb_addr, size_t size, enum dma_data_direction dir);
+void pswiotlb_sync_single_for_cpu(struct device *dev, int nid,
+			phys_addr_t tlb_addr, size_t size, enum dma_data_direction dir);
 dma_addr_t pswiotlb_map(struct device *dev, int nid, phys_addr_t phys,
-		size_t size, enum dma_data_direction dir, unsigned long attrs);
+			size_t size, enum dma_data_direction dir, unsigned long attrs);
 void pswiotlb_store_local_node(struct pci_dev *dev, struct pci_bus *bus);
 void iommu_dma_unmap_sg_pswiotlb(struct device *dev, struct scatterlist *sg,
-		int nents, enum dma_data_direction dir, unsigned long attrs);
+			unsigned long iova, size_t mapped, int nents,
+			enum dma_data_direction dir, unsigned long attrs);
+dma_addr_t pswiotlb_dma_direct_map_page_distribute(struct device *dev,
+			struct page *page, size_t offset, size_t size,
+			enum dma_data_direction dir, unsigned long attrs);
+void pswiotlb_dma_direct_unmap_page_attrs_distribute(struct device *dev,
+			dma_addr_t addr, size_t size, enum dma_data_direction dir,
+			unsigned long attrs);
+int pswiotlb_dma_direct_map_sg_attrs_distribute(struct device *dev,
+			struct scatterlist *sg, int nents, enum dma_data_direction dir,
+			unsigned long attrs);
+void pswiotlb_dma_direct_unmap_sg_attrs_distribute(struct device *dev,
+			struct scatterlist *sg, int nents, enum dma_data_direction dir,
+			unsigned long attrs);
+void pswiotlb_dma_direct_sync_single_for_cpu_distribute(struct device *dev,
+			dma_addr_t addr, size_t size, enum dma_data_direction dir);
+void pswiotlb_dma_direct_sync_single_for_device_distribute(struct device *dev,
+			dma_addr_t addr, size_t size, enum dma_data_direction dir);
+void pswiotlb_dma_direct_sync_sg_for_cpu_distribute(struct device *dev,
+			struct scatterlist *sg, int nelems, enum dma_data_direction dir);
+void pswiotlb_dma_direct_sync_sg_for_device_distribute(struct device *dev,
+			struct scatterlist *sg, int nelems, enum dma_data_direction dir);
+dma_addr_t pswiotlb_dma_iommu_map_page_distribute(struct device *dev,
+			struct page *page, size_t offset, size_t size,
+			enum dma_data_direction dir, unsigned long attrs);
+void pswiotlb_dma_iommu_unmap_page_attrs_distribute(struct device *dev,
+			dma_addr_t addr, size_t size, enum dma_data_direction dir,
+			unsigned long attrs);
+int pswiotlb_dma_iommu_map_sg_attrs_distribute(struct device *dev,
+			struct scatterlist *sg, int nents, int prot, unsigned long attrs);
+void pswiotlb_dma_iommu_unmap_sg_attrs_distribute(struct device *dev,
+			struct scatterlist *sg, int nents, enum dma_data_direction dir,
+			unsigned long attrs);
+void pswiotlb_dma_iommu_sync_single_for_cpu_distribute(struct device *dev,
+			dma_addr_t addr, size_t size, enum dma_data_direction dir);
+void pswiotlb_dma_iommu_sync_single_for_device_distribute(struct device *dev,
+			dma_addr_t addr, size_t size, enum dma_data_direction dir);
+void pswiotlb_dma_iommu_sync_sg_for_cpu_distribute(struct device *dev,
+			struct scatterlist *sg, int nelems, enum dma_data_direction dir);
+void pswiotlb_dma_iommu_sync_sg_for_device_distribute(struct device *dev,
+			struct scatterlist *sg, int nelems, enum dma_data_direction dir);
+
 #ifdef CONFIG_PSWIOTLB
 
 /**
@@ -200,6 +241,19 @@ static inline bool is_phytium_ps23064_socs(void)
 		return true;
 	} else
 		return false;
+}
+
+static inline bool check_if_pswiotlb_is_applicable(struct device *dev)
+{
+	if (is_phytium_ps23064_socs() && !pswiotlb_force_disable) {
+		if (dev->numa_node == NUMA_NO_NODE ||
+			dev->numa_node != dev->local_node)
+			dev->numa_node = dev->local_node;
+
+		if (dev_is_pci(dev) && (dev->numa_node != NUMA_NO_NODE))
+			return true;
+	}
+	return false;
 }
 
 static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t paddr)
