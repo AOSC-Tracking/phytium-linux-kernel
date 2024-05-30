@@ -8,4 +8,5 @@ obj-$(CONFIG_DMA_NONCOHERENT_OPS)	+= noncoherent.o
 obj-$(CONFIG_DMA_VIRT_OPS)		+= virt.o
 obj-$(CONFIG_DMA_API_DEBUG)		+= debug.o
 obj-$(CONFIG_SWIOTLB)			+= swiotlb.o
+obj-$(CONFIG_PSWIOTLB)			+= phytium/
 
