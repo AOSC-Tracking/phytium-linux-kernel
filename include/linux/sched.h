@@ -556,8 +556,10 @@ struct sched_entity {
 	u64				min_deadline;
 
 	struct list_head		group_node;
-	unsigned int			on_rq;
-	unsigned int			sched_delayed;
+	unsigned char			on_rq;
+	unsigned char			sched_delayed;
+	unsigned char			rel_deadline;
+					/* hole */
 
 	u64				exec_start;
 	u64				sum_exec_runtime;
