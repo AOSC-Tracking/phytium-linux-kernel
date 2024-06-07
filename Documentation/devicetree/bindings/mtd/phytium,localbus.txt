@@ -1,0 +1,47 @@
+* Phytium localbus controller
+
+The localbus controller(abbr. lbc) in the Phytium Soc now supports eights chip selects,
+but can only use one in each use. This lbc supports two kinds of devices, such as async
+flash and async sram, sync flash and sync sram are designed to support, but they are banned
+as they have not been tested yet.
+
+Required properties:
+- compatible : "phytium,localbus".
+- reg : first contains the register location and length,
+        second contains the memory mapping address and length.
+- reg-names : should contains the resource reg names
+             - localbus : configuration registers address space
+             - lbc_mm : memory mapped address space
+
+Required localbus slave node properties:
+- device-type : should contains one of the following:
+                - <1>: async flash,
+                - <2>: async sram,
+                - <3>: sync flash,
+                - <4>: sync sram.
+- device-time-seq : should contains four elements:
+                - [0]: reg CSPR,
+                - [1]: reg FTIM0_CS_{NOR/GPCM},
+                - [2]: reg FTIM1_CS_{NOR/GPCM},
+                - [3]: reg FTIM2_CS_{NOR/GPCM}.
+- device-size : should equal to the capacity of slave device.
+- bank-width : should contains one of the following:
+                - <1> : 1 byte, or 8 bits,
+                - <2> : 2 bytes, or 16bits.
+
+Example showing the usage of the localbus controller with one slave device:
+
+lbc: localbus@28003000 {
+	compatible = "phytium,localbus";
+	#address-cells = <2>;
+	#size-cells = <1>;
+	reg = <0x00 0x28003000 0x00 0x1000 0x01 0x10000000 0x0 0x10000000>;
+	reg-names = "localbus", "lbc_mm";
+	status = "disabled";
+	norflash@0 {
+		device-type = <1>;
+		device-time-seq = <0x0003 0x043043 0x3f1f01 0x3fc40f>;
+		device-size = <0x10000000>;
+		bank-width = <2>;
+	};
+:};
