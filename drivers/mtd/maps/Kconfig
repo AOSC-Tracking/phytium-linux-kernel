@@ -409,4 +409,10 @@ config MTD_LATCH_ADDR
 
 	  If compiled as a module, it will be called latch-addr-flash.
 
+config MTD_PHYTIUM_LBC
+	tristate "phytium lbc Flash Chip Support"
+	depends on MTD_COMPLEX_MAPPINGS
+	help
+	  This driver is support phytium localbus control,it is used for norflash devices.
+	  If compiled as a module, it will be called phytium-lbc.ko.
 endmenu
