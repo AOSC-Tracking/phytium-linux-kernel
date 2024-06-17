@@ -11,7 +11,6 @@
 #include <linux/ctype.h>
 #include <linux/debugfs.h>
 #include <linux/dma-direct.h>
-#include <linux/mm.h>
 #include <linux/export.h>
 #include <linux/gfp.h>
 #include <linux/highmem.h>
@@ -46,13 +45,9 @@
 #include <linux/slab.h>
 #endif
 
-#include <linux/io.h>
 #include <asm/dma.h>
 
-#include <linux/init.h>
-#include <linux/memblock.h>
 #include <linux/bootmem.h>
-#include <linux/iommu-helper.h>
 #include <linux/random.h>
 
 #define CREATE_TRACE_POINTS
@@ -92,6 +87,7 @@ struct p_io_tlb_mem p_io_tlb_default_mem[MAX_NUMNODES];
 static struct timer_list service_timer;
 
 static unsigned long default_npslabs = P_IO_TLB_DEFAULT_SIZE >> P_IO_TLB_SHIFT;
+static unsigned long dynamic_inc_thr_npslabs = P_IO_TLB_INC_THR >> P_IO_TLB_SHIFT;
 static unsigned long default_npareas;
 
 /**
@@ -589,8 +585,10 @@ static struct p_io_tlb_pool *pswiotlb_formal_alloc(struct device *dev,
 {
 	struct p_io_tlb_pool *pool;
 
-	pool = pswiotlb_alloc_pool(dev, mem->numa_node_id, P_IO_TLB_MIN_SLABS, default_npslabs,
-				  default_npareas, mem->phys_limit, 0, GFP_NOWAIT | __GFP_NOWARN);
+	pool = pswiotlb_alloc_pool(dev, mem->numa_node_id,
+				P_IO_TLB_MIN_SLABS, dynamic_inc_thr_npslabs,
+				dynamic_inc_thr_npslabs, mem->phys_limit,
+				0, GFP_NOWAIT | __GFP_NOWARN);
 	if (!pool) {
 		pr_warn_ratelimited("Failed to allocate new formal pool");
 		return NULL;
@@ -1028,12 +1026,12 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 	rcu_read_lock();
 	capacity = mem->capacity;
 	for (i = 0; i < 15; i++) {
-		if (i == 0 && capacity > (cpuid + 1)) {
-			pool = mem->pool_addr[cpuid + 1];
+		if (i == 0) {
+			pool = mem->pool_addr[0];
 			index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
 						alloc_size, alloc_align_mask);
-		} else if (i == 1) {
-			pool = mem->pool_addr[0];
+		} else if (i == 1 && capacity > (cpuid + 1)) {
+			pool = mem->pool_addr[cpuid + 1];
 			index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
 						alloc_size, alloc_align_mask);
 		} else {
@@ -1052,6 +1050,8 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 		return -1;
 
 	pool = pswiotlb_formal_alloc(dev, mem);
+	if (!pool)
+		return -1;
 
     /* retry */
 	rcu_read_lock();
@@ -1253,7 +1253,7 @@ static void pswiotlb_release_slots(struct device *dev, int nid, phys_addr_t tlb_
  * tlb_addr is the physical address of the bounce buffer to unmap.
  */
 void pswiotlb_tbl_unmap_single(struct device *dev, int nid, phys_addr_t tlb_addr,
-			      size_t mapping_size, enum dma_data_direction dir,
+			      size_t offset, size_t mapping_size, enum dma_data_direction dir,
 			      unsigned long attrs)
 {
 	struct page *page = pfn_to_page(PFN_DOWN(tlb_addr));
@@ -1265,6 +1265,7 @@ void pswiotlb_tbl_unmap_single(struct device *dev, int nid, phys_addr_t tlb_addr
 		(test_bit(PG_pswiotlbsync, &page->flags) == false))
 		pswiotlb_bounce(dev, nid, tlb_addr, mapping_size, DMA_FROM_DEVICE);
 
+	tlb_addr -= offset;
 	pswiotlb_release_slots(dev, nid, tlb_addr);
 
 	clear_bit(PG_pswiotlbsync, &page->flags);
@@ -1281,12 +1282,11 @@ void pswiotlb_sync_single_for_device(struct device *dev, int nid, phys_addr_t tl
 void pswiotlb_sync_single_for_cpu(struct device *dev, int nid, phys_addr_t tlb_addr,
 		size_t size, enum dma_data_direction dir)
 {
-	struct page *page = pfn_to_page(PFN_DOWN(tlb_addr));
-
-	set_bit(PG_pswiotlbsync, &page->flags);
-	if (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL)
+	if (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL) {
+		struct page *page = pfn_to_page(PFN_DOWN(tlb_addr));
 		pswiotlb_bounce(dev, nid, tlb_addr, size, DMA_FROM_DEVICE);
-	else
+		set_bit(PG_pswiotlbsync, &page->flags);
+	} else
 		WARN_ON(dir != DMA_TO_DEVICE);
 }
 /*
@@ -1308,7 +1308,7 @@ dma_addr_t pswiotlb_map(struct device *dev, int nid, phys_addr_t paddr, size_t s
 
 	dma_addr = __phys_to_dma(dev, pswiotlb_addr);
 	if ((!dma_is_in_local_node(dev, nid, dma_addr, size))) {
-		pswiotlb_tbl_unmap_single(dev, nid, pswiotlb_addr, size, dir,
+		pswiotlb_tbl_unmap_single(dev, nid, pswiotlb_addr, 0, size, dir,
 			attrs | DMA_ATTR_SKIP_CPU_SYNC);
 		dev_WARN_ONCE(dev, 1,
 				"pswiotlb DMA addr %pad+%zu is NOT in local node %d\n",
