@@ -41,6 +41,7 @@ extern bool pswiotlb_force_disable;
 
 /* default to 256MB */
 #define P_IO_TLB_DEFAULT_SIZE (256UL<<20)
+#define P_IO_TLB_INC_THR (16UL<<20)
 
 unsigned long pswiotlb_size_or_default(void);
 void __init pswiotlb_init_remap(bool addressing_limit, int nid, unsigned int flags,
@@ -54,6 +55,7 @@ phys_addr_t pswiotlb_tbl_map_single(struct device *hwdev, int nid, phys_addr_t p
 extern void pswiotlb_tbl_unmap_single(struct device *hwdev,
 				     int nid,
 					 phys_addr_t tlb_addr,
+				     size_t offset,
 				     size_t mapping_size,
 				     enum dma_data_direction dir,
 				     unsigned long attrs);

@@ -35,16 +35,7 @@ dma_addr_t pswiotlb_dma_iommu_map_page_distribute(struct device *dev, struct pag
 			size_t offset, size_t size, enum dma_data_direction dir,
 			unsigned long attrs)
 {
-	dma_addr_t addr;
-	bool coherent = is_device_dma_coherent(dev);
-
-	addr = pswiotlb_iommu_dma_map_page(dev, page, offset, size, dir, attrs);
-
-	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC) &&
-	    !iommu_dma_mapping_error(dev, addr))
-		__dma_map_area(page_address(page) + offset, size, dir);
-
-	return addr;
+	return pswiotlb_iommu_dma_map_page(dev, page, offset, size, dir, attrs);
 }
 
 void pswiotlb_dma_direct_unmap_page_attrs_distribute(struct device *dev,

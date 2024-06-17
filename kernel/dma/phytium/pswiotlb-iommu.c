@@ -131,7 +131,7 @@ static ssize_t __iommu_map_sg_dma(struct device *dev, struct iommu_domain *domai
 				aligned_size))) {
 				aligned_size = iova_align(iovad, s->length);
 				phys = pswiotlb_tbl_map_single(dev, nid,
-				phys, s->length, aligned_size, 0, dir, attrs);
+				phys, s->length, aligned_size, iova_mask(iovad), dir, attrs);
 				if (phys == DMA_MAPPING_ERROR) {
 					dev_warn_ratelimited(dev,
 						"Failed to allocate memory from pswiotlb, non-local dma is not recommended\n");
@@ -139,6 +139,8 @@ static ssize_t __iommu_map_sg_dma(struct device *dev, struct iommu_domain *domai
 				}
 			}
 		}
+		if (!is_device_dma_coherent(dev) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+			__dma_map_area(phys_to_virt(phys), s->length, dir);
 
 		ret = iommu_map(domain, iova + mapped, phys, s->length, prot);
 		if (ret)
@@ -304,23 +306,42 @@ void pswiotlb_iommu_dma_sync_sg_for_cpu(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 	int nid = dev->numa_node;
+	dma_addr_t start_orig;
+	phys_addr_t phys;
+	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 
 	if (is_pswiotlb_active(dev)) {
+		start_orig = sg_dma_address(sgl);
 		for_each_sg(sgl, sg, nelems, i) {
-			if (!is_device_dma_coherent(dev))
-				__dma_unmap_area(sg_virt(sg), sg->length, dir);
+			if (dir != DMA_TO_DEVICE) {
+				unsigned int s_iova_off = iova_offset(iovad, sg->offset);
 
-			if (is_pswiotlb_buffer(dev, nid, sg_phys(sg)))
-				pswiotlb_sync_single_for_cpu(dev, nid, sg_phys(sg),
-								sg->length, dir);
+				if (i > 0)
+					start_orig += s_iova_off;
+				phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev),
+							start_orig);
+				if (!is_device_dma_coherent(dev))
+					__dma_unmap_area(phys_to_virt(phys), sg->length, dir);
+
+				if (is_pswiotlb_buffer(dev, nid, phys))
+					pswiotlb_sync_single_for_cpu(dev, nid, phys,
+									sg->length, dir);
+				start_orig -= s_iova_off;
+				start_orig += iova_align(iovad, sg->length + s_iova_off);
+			} else {
+				if (!is_device_dma_coherent(dev))
+					__dma_unmap_area(sg_virt(sg), sg->length, dir);
 			}
+		}
+	} else {
+		if (is_device_dma_coherent(dev))
+			return;
+
+		for_each_sg(sgl, sg, nelems, i)
+			__dma_unmap_area(sg_virt(sg), sg->length, dir);
 	}
-
-	if (is_device_dma_coherent(dev))
-		return;
-
-	for_each_sg(sgl, sg, nelems, i)
-		__dma_unmap_area(sg_virt(sg), sg->length, dir);
 }
 
 void pswiotlb_iommu_dma_sync_sg_for_device(struct device *dev,
@@ -333,13 +354,14 @@ void pswiotlb_iommu_dma_sync_sg_for_device(struct device *dev,
 
 	if (is_pswiotlb_active(dev)) {
 		for_each_sg(sgl, sg, nelems, i) {
-			if (is_pswiotlb_buffer(dev, nid, sg_phys(sg)))
-				pswiotlb_sync_single_for_device(dev, nid, sg_phys(sg),
-								   sg->length, dir);
-
-			if (!is_device_dma_coherent(dev))
-				__dma_map_area(sg_virt(sg), sg->length, dir);
-			}
+			if (dir != DMA_TO_DEVICE) {
+				if (is_pswiotlb_buffer(dev, nid, sg_phys(sg)))
+					pswiotlb_sync_single_for_device(dev, nid, sg_phys(sg),
+									   sg->length, dir);
+			} else
+				if (!is_device_dma_coherent(dev))
+					__dma_map_area(sg_virt(sg), sg->length, dir);
+		}
 	} else {
 		if (is_device_dma_coherent(dev))
 			return;
@@ -381,10 +403,12 @@ dma_addr_t pswiotlb_iommu_dma_map_page(struct device *dev, struct page *page,
 		}
 	}
 
+	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+		__dma_map_area(phys_to_virt(phys), size, dir);
+
 	iova = __iommu_dma_map(dev, phys, size, prot, domain);
-	if (iova == DMA_MAPPING_ERROR && is_pswiotlb_buffer(dev, nid, phys) &&
-					is_phytium_ps23064_socs())
-		pswiotlb_tbl_unmap_single(dev, nid, phys, size, dir, attrs);
+	if (iova == DMA_MAPPING_ERROR && is_pswiotlb_buffer(dev, nid, phys))
+		pswiotlb_tbl_unmap_single(dev, nid, phys, 0, size, dir, attrs);
 	return iova;
 }
 
@@ -399,15 +423,18 @@ void pswiotlb_iommu_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
 	if (WARN_ON(!phys))
 		return;
 
+	if (((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0) && !is_device_dma_coherent(dev))
+		__dma_unmap_area(phys_to_virt(phys), size, dir);
+
 	__iommu_dma_unmap(domain, dma_handle, size);
 
 	if (is_pswiotlb_active(dev) &&
 		is_pswiotlb_buffer(dev, nid, phys))
-		pswiotlb_tbl_unmap_single(dev, nid, phys, size, dir, attrs);
+		pswiotlb_tbl_unmap_single(dev, nid, phys, 0, size, dir, attrs);
 }
 
 static void iommu_dma_unmap_page_sg(struct device *dev, dma_addr_t dma_handle,
-		size_t size, enum dma_data_direction dir, unsigned long attrs)
+		size_t offset, size_t size, enum dma_data_direction dir, unsigned long attrs)
 {
 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
 	phys_addr_t phys;
@@ -422,7 +449,7 @@ static void iommu_dma_unmap_page_sg(struct device *dev, dma_addr_t dma_handle,
 		__dma_unmap_area(phys_to_virt(phys), size, dir);
 
 	if (is_pswiotlb_buffer(dev, nid, phys))
-		pswiotlb_tbl_unmap_single(dev, nid, phys, size, dir, attrs);
+		pswiotlb_tbl_unmap_single(dev, nid, phys, offset, size, dir, attrs);
 }
 
 /*
@@ -516,10 +543,42 @@ void iommu_dma_unmap_sg_pswiotlb(struct device *dev, struct scatterlist *sg,
 			break;
 		if (s->length == 0)
 			break;
-		iommu_dma_unmap_page_sg(dev, start_orig,
+		iommu_dma_unmap_page_sg(dev, start_orig, 0,
 				s->length, dir, attrs);
 		start_orig += s->length;
 	}
+}
+
+static void iommu_dma_unmap_sg_pswiotlb_pagesize(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, unsigned long attrs)
+{
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nents, i)
+		pswiotlb_iommu_dma_unmap_page(dev, sg_dma_address(s),
+				sg_dma_len(s), dir, attrs);
+}
+
+static int iommu_dma_map_sg_pswiotlb_pagesize(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, unsigned long attrs)
+{
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nents, i) {
+		sg_dma_address(s) = pswiotlb_iommu_dma_map_page(dev, sg_page(s),
+				s->offset, s->length, dir, attrs);
+		if (sg_dma_address(s) == DMA_MAPPING_ERROR)
+			goto out_unmap;
+		sg_dma_len(s) = s->length;
+	}
+
+	return nents;
+
+out_unmap:
+	iommu_dma_unmap_sg_pswiotlb_pagesize(dev, sg, i, dir, attrs | DMA_ATTR_SKIP_CPU_SYNC);
+	return -EIO;
 }
 
 /*
@@ -542,6 +601,10 @@ int pswiotlb_iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 	unsigned long mask = dma_get_seg_boundary(dev);
 	ssize_t ret;
 	int i;
+
+	if (dir != DMA_TO_DEVICE && is_pswiotlb_active(dev)
+				&& ((nents == 1) && (sg->length < PAGE_SIZE)))
+		return iommu_dma_map_sg_pswiotlb_pagesize(dev, sg, nents, dir, attrs);
 
 	/*
 	 * Work out how much IOVA space we need, and align the segments to
@@ -611,10 +674,17 @@ void pswiotlb_iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		int nents, enum dma_data_direction dir, unsigned long attrs)
 {
 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	dma_addr_t start, end, start_orig;
 	struct scatterlist *tmp, *s;
 	struct scatterlist *sg_orig = sg;
 	int i;
+
+	if ((dir != DMA_TO_DEVICE) && ((nents == 1) && (sg->length < PAGE_SIZE))) {
+		iommu_dma_unmap_sg_pswiotlb_pagesize(dev, sg, nents, dir, attrs);
+		return;
+	}
 
 	/*
 	 * The scatterlist segments are mapped into a single
@@ -627,11 +697,15 @@ void pswiotlb_iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		start_orig = start;
 		if (dir != DMA_TO_DEVICE) {
 			for_each_sg(sg_orig, s, nents, i) {
-				if (s->length == 0)
-					break;
+				unsigned int s_iova_off = iova_offset(iovad, s->offset);
+
+				if (i > 0)
+					start_orig += s_iova_off;
 				iommu_dma_unmap_page_sg(dev, start_orig,
-						s->length, dir, attrs);
-				start_orig += s->length;
+						s_iova_off, s->length,
+						dir, attrs);
+				start_orig -= s_iova_off;
+				start_orig += iova_align(iovad, s->length + s_iova_off);
 			}
 		}
 	}

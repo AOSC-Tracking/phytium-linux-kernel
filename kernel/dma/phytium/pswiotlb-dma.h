@@ -143,7 +143,7 @@ static inline void pswiotlb_dma_direct_unmap_page(struct device *dev, dma_addr_t
 
 	if (is_pswiotlb_active(dev)) {
 		if (unlikely(is_pswiotlb_buffer(dev, nid, phys)))
-			pswiotlb_tbl_unmap_single(dev, nid, phys, size, dir, attrs);
+			pswiotlb_tbl_unmap_single(dev, nid, phys, 0, size, dir, attrs);
 
 		if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC) && (dir == DMA_FROM_DEVICE))
 			dma_mark_clean(phys_to_virt(phys), size);

@@ -916,15 +916,17 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
 {
 	bool coherent = is_device_dma_coherent(dev);
 
-	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
-		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
-
 #ifdef CONFIG_PSWIOTLB
 	if (check_if_pswiotlb_is_applicable(dev)) {
+		if ((dir == DMA_TO_DEVICE) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+			pswiotlb_dma_iommu_sync_sg_for_device_distribute(dev, sgl, nelems, dir);
+
 		return pswiotlb_dma_iommu_map_sg_attrs_distribute(dev, sgl, nelems,
 					dma_info_to_prot(dir, coherent, attrs), attrs);
 	}
 #endif
+	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
 
 	return iommu_dma_map_sg(dev, sgl, nelems,
 				dma_info_to_prot(dir, coherent, attrs));
@@ -935,15 +937,17 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
 				   enum dma_data_direction dir,
 				   unsigned long attrs)
 {
-	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
-		__iommu_sync_sg_for_cpu(dev, sgl, nelems, dir);
-
 #ifdef CONFIG_PSWIOTLB
 	if (check_if_pswiotlb_is_applicable(dev)) {
+		if ((dir == DMA_TO_DEVICE) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+			pswiotlb_dma_iommu_sync_sg_for_cpu_distribute(dev, sgl, nelems, dir);
+
 		pswiotlb_dma_iommu_unmap_sg_attrs_distribute(dev, sgl, nelems, dir, attrs);
 		return;
 	}
 #endif
+	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+		__iommu_sync_sg_for_cpu(dev, sgl, nelems, dir);
 
 	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
 }
