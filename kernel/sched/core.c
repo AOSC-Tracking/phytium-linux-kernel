@@ -7969,6 +7969,8 @@ int sched_cpu_activate(unsigned int cpu)
 		cpuset_cpu_active();
 	}
 
+	scx_rq_activate(rq);
+
 	/*
 	 * Put the rq online, if not already. This happens:
 	 *
@@ -8003,6 +8005,8 @@ int sched_cpu_deactivate(unsigned int cpu)
 	 * sched_cpu_dying().
 	 */
 	balance_push_set(cpu, true);
+
+	scx_rq_deactivate(rq);
 
 	/*
 	 * We've cleared cpu_active_mask / set balance_push, wait for all
