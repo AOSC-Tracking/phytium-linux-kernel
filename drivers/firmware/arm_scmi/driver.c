@@ -54,6 +54,8 @@ enum scmi_error_codes {
 static LIST_HEAD(scmi_list);
 /* Protection for the entire list */
 static DEFINE_MUTEX(scmi_list_mutex);
+/* Protection for scmi xfer, prevent transmission timeout */
+static DEFINE_MUTEX(scmi_xfer_mutex);
 
 /**
  * struct scmi_xfers_info - Structure to manage transfer information
@@ -413,8 +415,11 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	xfer->hdr.poll_completion = true;
 #endif
 
+	/* lock scmi xfer, too many scmi xfers may cause timeout */
+	mutex_lock(&scmi_xfer_mutex);
 	ret = mbox_send_message(cinfo->chan, xfer);
 	if (ret < 0) {
+		mutex_unlock(&scmi_xfer_mutex);
 		dev_dbg(dev, "mbox send fail %d\n", ret);
 		return ret;
 	}
@@ -428,7 +433,8 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 
 		spin_until_cond(scmi_xfer_done_no_timeout(cinfo, xfer, stop));
 
-		if (ktime_before(ktime_get(), stop))
+		if (ktime_before(ktime_get(), stop) ||
+		    scmi_xfer_poll_done(cinfo, xfer))
 			scmi_fetch_response(xfer, cinfo->payload);
 		else
 			ret = -ETIMEDOUT;
@@ -452,6 +458,7 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	 * received our message.
 	 */
 	mbox_client_txdone(cinfo->chan, ret);
+	mutex_unlock(&scmi_xfer_mutex);
 
 	return ret;
 }
