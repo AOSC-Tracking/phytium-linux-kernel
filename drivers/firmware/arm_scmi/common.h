@@ -91,7 +91,6 @@ struct scmi_xfer {
 	struct scmi_msg tx;
 	struct scmi_msg rx;
 	struct completion done;
-	spinlock_t lock;
 };
 
 void scmi_xfer_put(const struct scmi_handle *h, struct scmi_xfer *xfer);
