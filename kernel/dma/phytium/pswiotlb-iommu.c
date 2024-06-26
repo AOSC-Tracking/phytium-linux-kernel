@@ -133,9 +133,9 @@ static ssize_t __iommu_map_sg_dma(struct device *dev, struct iommu_domain *domai
 				phys = pswiotlb_tbl_map_single(dev, nid,
 				phys, s->length, aligned_size, iova_mask(iovad), dir, attrs);
 				if (phys == DMA_MAPPING_ERROR) {
-					dev_warn_ratelimited(dev,
-						"Failed to allocate memory from pswiotlb, non-local dma is not recommended\n");
-					goto out_err_pswiotlb;
+					phys = page_to_phys(sg_page(s)) + s->offset;
+					dev_warn_once(dev,
+						"Failed to allocate memory from pswiotlb, fall back to non-local dma\n");
 				}
 			}
 		}
@@ -158,14 +158,6 @@ out_err:
 	iommu_unmap(domain, iova, mapped);
 
 	return ret;
-
-out_err_pswiotlb:
-	iommu_dma_unmap_sg_pswiotlb(dev, sg_orig, iova,
-				mapped, i - 1, dir, attrs | DMA_ATTR_SKIP_CPU_SYNC);
-	iommu_unmap(domain, iova, mapped);
-
-	return 0;
-
 }
 
 static ssize_t pswiotlb_iommu_map_sg_atomic_dma(struct device *dev,
@@ -395,9 +387,9 @@ dma_addr_t pswiotlb_iommu_dma_map_page(struct device *dev, struct page *page,
 							aligned_size, iova_mask(iovad),
 							dir, attrs);
 				if (phys == DMA_MAPPING_ERROR) {
-					dev_warn_ratelimited(dev,
-						"Failed to allocate memory from pswiotlb, non-local dma is not recommended\n");
-					return DMA_MAPPING_ERROR;
+					phys = page_to_phys(page) + offset;
+					dev_warn_once(dev,
+						"Failed to allocate memory from pswiotlb, fall back to non-local dma\n");
 				}
 			}
 		}
