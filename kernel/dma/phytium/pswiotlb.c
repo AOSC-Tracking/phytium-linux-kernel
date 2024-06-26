@@ -1291,6 +1291,12 @@ phys_addr_t pswiotlb_tbl_map_single(struct device *dev, int nid, phys_addr_t ori
 	unsigned long index;
 	phys_addr_t tlb_addr;
 
+	if (alloc_size > (P_IO_TLB_SEGSIZE << P_IO_TLB_SHIFT)) {
+		dev_warn_ratelimited(dev, "alloc size 0x%lx is larger than segment(0x%x) of pswiotlb\n",
+					alloc_size, P_IO_TLB_SEGSIZE << P_IO_TLB_SHIFT);
+		return (phys_addr_t)DMA_MAPPING_ERROR;
+	}
+
 	if (!mem || !mem->nslabs) {
 		dev_warn_ratelimited(dev,
 			"Can not allocate PSWIOTLB buffer earlier and can't now provide you with the DMA bounce buffer");

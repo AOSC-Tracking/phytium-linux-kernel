@@ -164,10 +164,12 @@ static inline dma_addr_t pswiotlb_dma_direct_map_page(struct device *dev,
 		if (dir != DMA_TO_DEVICE) {
 			if (unlikely(!dma_is_in_local_node(dev, nid, dma_addr, size))) {
 				dma_addr = pswiotlb_map(dev, nid, phys, size, dir, attrs);
-				if (dma_addr == DMA_MAPPING_ERROR)
-					dev_warn_ratelimited(dev,
-						"Failed to allocate memory from pswiotlb, non-local dma is not recommended\n");
-				return dma_addr;
+				if (dma_addr == DMA_MAPPING_ERROR) {
+					dma_addr = phys_to_dma(dev, phys);
+					dev_warn_once(dev,
+						"Failed to allocate memory from pswiotlb, fall back to non-local dma\n");
+				} else
+					return dma_addr;
 			}
 		}
 	}
