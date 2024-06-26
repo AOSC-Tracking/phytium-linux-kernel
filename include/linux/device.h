@@ -1034,6 +1034,7 @@ struct device {
 #ifdef CONFIG_PSWIOTLB
 	struct p_io_tlb_mem *dma_p_io_tlb_mem;
 	bool dma_uses_p_io_tlb;
+	bool can_use_pswiotlb;
 #endif
 	/* arch specific additions */
 	struct dev_archdata	archdata;
