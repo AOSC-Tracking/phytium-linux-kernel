@@ -83,7 +83,8 @@ void pswiotlb_iommu_dma_sync_sg_for_device(struct device *dev,
 
 static inline bool check_if_pswiotlb_is_applicable(struct device *dev)
 {
-	if (is_phytium_ps23064_socs() && !pswiotlb_force_disable) {
+	if (dev->can_use_pswiotlb && is_phytium_ps23064_socs()
+				&& !pswiotlb_force_disable) {
 		if (dev->numa_node == NUMA_NO_NODE ||
 			dev->numa_node != dev->local_node)
 			dev->numa_node = dev->local_node;

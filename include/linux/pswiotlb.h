@@ -44,6 +44,11 @@ static bool is_ps23064_socs;
 #define P_IO_TLB_DEFAULT_SIZE (256UL<<20)
 #define P_IO_TLB_INC_THR (16UL<<20)
 
+/* blacklist which incompatible with pswiotlb temporarily */
+#define BL_PCI_VENDOR_ID_NVIDIA          0x10de
+#define BL_PCI_VENDOR_ID_ILUVATAR        0x1E3E
+#define BL_PCI_VENDOR_ID_METAX			 0x9999
+
 unsigned long pswiotlb_size_or_default(void);
 void __init pswiotlb_init_remap(bool addressing_limit, int nid, unsigned int flags,
 	int (*remap)(void *tlb, unsigned long nslabs));
@@ -71,7 +76,12 @@ void pswiotlb_store_local_node(struct pci_dev *dev, struct pci_bus *bus);
 void iommu_dma_unmap_sg_pswiotlb(struct device *dev, struct scatterlist *sg, unsigned long iova,
 			size_t mapped, int nents, enum dma_data_direction dir, unsigned long attrs);
 #ifdef CONFIG_PSWIOTLB
-
+struct pswiotlb_blacklist {
+	struct list_head node;
+	unsigned short vendor;
+	unsigned short device;
+	bool from_grub;
+};
 /**
  * struct p_io_tlb_pool - Phytium IO TLB memory pool descriptor
  * @start:	The start address of the pswiotlb memory pool. Used to do a quick
@@ -248,6 +258,7 @@ bool is_pswiotlb_active(struct device *dev);
 void __init pswiotlb_adjust_size(unsigned long size);
 phys_addr_t default_pswiotlb_base(struct device *dev);
 phys_addr_t default_pswiotlb_limit(struct device *dev);
+bool pswiotlb_is_dev_in_blacklist(struct pci_dev *dev);
 #else
 static inline void pswiotlb_init(bool addressing_limited, unsigned int flags)
 {
@@ -290,6 +301,11 @@ static inline phys_addr_t default_pswiotlb_base(struct device *dev)
 static inline phys_addr_t default_pswiotlb_limit(struct device *dev)
 {
 	return 0;
+}
+
+static inline bool pswiotlb_is_dev_in_blacklist(struct pci_dev *dev)
+{
+	return false;
 }
 #endif /* CONFIG_PSWIOTLB */
 

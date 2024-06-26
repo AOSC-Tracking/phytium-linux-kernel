@@ -766,6 +766,7 @@ struct device {
 #ifdef CONFIG_PSWIOTLB
 	struct p_io_tlb_mem *dma_p_io_tlb_mem;
 	bool dma_uses_p_io_tlb;
+	bool can_use_pswiotlb;
 #endif
 #ifdef CONFIG_SWIOTLB_DYNAMIC
 	struct list_head dma_io_tlb_pools;

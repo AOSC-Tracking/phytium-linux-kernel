@@ -88,6 +88,10 @@ static unsigned long default_npslabs = P_IO_TLB_DEFAULT_SIZE >> P_IO_TLB_SHIFT;
 static unsigned long dynamic_inc_thr_npslabs = P_IO_TLB_INC_THR >> P_IO_TLB_SHIFT;
 static unsigned long default_npareas;
 
+LIST_HEAD(blacklist);
+static spinlock_t blacklist_lock;
+static struct pswiotlb_blacklist blacklist_entry[1024];
+static struct dentry *blacklist_debugfs;
 /**
  * struct p_io_tlb_area - Phytium IO TLB memory area descriptor
  *
@@ -103,6 +107,17 @@ struct p_io_tlb_area {
 	unsigned int index;
 	spinlock_t lock;
 };
+
+static struct pswiotlb_blacklist_entry {
+	unsigned short vendor;
+	unsigned short device;
+} ps_blacklist[] = {
+	{BL_PCI_VENDOR_ID_NVIDIA,	  0xFFFF},
+	{BL_PCI_VENDOR_ID_ILUVATAR,	  0xFFFF},
+	{BL_PCI_VENDOR_ID_METAX,      0xFFFF},
+	{}
+};
+
 /*
  * Round up number of slabs to the next power of 2. The last area is going
  * be smaller than the rest if default_npslabs is not power of two.
@@ -186,6 +201,38 @@ setup_p_io_tlb_npages(char *str)
 	return 0;
 }
 early_param("pswiotlb", setup_p_io_tlb_npages);
+
+static int __init
+setup_pswiotlb_blacklist(char *str)
+{
+	char tmp_str[5] = {'\0'};
+	unsigned long flags;
+	int i, j, k;
+	int ret;
+
+	for (i = 0, j = 0, k = 0; i < strlen(str) + 1; i++) {
+		if (*(str + i) != ',' && *(str + i) != '\0') {
+			tmp_str[j++] = *(str + i);
+		} else {
+			j = 0;
+
+			ret = kstrtou16(tmp_str, 16, &blacklist_entry[k].vendor);
+			if (ret)
+				return ret;
+
+			blacklist_entry[k].from_grub = true;
+
+			spin_lock_irqsave(&blacklist_lock, flags);
+			list_add_rcu(&blacklist_entry[k].node, &blacklist);
+			spin_unlock_irqrestore(&blacklist_lock, flags);
+
+			k++;
+		}
+	}
+
+	return 0;
+}
+early_param("pswiotlb_blacklist", setup_pswiotlb_blacklist);
 
 unsigned long pswiotlb_size_or_default(void)
 {
@@ -646,6 +693,67 @@ static void pswiotlb_init_tlb_mem_dynamic(struct p_io_tlb_mem *mem, int nid)
 	mem->whole_size = 0;
 	mem->numa_node_id = nid;
 }
+
+bool pswiotlb_is_dev_in_blacklist(struct pci_dev *dev)
+{
+	struct pswiotlb_blacklist *bl_entry;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(bl_entry, &blacklist, node) {
+		if (bl_entry->vendor == dev->vendor) {
+			rcu_read_unlock();
+			goto out;
+		}
+	}
+	rcu_read_unlock();
+
+	return true;
+out:
+	return false;
+}
+
+static void pswiotlb_show_blacklist(void)
+{
+	struct pswiotlb_blacklist *bl_entry;
+
+	pr_info("The following vendors devices belong to are incompatible with pswiotlb temporarily:\n");
+	rcu_read_lock();
+	list_for_each_entry_rcu(bl_entry, &blacklist, node)
+		printk(KERN_CONT "0x%-06x", bl_entry->vendor);
+	rcu_read_unlock();
+}
+static void pswiotlb_blacklist_init(void)
+{
+	int dev_num = 0;
+	int i;
+	size_t alloc_size;
+	struct pswiotlb_blacklist *blacklist_array;
+
+	spin_lock_init(&blacklist_lock);
+
+	for (i = 0; ps_blacklist[i].vendor != 0; i++)
+		dev_num++;
+
+	alloc_size = PAGE_ALIGN(array_size(sizeof(struct pswiotlb_blacklist), dev_num));
+	blacklist_array = memblock_alloc(alloc_size, PAGE_SIZE);
+	if (!blacklist_array) {
+		pr_warn("%s: Failed to allocate memory for blacklist\n",
+					__func__);
+		return;
+	}
+
+	for (i = 0; i < dev_num; i++) {
+		blacklist_array[i].vendor = ps_blacklist[i].vendor;
+		blacklist_array[i].device = ps_blacklist[i].device;
+
+		spin_lock(&blacklist_lock);
+		list_add_rcu(&blacklist_array[i].node, &blacklist);
+		spin_unlock(&blacklist_lock);
+	}
+
+	pswiotlb_show_blacklist();
+}
+
 /*
  * Statically reserve bounce buffer space and initialize bounce buffer data
  * structures for the software IO TLB used to implement the DMA API.
@@ -671,6 +779,8 @@ void __init pswiotlb_init(bool addressing_limit, unsigned int flags)
 	/* Get P TLB memory according to numa node id */
 	for (i = 0; i < pswiotlb_node_num; i++)
 		pswiotlb_init_remap(addressing_limit, i, flags, NULL);
+
+	pswiotlb_blacklist_init();
 }
 
 /**
@@ -1450,10 +1560,88 @@ static void pswiotlb_create_debugfs_files(struct p_io_tlb_mem *mem,
 			&fops_p_io_tlb_hiwater);
 }
 
+static int blacklist_display_show(struct seq_file *m, void *v)
+{
+	struct pswiotlb_blacklist *bl_entry;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(bl_entry, &blacklist, node) {
+		seq_printf(m, "0x%04x\n", bl_entry->vendor);
+	}
+	rcu_read_unlock();
+
+	return 0;
+}
+
+static int blacklist_add(void *data, u64 val)
+{
+	struct pswiotlb_blacklist *bl_entry;
+	unsigned long flags;
+
+	bl_entry = kzalloc(sizeof(*bl_entry), GFP_ATOMIC);
+	if (!bl_entry)
+		return -ENOMEM;
+
+	bl_entry->vendor = val;
+	bl_entry->from_grub = false;
+
+	spin_lock_irqsave(&blacklist_lock, flags);
+	list_add_rcu(&bl_entry->node, &blacklist);
+	spin_unlock_irqrestore(&blacklist_lock, flags);
+
+	return 0;
+}
+
+static int blacklist_del(void *data, u64 val)
+{
+	struct pswiotlb_blacklist *bl_entry;
+	unsigned long flags;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(bl_entry, &blacklist, node) {
+		if (bl_entry->vendor == val)
+			goto found;
+	}
+	rcu_read_unlock();
+
+	return 0;
+found:
+	rcu_read_unlock();
+	spin_lock_irqsave(&blacklist_lock, flags);
+	list_del_rcu(&bl_entry->node);
+	spin_unlock_irqrestore(&blacklist_lock, flags);
+
+	if (bl_entry->from_grub == false)
+		kfree(bl_entry);
+
+	return 0;
+}
+
+DEFINE_SHOW_ATTRIBUTE(blacklist_display);
+DEFINE_DEBUGFS_ATTRIBUTE(fops_blacklist_add, NULL,
+				blacklist_add, "%llu\n");
+DEFINE_DEBUGFS_ATTRIBUTE(fops_blacklist_del, NULL,
+				blacklist_del, "%llu\n");
+
+static void pswiotlb_create_blacklist_debugfs_files(const char *dirname)
+{
+	blacklist_debugfs = debugfs_create_dir(dirname, blacklist_debugfs);
+	if (!blacklist_debugfs)
+		return;
+
+	debugfs_create_file("show_devices", 0400, blacklist_debugfs, NULL,
+			&blacklist_display_fops);
+	debugfs_create_file("add_device", 0600, blacklist_debugfs, NULL,
+			&fops_blacklist_add);
+	debugfs_create_file("del_device", 0600, blacklist_debugfs, NULL,
+			&fops_blacklist_del);
+}
+
 static int __init pswiotlb_create_default_debugfs(void)
 {
 	int i;
 	char name[20] = "";
+	char blacklist_name[20] = "";
 
 	if (!pswiotlb_mtimer_alive && !pswiotlb_force_disable) {
 		pr_info("setup pswiotlb monitor timer service\n");
@@ -1468,6 +1656,9 @@ static int __init pswiotlb_create_default_debugfs(void)
 		sprintf(name, "%s-%d", "pswiotlb", i);
 		pswiotlb_create_debugfs_files(&p_io_tlb_default_mem[i], i, name);
 	}
+	sprintf(blacklist_name, "%s", "pswiotlb-blacklist");
+	pswiotlb_create_blacklist_debugfs_files(blacklist_name);
+
 	return 0;
 }
 
