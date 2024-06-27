@@ -1809,11 +1809,12 @@ static void phytmac_validate(struct net_device *ndev,
 	if (state->interface == PHY_INTERFACE_MODE_2500BASEX)
 		phylink_set(mask, 2500baseX_Full);
 
-	if (state->interface == PHY_INTERFACE_MODE_1000BASEX ||
-	    state->interface == PHY_INTERFACE_MODE_SGMII ||
+	if (state->interface == PHY_INTERFACE_MODE_1000BASEX)
+		phylink_set(mask, 1000baseX_Full);
+
+	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
 	    phy_interface_mode_is_rgmii(state->interface)) {
 		phylink_set(mask, 1000baseT_Full);
-		phylink_set(mask, 1000baseX_Full);
 		phylink_set(mask, 1000baseT_Half);
 		phylink_set(mask, 10baseT_Half);
 		phylink_set(mask, 10baseT_Full);
