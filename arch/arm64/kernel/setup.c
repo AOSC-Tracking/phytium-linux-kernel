@@ -403,7 +403,7 @@ static int __init topology_init(void)
 {
 	int i;
 
-	for_each_possible_cpu(i) {
+	for_each_present_cpu(i) {
 		struct cpu *cpu = &per_cpu(cpu_data.cpu, i);
 		cpu->hotpluggable = cpu_can_disable(i);
 		register_cpu(cpu, i);
@@ -454,3 +454,24 @@ static int __init check_mmu_enabled_at_boot(void)
 	return 0;
 }
 device_initcall_sync(check_mmu_enabled_at_boot);
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+int arch_register_cpu(int num)
+{
+	struct cpu *cpu = &per_cpu(cpu_data.cpu, num);
+
+	cpu->hotpluggable = 1;
+	return register_cpu(cpu, num);
+}
+EXPORT_SYMBOL(arch_register_cpu);
+
+void arch_unregister_cpu(int num)
+{
+	struct cpu *cpu = &per_cpu(cpu_data.cpu, num);
+
+	unregister_cpu(cpu);
+}
+EXPORT_SYMBOL(arch_unregister_cpu);
+
+#endif

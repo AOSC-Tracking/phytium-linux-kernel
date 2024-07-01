@@ -29,6 +29,7 @@
 #include <linux/pgtable.h>
 
 #include <acpi/ghes.h>
+#include <acpi/processor.h>
 #include <asm/cputype.h>
 #include <asm/cpu_ops.h>
 #include <asm/daifflags.h>
@@ -517,3 +518,35 @@ int acpi_ffh_address_space_arch_handler(acpi_integer *value, void *region_contex
 	return ret;
 }
 #endif /* CONFIG_ACPI_FFH */
+
+int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, u32 acpi_id,
+		 int *pcpu)
+{
+	int cpu, nid;
+
+	cpu = acpi_map_cpuid(physid, acpi_id);
+	if (cpu < 0) {
+		pr_info("Unable to map GICC to logical cpu number\n");
+		return cpu;
+	}
+	nid = acpi_get_node(handle);
+	if (nid != NUMA_NO_NODE) {
+		set_cpu_numa_node(cpu, nid);
+		numa_add_cpu(cpu);
+	}
+
+	*pcpu = cpu;
+	set_cpu_present(cpu, true);
+
+	return 0;
+}
+EXPORT_SYMBOL(acpi_map_cpu);
+
+int acpi_unmap_cpu(int cpu)
+{
+	set_cpu_present(cpu, false);
+	numa_clear_node(cpu);
+
+	return 0;
+}
+EXPORT_SYMBOL(acpi_unmap_cpu);
