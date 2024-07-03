@@ -1856,6 +1856,7 @@ F:	arch/arm/include/asm/kvm_ras.h
 F:	arch/arm64/include/asm/kvm_ras.h
 F:	Documentation/devicetree/bindings/edac/phytium-pe220x-edac.txt
 F:	Documentation/devicetree/bindings/dma/phytium-ddma.yaml
+F:	Documentation/devicetree/bindings/dma/phytium,gdma.yaml
 F:	Documentation/devicetree/bindings/gpio/gpio-phytium.txt
 F:	Documentation/devicetree/bindings/gpio/gpio-phytium-sgpio.txt
 F:	Documentation/devicetree/bindings/gpu/phytium-display.txt
