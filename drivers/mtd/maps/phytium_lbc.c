@@ -520,12 +520,12 @@ static const struct of_device_id phytium_lbc_of_match[] = {
 	{.compatible = "phytium,localbus"},
 	{ }
 };
-MODULE_DEVICE_TABLE(of, phytium_lbc_match);
+MODULE_DEVICE_TABLE(of, phytium_lbc_of_match);
 static const struct acpi_device_id phytium_lbc_acpi_match[] = {
 	{"PHYT0053", 0},
 	{ }
 };
-MODULE_DEVICE_TABLE(acpi, phytium_lbc_match);
+MODULE_DEVICE_TABLE(acpi, phytium_lbc_acpi_match);
 
 static struct platform_driver phytium_lbc_driver = {
 	.probe		= phytium_lbc_probe,
