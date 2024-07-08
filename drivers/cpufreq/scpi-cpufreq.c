@@ -61,7 +61,7 @@ scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
 	if (ret)
 		return ret;
 
-	if (clk_get_rate(priv->clk) != rate)
+	if (clk_get_rate(priv->clk) / 1000 * 1000 != rate)
 		return -EIO;
 
 	arch_set_freq_scale(policy->related_cpus, freq,
