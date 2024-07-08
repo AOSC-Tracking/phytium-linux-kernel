@@ -92,6 +92,10 @@ static u8 phytium_kcs_inb(struct kcs_bmc *kcs_bmc, u32 reg)
 	rc = regmap_read(priv->map, reg, &val);
 	WARN(rc != 0, "regmap_read() failed: %d\n", rc);
 
+	if (reg == LPC_IDR1 || reg == LPC_IDR2 ||
+			reg == LPC_IDR3 || reg == LPC_IDR4)
+		rc = regmap_read(priv->map, reg, &val);
+
 	return rc == 0 ? (u8) val : 0;
 }
 
@@ -99,6 +103,10 @@ static void phytium_kcs_outb(struct kcs_bmc *kcs_bmc, u32 reg, u8 data)
 {
 	struct phytium_kcs_bmc *priv = kcs_bmc_priv(kcs_bmc);
 	int rc;
+
+	if (reg == LPC_ODR1 || reg == LPC_ODR2 ||
+			reg == LPC_ODR3 || reg == LPC_ODR4)
+		regmap_write(priv->map, reg, data);
 
 	rc = regmap_write(priv->map, reg, data);
 	WARN(rc != 0, "regmap_write() failed: %d\n", rc);
