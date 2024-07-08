@@ -81,22 +81,18 @@ static int phytium_can_pci_probe(struct pci_dev *pdev, const struct pci_device_i
 
 	pci_set_drvdata(pdev, cdev->net);
 
-	if (!pm_runtime_enabled(cdev->dev))
-		pm_runtime_enable(cdev->dev);
-	ret = pm_runtime_get_sync(cdev->dev);
-	if (ret < 0) {
-		netdev_err(cdev->net, "%s: pm_runtime_get failed(%d)\n",
-			   __func__, ret);
-		goto err_pmdisable;
-	}
+	pm_runtime_get_noresume(cdev->dev);
+	pm_runtime_set_active(cdev->dev);
+	pm_runtime_enable(cdev->dev);
 	ret = phytium_can_register(cdev);
 	if (ret)
-		goto err;
+		goto err_pmdisable;
 
 	return 0;
 
 err_pmdisable:
 	pm_runtime_disable(&pdev->dev);
+	phytium_can_free_dev(cdev->net);
 err:
 	return ret;
 }
@@ -106,9 +102,8 @@ static void phytium_can_pci_remove(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct phytium_can_dev *cdev = netdev_priv(dev);
 
-	pm_runtime_disable(cdev->dev);
-
 	phytium_can_unregister(cdev);
+	pm_runtime_disable(cdev->dev);
 	phytium_can_free_dev(cdev->net);
 }
 

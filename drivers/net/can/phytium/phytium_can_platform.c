@@ -145,7 +145,10 @@ static int phytium_can_plat_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, cdev->net);
 
+	pm_runtime_get_noresume(cdev->dev);
+	pm_runtime_set_active(cdev->dev);
 	pm_runtime_enable(cdev->dev);
+	/*This functiong call the pm_runtime_put_sync*/
 	ret = phytium_can_register(cdev);
 	if (ret)
 		goto out_runtime_disable;
@@ -175,7 +178,7 @@ static int phytium_can_plat_remove(struct platform_device *pdev)
 	struct phytium_can_dev *cdev = netdev_priv(dev);
 
 	phytium_can_unregister(cdev);
-
+	pm_runtime_disable(cdev->dev);
 	phytium_can_free_dev(cdev->net);
 
 	return 0;
