@@ -496,9 +496,10 @@ static int phytium_lbc_remove(struct platform_device *pdev)
 	struct phytium_lbc *lbc = platform_get_drvdata(pdev);
 	int i = 0;
 
-	for (i = 0; i < lbc->dev_num; i++)
+	for (i = 0; i < lbc->dev_num; i++) {
+		mtd_device_unregister(lbc->dev[i].mtd);
 		map_destroy(lbc->dev[i].mtd);
-
+	}
 	return 0;
 }
 
