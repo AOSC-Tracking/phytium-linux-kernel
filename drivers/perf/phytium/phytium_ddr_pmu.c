@@ -31,6 +31,7 @@
 #define pr_fmt(fmt) "phytium_ddr_pmu: " fmt
 
 #define PHYTIUM_DDR_MAX_COUNTERS 8
+#define DDR_PERF_DRIVER_VERSION "1.2.1"
 
 #define DDR_START_TIMER 0x000
 #define DDR_STOP_TIMER 0x004
@@ -749,4 +750,5 @@ module_exit(phytium_ddr_pmu_module_exit);
 
 MODULE_DESCRIPTION("Phytium DDR PMU driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DDR_PERF_DRIVER_VERSION);
 MODULE_AUTHOR("Hu Xianghua <huxianghua@phytium.com.cn>");
