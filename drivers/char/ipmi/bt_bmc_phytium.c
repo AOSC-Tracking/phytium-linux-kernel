@@ -72,6 +72,8 @@
 
 #define BT_BMC_BUFFER_SIZE 256
 
+#define BT_BMC_DRIVER_VERSION "1.1.1"
+
 struct bt_bmc {
 	struct device		dev;
 	struct miscdevice	miscdev;
@@ -531,3 +533,4 @@ module_platform_driver(bt_bmc_driver);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn");
 MODULE_DESCRIPTION("Linux device interface to the BT interface");
+MODULE_VERSION(BT_BMC_DRIVER_VERSION);
