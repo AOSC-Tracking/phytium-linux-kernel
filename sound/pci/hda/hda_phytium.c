@@ -36,6 +36,8 @@
 
 #include "hda_intel_trace.h"
 
+#define PHYTIUM_HDA_V1_VERSION "1.0.0"
+
 /* position fix mode */
 enum {
 	POS_FIX_AUTO,
@@ -1223,3 +1225,4 @@ module_platform_driver(ft_platform_hda);
 
 MODULE_DESCRIPTION("FT HDA bus driver");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(PHYTIUM_HDA_V1_VERSION);
