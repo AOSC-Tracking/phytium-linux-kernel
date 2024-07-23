@@ -18,6 +18,8 @@
 
 #include "gpio-phytium-core.h"
 
+#define GPIO_PLAT_DRIVER_VERSION "1.1.2"
+
 static const struct of_device_id phytium_gpio_of_match[] = {
 	{ .compatible = "phytium,gpio", },
 	{ }
@@ -202,3 +204,4 @@ module_platform_driver(phytium_gpio_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Chen Baozi <chenbaozi@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium GPIO driver");
+MODULE_VERSION(GPIO_PLAT_DRIVER_VERSION);

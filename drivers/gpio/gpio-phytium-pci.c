@@ -13,6 +13,8 @@
 
 #include "gpio-phytium-core.h"
 
+#define GPIO_PCI_DRIVER_VERSION "1.1.1"
+
 static int phytium_gpio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct device *dev = &pdev->dev;
@@ -185,3 +187,4 @@ module_pci_driver(phytium_gpio_pci_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium GPIO PCI Driver");
+MODULE_VERSION(GPIO_PCI_DRIVER_VERSION);
