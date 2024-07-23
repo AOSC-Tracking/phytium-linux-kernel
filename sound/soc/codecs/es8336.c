@@ -31,6 +31,8 @@
 #include <linux/regmap.h>
 #include "es8336.h"
 
+#define ES8336_V1_VERSION "1.0.0"
+
 #define ES8336_MUTE (1 << 5)
 
 static struct snd_soc_component *es8336_component;
@@ -1073,3 +1075,4 @@ static struct i2c_driver es8336_i2c_driver = {
 module_i2c_driver(es8336_i2c_driver);
 MODULE_DESCRIPTION("ASoC es8336 driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(ES8336_V1_VERSION);
