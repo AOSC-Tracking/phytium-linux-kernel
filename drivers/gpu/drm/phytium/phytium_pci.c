@@ -402,6 +402,7 @@ static const struct phytium_device_info px210_info = {
 	.vdisplay_max = PX210_DC_VDISPLAY_MAX,
 	.address_mask = PX210_DC_ADDRESS_MASK,
 	.backlight_max = PX210_DP_BACKLIGHT_MAX,
+	.bmc_mode = false,
 };
 
 static const struct phytium_device_info pe220x_info = {
@@ -412,6 +413,7 @@ static const struct phytium_device_info pe220x_info = {
 	.vdisplay_max = PE220X_DC_VDISPLAY_MAX,
 	.address_mask = PE220X_DC_ADDRESS_MASK,
 	.backlight_max = PE220X_DP_BACKLIGHT_MAX,
+	.bmc_mode = true,
 };
 
 static const struct pci_device_id phytium_display_pci_ids[] = {
