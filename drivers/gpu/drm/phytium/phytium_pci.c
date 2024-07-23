@@ -408,6 +408,7 @@ static const struct phytium_device_info px210_info = {
 	.vdisplay_max = PX210_DC_VDISPLAY_MAX,
 	.address_mask = PX210_DC_ADDRESS_MASK,
 	.backlight_max = PX210_DP_BACKLIGHT_MAX,
+	.backlight_min = PX210_DP_BACKLIGHT_MIN,
 	.bmc_mode = false,
 };
 
@@ -419,6 +420,7 @@ static const struct phytium_device_info pe220x_info = {
 	.vdisplay_max = PE220X_DC_VDISPLAY_MAX,
 	.address_mask = PE220X_DC_ADDRESS_MASK,
 	.backlight_max = PE220X_DP_BACKLIGHT_MAX,
+	.backlight_min = PE220X_DP_BACKLIGHT_MIN,
 	.bmc_mode = true,
 };
 
