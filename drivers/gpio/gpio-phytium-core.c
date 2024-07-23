@@ -11,6 +11,8 @@
 
 #include "gpio-phytium-core.h"
 
+#define GPIO_CORE_DRIVER_VERSION "1.1.2"
+
 static int get_pin_location(struct phytium_gpio *gpio, unsigned int offset,
 		     struct pin_loc *pl)
 {
@@ -360,3 +362,4 @@ EXPORT_SYMBOL_GPL(phytium_gpio_irq_set_affinity);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Phytium GPIO Controller core");
+MODULE_VERSION(GPIO_CORE_DRIVER_VERSION);
