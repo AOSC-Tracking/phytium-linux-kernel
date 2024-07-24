@@ -1469,5 +1469,6 @@ static struct platform_driver phytium_jpeg_driver = {
 module_platform_driver(phytium_jpeg_driver);
 
 MODULE_DESCRIPTION("Phytium JPEG Encoder driver");
+MODULE_VERSION(JPEG_DRIVER_VERSION);
 MODULE_AUTHOR("Wang Min <wangmin@phytium.com.cn>");
 MODULE_LICENSE("GPL v2");

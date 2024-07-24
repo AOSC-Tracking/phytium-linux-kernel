@@ -36,6 +36,7 @@
 #include <media/videobuf2-dma-contig.h>
 
 #define PHYTIUM_JPEG_NAME       "phytium-jpeg"
+#define JPEG_DRIVER_VERSION     "1.0.0"
 #define MAX_FRAME_RATE          60
 #define MAX_HEIGHT              1080
 #define MAX_WIDTH               1920
