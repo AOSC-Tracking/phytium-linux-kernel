@@ -345,6 +345,7 @@ struct drm_driver phytium_display_drm_driver = {
 	.irq_uninstall		= phytium_irq_uninstall,
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
+	.gem_free_object_unlocked = phytium_gem_free_object,
 	.gem_prime_export	= drm_gem_prime_export,
 	.gem_prime_import	= drm_gem_prime_import,
 	.gem_prime_import_sg_table = phytium_gem_prime_import_sg_table,
