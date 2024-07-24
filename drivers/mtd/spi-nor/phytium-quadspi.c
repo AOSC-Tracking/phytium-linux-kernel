@@ -23,6 +23,8 @@
 #include <linux/swab.h>
 #include <linux/acpi.h>
 
+#define DRIVER_VERSION	"1.0.0"
+
 #define QSPI_FLASH_CAP_REG   0x000
 #define QSPI_RD_CFG_REG      0x004
 #define QSPI_WR_CFG_REG      0x008
@@ -1059,3 +1061,4 @@ module_platform_driver(phytium_qspi_driver);
 MODULE_AUTHOR("Mingshuai Zhu <zhumingshui@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium QuadSPI driver");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(DRIVER_VERSION);
