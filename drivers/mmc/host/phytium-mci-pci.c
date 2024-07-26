@@ -173,3 +173,4 @@ module_pci_driver(phytium_mci_pci_driver);
 MODULE_DESCRIPTION("Phytium Multimedia Card Interface PCI driver");
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
+MODULE_VERSION(PHYTIUM_MMC_DRIVER_VERSION);
