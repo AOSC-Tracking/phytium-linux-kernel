@@ -14,9 +14,10 @@
 #include <linux/pci.h>
 #include "phytium-mci.h"
 
+#define PHYTIUM_MMC_PCI_DRIVER_VERSION "1.0.0"
+
 static u32 sd_caps = MMC_CAP_SD_HIGHSPEED | MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE |
-		     MMC_CAP_CMD23 | MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR50|
-		     MMC_CAP_4_BIT_DATA;
+		     MMC_CAP_CMD23 | MMC_CAP_4_BIT_DATA;
 static u32 sd_caps2 = MMC_CAP2_NO_MMC;
 
 static u32 emmc_caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_WAIT_WHILE_BUSY |
@@ -177,3 +178,4 @@ module_pci_driver(phytium_mci_pci_driver);
 MODULE_DESCRIPTION("Phytium Multimedia Card Interface PCI driver");
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
+MODULE_VERSION(PHYTIUM_MMC_PCI_DRIVER_VERSION);

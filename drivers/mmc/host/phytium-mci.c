@@ -37,6 +37,8 @@
 #include <linux/delay.h>
 #include "phytium-mci.h"
 
+#define PHYTIUM_MMC_DRIVER_VERSION "1.0.0"
+
 static const u32 cmd_ints_mask = MCI_INT_MASK_RE | MCI_INT_MASK_CMD | MCI_INT_MASK_RCRC |
 				 MCI_INT_MASK_RTO | MCI_INT_MASK_HTO | MCI_RAW_INTS_HLE;
 
@@ -1584,3 +1586,4 @@ EXPORT_SYMBOL(phytium_mci_common_probe);
 MODULE_DESCRIPTION("Phytium Multimedia Card Interface driver");
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
+MODULE_VERSION(PHYTIUM_MMC_DRIVER_VERSION);
