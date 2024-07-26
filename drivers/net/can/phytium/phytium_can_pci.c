@@ -8,6 +8,8 @@
 
 #include "phytium_can.h"
 
+#define CAN_PHYTIUM_PCI_VERSION "1.1.0"
+
 struct phytium_can_pci_config {
 	const struct phytium_can_devtype *devtype;
 	unsigned int clock_freq;
@@ -141,3 +143,4 @@ module_pci_driver(phytium_can_pci_driver);
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Phytium CAN driver for PCI-based controllers");
+MODULE_VERSION(CAN_PHYTIUM_PCI_VERSION);

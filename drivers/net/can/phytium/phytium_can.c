@@ -8,6 +8,8 @@
 
 #include "phytium_can.h"
 
+#define CAN_PHYTIUM_VERSION "1.1.0"
+
 /* register definition */
 enum phytium_can_reg {
 	CAN_CTRL		= 0x00,		/* Global control register */
@@ -1196,4 +1198,4 @@ MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_AUTHOR("Chen Baozi <chenbaozi@phytium.com.cn>");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("CAN bus driver for Phytium CAN controller");
-
+MODULE_VERSION(CAN_PHYTIUM_VERSION);
