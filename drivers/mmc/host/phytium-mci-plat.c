@@ -14,6 +14,8 @@
 #include <linux/dma-mapping.h>
 #include "phytium-mci.h"
 
+#define PHYTIUM_MMC_PLAT_DRIVER_VERSION "1.0.0"
+
 static u32 mci_caps = MMC_CAP_CMD23;
 
 #if defined CONFIG_PM && defined CONFIG_PM_SLEEP
@@ -193,3 +195,4 @@ module_platform_driver(phytium_mci_driver);
 MODULE_DESCRIPTION("Phytium Multimedia Card Interface driver");
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
+MODULE_VERSION(PHYTIUM_MMC_PLAT_DRIVER_VERSION);
