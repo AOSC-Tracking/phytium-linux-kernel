@@ -20,6 +20,8 @@
 
 #include "i2c-phytium-core.h"
 
+#define I2C_PHYTIUM_CORE_VERSION "1.1.0"
+
 static char *abort_sources[] = {
 	[ABRT_7B_ADDR_NOACK] =
 		"slave address not acknowledged (7bit mode)",
@@ -200,4 +202,5 @@ void i2c_phytium_disable_int(struct phytium_i2c_dev *dev)
 
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium I2C bus adapter core");
+MODULE_VERSION(I2C_PHYTIUM_CORE_VERSION);
 MODULE_LICENSE("GPL");
