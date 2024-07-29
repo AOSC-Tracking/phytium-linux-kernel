@@ -152,6 +152,8 @@
 #define PHYTIUM_FMODE_MM		0x01
 #define PHYTIUM_FMODE_IN		0x02
 
+#define WR_CFG_NODIRMAP_VALUE		0x5000000
+
 /*
  * the codes of the different commands
  */
@@ -657,6 +659,86 @@ static ssize_t phytium_qspi_write(struct spi_nor *nor, loff_t to, size_t len,
 	return len;
 }
 
+static ssize_t phytium_qspi_nodirmap_write(struct spi_nor *nor, loff_t to, size_t len,
+				  const u_char *buf)
+{
+	struct phytium_qspi_flash *flash = nor->priv;
+	struct device *dev = flash->qspi->dev;
+	struct phytium_qspi *qspi = flash->qspi;
+	u32 cmd = nor->program_opcode;
+	u32 addr = (u32)to;
+	int i;
+	u_char tmp[8] = {0};
+	size_t mask = 0x03;
+	size_t mask_p = 0x07;
+	u8 len_p;
+
+	if (addr & 0x03) {
+		dev_err(dev, "Addr not four-byte aligned!\n");
+		return -EINVAL;
+	}
+
+	cmd  = cmd << QSPI_CMD_PORT_CMD_SHIFT;
+	cmd |= flash->cs << QSPI_CMD_PORT_CS_SHIFT;
+	cmd |= BIT(QSPI_CMD_PORT_CMD_ADDR_SHIFT);
+	cmd |= BIT(QSPI_CMD_PORT_DATA_TRANSFER_SHIFT);
+	cmd |= flash->clk_div & QSPI_CMD_PORT_SCK_SEL_MASK;
+	cmd |= 0x07 << QSPI_CMD_PORT_RW_NUM_SHIFT;
+
+	switch (nor->program_opcode) {
+	case CMD_PP:
+	case CMD_QPP:
+		cmd &= ~(0x1 << QSPI_CMD_PORT_SEL_SHIFT);
+		break;
+	case CMD_4PP:
+	case CMD_4QPP:
+		cmd |= BIT(QSPI_CMD_PORT_SEL_SHIFT);
+		break;
+	default:
+		dev_err(qspi->dev, "Not support program command:%#x\n",
+			nor->erase_opcode);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < len/8; i++) {
+		phytium_qspi_write_enable(qspi, flash);
+		writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
+		writel_relaxed(addr, qspi->io_base + QSPI_ADDR_PORT_REG);
+		writel_relaxed(*(u32 *)(buf + 4 + 8 * i),
+				qspi->io_base + QSPI_HD_PORT_REG);
+		writel_relaxed(*(u32 *)(buf + 8 * i),
+				qspi->io_base + QSPI_LD_PORT_REG);
+		phytium_qspi_wait_cmd(qspi, flash);
+		phytium_qspi_write_disable(qspi, flash);
+		addr += 8;
+	}
+
+	len_p = (u8)(len & mask_p);
+	if (len_p) {
+		phytium_qspi_write_enable(qspi, flash);
+		cmd &= ~(0x07 << QSPI_CMD_PORT_RW_NUM_SHIFT);
+		cmd |= (len_p - 1) << QSPI_CMD_PORT_RW_NUM_SHIFT;
+		writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
+		writel_relaxed(addr, qspi->io_base + QSPI_ADDR_PORT_REG);
+		if ((len_p - 4) > 0) {
+			memcpy(tmp, buf + 4 + (len / 8) * 8, len_p - 4);
+			writel_relaxed(*(u32 *)tmp, qspi->io_base + QSPI_HD_PORT_REG);
+			memcpy(tmp, buf + (len / 8) * 8, 4);
+			writel_relaxed(*(u32 *)tmp, qspi->io_base + QSPI_LD_PORT_REG);
+		} else if (len_p == 4) {
+			memcpy(tmp, buf + (len / 8) * 8, 4);
+			writel_relaxed(*(u32 *)tmp, qspi->io_base + QSPI_LD_PORT_REG);
+		} else {
+			memcpy(tmp, buf + (len / 8) * 8, len & mask);
+			writel_relaxed(*(u32 *)tmp, qspi->io_base + QSPI_LD_PORT_REG);
+		}
+	}
+
+	phytium_qspi_wait_cmd(qspi, flash);
+
+	return len;
+}
+
 static int phytium_qspi_erase(struct spi_nor *nor, loff_t offs)
 {
 	struct phytium_qspi_flash *flash = nor->priv;
@@ -787,6 +869,7 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 	struct mtd_info *mtd;
 	struct device_node *of_node;
 	int ret;
+	bool dirmap_write = false;
 
 	fwnode_property_read_u32(np, "reg", &cs_num);
 	if (cs_num >= PHYTIUM_MAX_NORCHIP)
@@ -818,6 +901,9 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 	} else if (width != 1)
 		return -EINVAL;
 
+	if (fwnode_property_read_bool(np, "dirmap-write"))
+		dirmap_write = true;
+
 	flash = &qspi->flash[cs_num];
 	flash->qspi = qspi;
 	flash->cs = cs_num;
@@ -835,7 +921,10 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 	mtd = &flash->nor.mtd;
 
 	flash->nor.read = phytium_qspi_read;
-	flash->nor.write = phytium_qspi_write;
+	if (dirmap_write)
+		flash->nor.write = phytium_qspi_write;
+	else
+		flash->nor.write = phytium_qspi_nodirmap_write;
 	flash->nor.erase = phytium_qspi_erase;
 	flash->nor.read_reg = phytium_qspi_read_reg;
 	flash->nor.write_reg = phytium_qspi_write_reg;
@@ -860,6 +949,9 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 	flash_cap = cs_num << QSPI_FLASH_CAP_NUM_SHIFT;
 	flash_cap |= ret;
 	writel_relaxed(flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
+
+	if (!dirmap_write)
+		writel_relaxed(WR_CFG_NODIRMAP_VALUE, qspi->io_base + QSPI_WR_CFG_REG);
 
 	flash->read_mode = PHYTIUM_FMODE_MM;
 
