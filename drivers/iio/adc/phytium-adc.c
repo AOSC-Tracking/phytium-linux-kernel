@@ -23,6 +23,8 @@
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/sysfs.h>
 
+#define ADC_PHYTIUM_DRV_VERSION "1.1.0"
+
 /* ADC register */
 #define ADC_CTRL_REG				0x00
 #define   ADC_CTRL_REG_PD_EN			BIT(31)
@@ -688,3 +690,4 @@ module_platform_driver(phytium_adc_driver);
 MODULE_AUTHOR("Yang Liu <yangliu2021@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium ADC driver");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(ADC_PHYTIUM_DRV_VERSION);
