@@ -19,6 +19,8 @@
 #include <linux/slab.h>
 #include <linux/timer.h>
 #include <linux/acpi.h>
+
+#define KEYPAD_PHYTIUM_DRV_VERSION "1.1.0"
 /*
  * Keypad Controller registers
  */
@@ -583,3 +585,4 @@ MODULE_AUTHOR("Song Wenting <songwenting@phytium.com>");
 MODULE_DESCRIPTION("PHYTIUM Keypad Port Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:phytium-keypad");
+MODULE_VERSION(KEYPAD_PHYTIUM_DRV_VERSION);
