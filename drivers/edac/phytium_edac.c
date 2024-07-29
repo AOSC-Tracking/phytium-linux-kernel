@@ -38,6 +38,8 @@
 
 #define MAX_ERR_GROUP			3
 
+#define EDAC_DRIVER_VERSION "1.1.1"
+
 struct phytium_edac {
 	struct device		*dev;
 	void __iomem		**ras_base;
@@ -479,3 +481,4 @@ module_platform_driver(phytium_edac_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Huangjie <huangjie1663@phytium.com.cn>");
+MODULE_VERSION(EDAC_DRIVER_VERSION);
