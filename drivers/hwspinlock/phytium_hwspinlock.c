@@ -20,6 +20,8 @@
 #include <linux/acpi.h>
 #include "hwspinlock_internal.h"
 
+#define HWSPINLOCK_PHYTIUM_VERSION "1.1.0"
+
 /* Spinlock register offsets */
 #define LOCK_BASE	0x10
 
@@ -182,3 +184,4 @@ module_exit(phytium_hwspinlock_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Hardware spinlock driver for Phytium");
 MODULE_AUTHOR("Chen Baozi <chenbaozi@phytium.com.cn>");
+MODULE_VERSION(HWSPINLOCK_PHYTIUM_VERSION);
