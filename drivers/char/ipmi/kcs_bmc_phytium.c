@@ -86,6 +86,9 @@
 #define LPC_STR4             0x94
 
 #define OBE_POLL_PERIOD      (HZ / 2)
+
+#define KCS_BMC_DRIVER_VERSION "1.1.2"
+
 struct phytium_kcs_bmc {
 	struct kcs_bmc_device kcs_bmc;
 
@@ -435,3 +438,4 @@ module_platform_driver(phytium_kcs_bmc_driver);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium device interface to the KCS BMC device");
+MODULE_VERSION(KCS_BMC_DRIVER_VERSION);
