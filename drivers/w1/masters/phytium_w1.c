@@ -53,6 +53,8 @@
 
 #define PHY_W1M_MAX_USER			4
 
+#define W1_DRIVER_VERSION "1.1.1"
+
 static DECLARE_WAIT_QUEUE_HEAD(w1m_wait_queue);
 
 struct w1m_data {
@@ -577,3 +579,5 @@ module_platform_driver(phytium_w1m_driver);
 MODULE_AUTHOR("Zhu Mingshuai <zhumingshuai@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium w1 bus master driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(W1_DRIVER_VERSION);
+
