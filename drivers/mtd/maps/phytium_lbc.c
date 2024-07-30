@@ -44,6 +44,8 @@
 #define LBC_DEVICE_ADDR			0x10000000
 #define PHYTIUM_MAX_SRAM_BLOCK		8
 
+#define PHYTIUM_LOCALBUS_DRIVER_VERSION	"1.0.0"
+
 struct phytium_lbc_dev {
 	struct resource *res;
 	struct mtd_info *mtd;
@@ -557,3 +559,4 @@ module_exit(phytium_lbc_exit);
 MODULE_AUTHOR("Hanmo Wang <Wanghanmo2242@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium LBC driver for devices");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(PHYTIUM_LOCALBUS_DRIVER_VERSION);
