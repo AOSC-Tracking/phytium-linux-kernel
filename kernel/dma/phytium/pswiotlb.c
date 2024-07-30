@@ -60,7 +60,7 @@
  * allocate a contiguous 1MB, we're probably in trouble anyway.
  */
 #define P_IO_TLB_MIN_SLABS ((1<<20) >> P_IO_TLB_SHIFT)
-
+#define PSWIOTLB_VERSION "1.0.0"
 #define INVALID_PHYS_ADDR (~(phys_addr_t)0)
 
 int pswiotlb_node_num;
@@ -90,10 +90,11 @@ static unsigned long default_npslabs = P_IO_TLB_DEFAULT_SIZE >> P_IO_TLB_SHIFT;
 static unsigned long dynamic_inc_thr_npslabs = P_IO_TLB_INC_THR >> P_IO_TLB_SHIFT;
 static unsigned long default_npareas;
 
-LIST_HEAD(blacklist);
-static spinlock_t blacklist_lock;
-static struct pswiotlb_blacklist blacklist_entry[1024];
-static struct dentry *blacklist_debugfs;
+LIST_HEAD(passthroughlist);
+static spinlock_t passthroughlist_lock;
+static struct pswiotlb_passthroughlist passthroughlist_entry[1024];
+static struct dentry *passthroughlist_debugfs;
+static struct dentry *pswiotlb_debugfs;
 /**
  * struct p_io_tlb_area - Phytium IO TLB memory area descriptor
  *
@@ -110,10 +111,10 @@ struct p_io_tlb_area {
 	spinlock_t lock;
 };
 
-static struct pswiotlb_blacklist_entry {
+static struct pswiotlb_passthroughlist_entry {
 	unsigned short vendor;
 	unsigned short device;
-} ps_blacklist[] = {
+} ps_passthroughlist[] = {
 	{BL_PCI_VENDOR_ID_NVIDIA,	  0xFFFF},
 	{BL_PCI_VENDOR_ID_ILUVATAR,	  0xFFFF},
 	{BL_PCI_VENDOR_ID_METAX,      0xFFFF},
@@ -205,7 +206,7 @@ setup_p_io_tlb_npages(char *str)
 early_param("pswiotlb", setup_p_io_tlb_npages);
 
 static int __init
-setup_pswiotlb_blacklist(char *str)
+setup_pswiotlb_passthroughlist(char *str)
 {
 	char tmp_str[5] = {'\0'};
 	unsigned long flags;
@@ -218,15 +219,15 @@ setup_pswiotlb_blacklist(char *str)
 		} else {
 			j = 0;
 
-			ret = kstrtou16(tmp_str, 16, &blacklist_entry[k].vendor);
+			ret = kstrtou16(tmp_str, 16, &passthroughlist_entry[k].vendor);
 			if (ret)
 				return ret;
 
-			blacklist_entry[k].from_grub = true;
+			passthroughlist_entry[k].from_grub = true;
 
-			spin_lock_irqsave(&blacklist_lock, flags);
-			list_add_rcu(&blacklist_entry[k].node, &blacklist);
-			spin_unlock_irqrestore(&blacklist_lock, flags);
+			spin_lock_irqsave(&passthroughlist_lock, flags);
+			list_add_rcu(&passthroughlist_entry[k].node, &passthroughlist);
+			spin_unlock_irqrestore(&passthroughlist_lock, flags);
 
 			k++;
 		}
@@ -234,7 +235,7 @@ setup_pswiotlb_blacklist(char *str)
 
 	return 0;
 }
-early_param("pswiotlb_blacklist", setup_pswiotlb_blacklist);
+early_param("pswiotlb_passthroughlist", setup_pswiotlb_passthroughlist);
 
 unsigned long pswiotlb_size_or_default(void)
 {
@@ -679,12 +680,12 @@ static void pswiotlb_init_tlb_mem_dynamic(struct p_io_tlb_mem *mem, int nid)
 	mem->numa_node_id = nid;
 }
 
-bool pswiotlb_is_dev_in_blacklist(struct pci_dev *dev)
+bool pswiotlb_is_dev_in_passthroughlist(struct pci_dev *dev)
 {
-	struct pswiotlb_blacklist *bl_entry;
+	struct pswiotlb_passthroughlist *bl_entry;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(bl_entry, &blacklist, node) {
+	list_for_each_entry_rcu(bl_entry, &passthroughlist, node) {
 		if (bl_entry->vendor == dev->vendor) {
 			rcu_read_unlock();
 			goto out;
@@ -697,46 +698,46 @@ out:
 	return false;
 }
 
-static void pswiotlb_show_blacklist(void)
+static void pswiotlb_show_passthroughlist(void)
 {
-	struct pswiotlb_blacklist *bl_entry;
+	struct pswiotlb_passthroughlist *bl_entry;
 
 	pr_info("The following vendors devices belong to are incompatible with pswiotlb temporarily:\n");
 	rcu_read_lock();
-	list_for_each_entry_rcu(bl_entry, &blacklist, node)
+	list_for_each_entry_rcu(bl_entry, &passthroughlist, node)
 		printk(KERN_CONT "0x%-06x", bl_entry->vendor);
 	rcu_read_unlock();
 }
-static void pswiotlb_blacklist_init(void)
+static void __init pswiotlb_passthroughlist_init(void)
 {
 	int dev_num = 0;
 	int i;
 	size_t alloc_size;
-	struct pswiotlb_blacklist *blacklist_array;
+	struct pswiotlb_passthroughlist *passthroughlist_array;
 
-	spin_lock_init(&blacklist_lock);
+	spin_lock_init(&passthroughlist_lock);
 
-	for (i = 0; ps_blacklist[i].vendor != 0; i++)
+	for (i = 0; ps_passthroughlist[i].vendor != 0; i++)
 		dev_num++;
 
-	alloc_size = PAGE_ALIGN(array_size(sizeof(struct pswiotlb_blacklist), dev_num));
-	blacklist_array = memblock_virt_alloc(alloc_size, PAGE_SIZE);
-	if (!blacklist_array) {
-		pr_warn("%s: Failed to allocate memory for blacklist\n",
+	alloc_size = PAGE_ALIGN(array_size(sizeof(struct pswiotlb_passthroughlist), dev_num));
+	passthroughlist_array = memblock_virt_alloc(alloc_size, PAGE_SIZE);
+	if (!passthroughlist_array) {
+		pr_warn("%s: Failed to allocate memory for passthroughlist\n",
 					__func__);
 		return;
 	}
 
 	for (i = 0; i < dev_num; i++) {
-		blacklist_array[i].vendor = ps_blacklist[i].vendor;
-		blacklist_array[i].device = ps_blacklist[i].device;
+		passthroughlist_array[i].vendor = ps_passthroughlist[i].vendor;
+		passthroughlist_array[i].device = ps_passthroughlist[i].device;
 
-		spin_lock(&blacklist_lock);
-		list_add_rcu(&blacklist_array[i].node, &blacklist);
-		spin_unlock(&blacklist_lock);
+		spin_lock(&passthroughlist_lock);
+		list_add_rcu(&passthroughlist_array[i].node, &passthroughlist);
+		spin_unlock(&passthroughlist_lock);
 	}
 
-	pswiotlb_show_blacklist();
+	pswiotlb_show_passthroughlist();
 }
 
 /*
@@ -766,7 +767,7 @@ void __init pswiotlb_init(bool addressing_limit, unsigned int flags)
 	for (i = 0; i < pswiotlb_node_num; i++)
 		pswiotlb_init_remap(addressing_limit, i, flags, NULL);
 
-	pswiotlb_blacklist_init();
+	pswiotlb_passthroughlist_init();
 }
 
 /**
@@ -1554,7 +1555,7 @@ static void pswiotlb_create_debugfs_files(struct p_io_tlb_mem *mem,
 	atomic_long_set(&mem->total_used, 0);
 	atomic_long_set(&mem->used_hiwater, 0);
 
-	mem->debugfs = debugfs_create_dir(dirname, p_io_tlb_default_mem[nid].debugfs);
+	mem->debugfs = debugfs_create_dir(dirname, pswiotlb_debugfs);
 	if (!mem->nslabs)
 		return;
 
@@ -1565,12 +1566,12 @@ static void pswiotlb_create_debugfs_files(struct p_io_tlb_mem *mem,
 			&fops_p_io_tlb_hiwater);
 }
 
-static int blacklist_display_show(struct seq_file *m, void *v)
+static int passthroughlist_display_show(struct seq_file *m, void *v)
 {
-	struct pswiotlb_blacklist *bl_entry;
+	struct pswiotlb_passthroughlist *bl_entry;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(bl_entry, &blacklist, node) {
+	list_for_each_entry_rcu(bl_entry, &passthroughlist, node) {
 		seq_printf(m, "0x%04x\n", bl_entry->vendor);
 	}
 	rcu_read_unlock();
@@ -1578,9 +1579,17 @@ static int blacklist_display_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static int blacklist_add(void *data, u64 val)
+static int version_display_show(struct seq_file *m, void *v)
 {
-	struct pswiotlb_blacklist *bl_entry;
+	seq_puts(m, "pswiotlb version ");
+	seq_printf(m, "%s\n", PSWIOTLB_VERSION);
+
+	return 0;
+}
+
+static int passthroughlist_add(void *data, u64 val)
+{
+	struct pswiotlb_passthroughlist *bl_entry;
 	unsigned long flags;
 
 	bl_entry = kzalloc(sizeof(*bl_entry), GFP_ATOMIC);
@@ -1590,20 +1599,20 @@ static int blacklist_add(void *data, u64 val)
 	bl_entry->vendor = val;
 	bl_entry->from_grub = false;
 
-	spin_lock_irqsave(&blacklist_lock, flags);
-	list_add_rcu(&bl_entry->node, &blacklist);
-	spin_unlock_irqrestore(&blacklist_lock, flags);
+	spin_lock_irqsave(&passthroughlist_lock, flags);
+	list_add_rcu(&bl_entry->node, &passthroughlist);
+	spin_unlock_irqrestore(&passthroughlist_lock, flags);
 
 	return 0;
 }
 
-static int blacklist_del(void *data, u64 val)
+static int passthroughlist_del(void *data, u64 val)
 {
-	struct pswiotlb_blacklist *bl_entry;
+	struct pswiotlb_passthroughlist *bl_entry;
 	unsigned long flags;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(bl_entry, &blacklist, node) {
+	list_for_each_entry_rcu(bl_entry, &passthroughlist, node) {
 		if (bl_entry->vendor == val)
 			goto found;
 	}
@@ -1612,9 +1621,9 @@ static int blacklist_del(void *data, u64 val)
 	return 0;
 found:
 	rcu_read_unlock();
-	spin_lock_irqsave(&blacklist_lock, flags);
+	spin_lock_irqsave(&passthroughlist_lock, flags);
 	list_del_rcu(&bl_entry->node);
-	spin_unlock_irqrestore(&blacklist_lock, flags);
+	spin_unlock_irqrestore(&passthroughlist_lock, flags);
 
 	if (bl_entry->from_grub == false)
 		kfree(bl_entry);
@@ -1622,31 +1631,51 @@ found:
 	return 0;
 }
 
-DEFINE_SHOW_ATTRIBUTE(blacklist_display);
-DEFINE_DEBUGFS_ATTRIBUTE(fops_blacklist_add, NULL,
-				blacklist_add, "%llu\n");
-DEFINE_DEBUGFS_ATTRIBUTE(fops_blacklist_del, NULL,
-				blacklist_del, "%llu\n");
+DEFINE_SHOW_ATTRIBUTE(passthroughlist_display);
+DEFINE_SHOW_ATTRIBUTE(version_display);
+DEFINE_DEBUGFS_ATTRIBUTE(fops_passthroughlist_add, NULL,
+				passthroughlist_add, "%llu\n");
+DEFINE_DEBUGFS_ATTRIBUTE(fops_passthroughlist_del, NULL,
+				passthroughlist_del, "%llu\n");
 
-static void pswiotlb_create_blacklist_debugfs_files(const char *dirname)
+static void pswiotlb_create_passthroughlist_debugfs_files(const char *dirname)
 {
-	blacklist_debugfs = debugfs_create_dir(dirname, blacklist_debugfs);
-	if (!blacklist_debugfs)
+	passthroughlist_debugfs = debugfs_create_dir(dirname, pswiotlb_debugfs);
+	if (!passthroughlist_debugfs)
 		return;
 
-	debugfs_create_file("show_devices", 0400, blacklist_debugfs, NULL,
-			&blacklist_display_fops);
-	debugfs_create_file("add_device", 0600, blacklist_debugfs, NULL,
-			&fops_blacklist_add);
-	debugfs_create_file("del_device", 0600, blacklist_debugfs, NULL,
-			&fops_blacklist_del);
+	debugfs_create_file("show_devices", 0400, passthroughlist_debugfs, NULL,
+			&passthroughlist_display_fops);
+	debugfs_create_file("add_device", 0600, passthroughlist_debugfs, NULL,
+			&fops_passthroughlist_add);
+	debugfs_create_file("del_device", 0600, passthroughlist_debugfs, NULL,
+			&fops_passthroughlist_del);
+}
+
+static void pswiotlb_create_pswiotlb_debugfs_files(const char *dirname)
+{
+	int i;
+	char name[20] = "";
+	char passthroughlist_name[50] = "";
+
+	pswiotlb_debugfs = debugfs_create_dir(dirname, pswiotlb_debugfs);
+	if (!pswiotlb_debugfs)
+		return;
+
+	debugfs_create_file("version", 0400, pswiotlb_debugfs, NULL,
+			&version_display_fops);
+
+	for (i = 0; i < pswiotlb_node_num; i++) {
+		sprintf(name, "%s-%d", "pswiotlb", i);
+		pswiotlb_create_debugfs_files(&p_io_tlb_default_mem[i], i, name);
+	}
+	sprintf(passthroughlist_name, "%s", "pswiotlb-passthroughlist");
+	pswiotlb_create_passthroughlist_debugfs_files(passthroughlist_name);
 }
 
 static int __init pswiotlb_create_default_debugfs(void)
 {
-	int i;
 	char name[20] = "";
-	char blacklist_name[20] = "";
 
 	if (!pswiotlb_mtimer_alive && !pswiotlb_force_disable) {
 		pr_info("setup pswiotlb monitor timer service\n");
@@ -1657,12 +1686,10 @@ static int __init pswiotlb_create_default_debugfs(void)
 		mod_timer(&service_timer, jiffies + 2 * HZ);
 	}
 
-	for (i = 0; i < pswiotlb_node_num; i++) {
-		sprintf(name, "%s-%d", "pswiotlb", i);
-		pswiotlb_create_debugfs_files(&p_io_tlb_default_mem[i], i, name);
+	if (!pswiotlb_force_disable) {
+		sprintf(name, "%s", "pswiotlb");
+		pswiotlb_create_pswiotlb_debugfs_files(name);
 	}
-	sprintf(blacklist_name, "%s", "pswiotlb-blacklist");
-	pswiotlb_create_blacklist_debugfs_files(blacklist_name);
 
 	return 0;
 }

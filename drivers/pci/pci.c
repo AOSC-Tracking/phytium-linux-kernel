@@ -4110,8 +4110,8 @@ void pci_set_master(struct pci_dev *dev)
 #ifdef CONFIG_PSWIOTLB
 	if ((pswiotlb_force_disable != true) &&
 		is_phytium_ps23064_socs()) {
-		dev->dev.can_use_pswiotlb = pswiotlb_is_dev_in_blacklist(dev);
-		dev_info(&dev->dev, "The device %s use pswiotlb because vendor 0x%04x %s in pswiotlb blacklist\n",
+		dev->dev.can_use_pswiotlb = pswiotlb_is_dev_in_passthroughlist(dev);
+		dev_info(&dev->dev, "The device %s use pswiotlb because vendor 0x%04x %s in pswiotlb passthroughlist\n",
 					dev->dev.can_use_pswiotlb ? "would" : "would NOT",
 					dev->vendor, dev->dev.can_use_pswiotlb ? "is NOT" : "is");
 	}
