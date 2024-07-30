@@ -17464,6 +17464,7 @@ F:	Documentation/devicetree/bindings/sound/phytium,i2s.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,qspi-nor.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi-v2.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
+F:	Documentation/devicetree/bindings/usb/phytium,usb2-2.0.yaml
 F:	Documentation/devicetree/bindings/usb/phytium,usb2.yaml
 F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
 F:	arch/arm64/boot/dts/phytium/*
