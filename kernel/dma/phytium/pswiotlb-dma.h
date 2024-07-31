@@ -70,13 +70,14 @@ static inline void pswiotlb_dma_direct_sync_single_for_device(struct device *dev
 {
 	phys_addr_t paddr = dma_to_phys(dev, addr);
 	int nid = dev->numa_node;
+	struct p_io_tlb_pool *pool;
 
 	if (unlikely(is_swiotlb_buffer(paddr)))
 		swiotlb_sync_single_for_device(dev, paddr, size, dir);
 
 	if (is_pswiotlb_active(dev)) {
-		if (unlikely(is_pswiotlb_buffer(dev, nid, paddr)))
-			pswiotlb_sync_single_for_device(dev, nid, paddr, size, dir);
+		if (unlikely(is_pswiotlb_buffer(dev, nid, paddr, &pool)))
+			pswiotlb_sync_single_for_device(dev, nid, paddr, size, dir, pool);
 	}
 }
 
@@ -85,13 +86,14 @@ static inline void pswiotlb_dma_direct_sync_single_for_cpu(struct device *dev,
 {
 	phys_addr_t paddr = dma_to_phys(dev, addr);
 	int nid = dev->numa_node;
+	struct p_io_tlb_pool *pool;
 
 	if (unlikely(is_swiotlb_buffer(paddr)))
 		swiotlb_sync_single_for_cpu(dev, paddr, size, dir);
 
 	if (is_pswiotlb_active(dev)) {
-		if (unlikely(is_pswiotlb_buffer(dev, nid, paddr)))
-			pswiotlb_sync_single_for_cpu(dev, nid, paddr, size, dir);
+		if (unlikely(is_pswiotlb_buffer(dev, nid, paddr, &pool)))
+			pswiotlb_sync_single_for_cpu(dev, nid, paddr, size, dir, pool);
 	}
 
 	if (dir == DMA_FROM_DEVICE)
@@ -139,13 +141,14 @@ static inline void pswiotlb_dma_direct_unmap_page(struct device *dev, dma_addr_t
 {
 	phys_addr_t phys = dma_to_phys(dev, addr);
 	int nid = dev->numa_node;
+	struct p_io_tlb_pool *pool;
 
 	if (unlikely(is_swiotlb_buffer(phys)))
 		swiotlb_tbl_unmap_single(dev, phys, size, dir, attrs);
 
 	if (is_pswiotlb_active(dev)) {
-		if (unlikely(is_pswiotlb_buffer(dev, nid, phys)))
-			pswiotlb_tbl_unmap_single(dev, nid, phys, 0, size, dir, attrs);
+		if (unlikely(is_pswiotlb_buffer(dev, nid, phys, &pool)))
+			pswiotlb_tbl_unmap_single(dev, nid, phys, 0, size, dir, attrs, pool);
 
 		if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC) && (dir == DMA_FROM_DEVICE))
 			dma_mark_clean(phys_to_virt(phys), size);

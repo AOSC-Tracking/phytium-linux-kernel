@@ -25,6 +25,7 @@ void pswiotlb_dma_direct_sync_sg_for_device(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 	int nid = dev->numa_node;
+	struct p_io_tlb_pool *pool;
 
 	for_each_sg(sgl, sg, nents, i) {
 		phys_addr_t paddr = dma_to_phys(dev, sg_dma_address(sg));
@@ -34,9 +35,9 @@ void pswiotlb_dma_direct_sync_sg_for_device(struct device *dev,
 						       dir);
 
 		if (is_pswiotlb_active(dev) &&
-			unlikely(is_pswiotlb_buffer(dev, nid, paddr)))
+			unlikely(is_pswiotlb_buffer(dev, nid, paddr, &pool)))
 			pswiotlb_sync_single_for_device(dev, nid, paddr,
-						sg->length, dir);
+						sg->length, dir, pool);
 	}
 }
 #endif
@@ -50,6 +51,7 @@ void pswiotlb_dma_direct_sync_sg_for_cpu(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 	int nid = dev->numa_node;
+	struct p_io_tlb_pool *pool;
 
 	for_each_sg(sgl, sg, nents, i) {
 		phys_addr_t paddr = dma_to_phys(dev, sg_dma_address(sg));
@@ -59,9 +61,9 @@ void pswiotlb_dma_direct_sync_sg_for_cpu(struct device *dev,
 						    dir);
 
 		if (is_pswiotlb_active(dev) &&
-			unlikely(is_pswiotlb_buffer(dev, nid, paddr)))
+			unlikely(is_pswiotlb_buffer(dev, nid, paddr, &pool)))
 			pswiotlb_sync_single_for_cpu(dev, nid, paddr,
-						sg->length, dir);
+						sg->length, dir, pool);
 
 		if (dir == DMA_FROM_DEVICE)
 			dma_mark_clean(phys_to_virt(paddr), sg->length);
