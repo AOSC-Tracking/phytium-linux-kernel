@@ -10,7 +10,6 @@
 
 #include "phytium_can.h"
 
-#define CAN_PHYTIUM_PLAT_VERSION "1.1.0"
 #define cdev2priv(dev) container_of(dev, struct phytium_can_plat, cdev)
 
 struct phytium_can_plat {
@@ -225,4 +224,4 @@ module_platform_driver(phytium_can_plat_driver);
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Phytium CAN driver for IO Mapped controllers");
-MODULE_VERSION(CAN_PHYTIUM_PLAT_VERSION);
+MODULE_VERSION(CAN_PHYTIUM_DRV_VERSION);
