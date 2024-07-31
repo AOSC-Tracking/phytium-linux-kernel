@@ -812,7 +812,6 @@ struct p_io_tlb_pool *pswiotlb_find_pool(struct device *dev, int nid, phys_addr_
 	/* prevent any other reads prior to this time */
 	smp_rmb();
 	whole_size = mem->whole_size;
-
 	rcu_read_lock();
 	for (i = 0; i < whole_size; i++) {
 		pool = mem->pool_addr[i];
@@ -862,9 +861,8 @@ static unsigned int pswiotlb_align_offset(struct device *dev, u64 addr)
  * Bounce: copy the pswiotlb buffer from or back to the original dma location
  */
 static void pswiotlb_bounce(struct device *dev, int nid, phys_addr_t tlb_addr, size_t size,
-			   enum dma_data_direction dir)
+			   enum dma_data_direction dir, struct p_io_tlb_pool *mem)
 {
-	struct p_io_tlb_pool *mem = pswiotlb_find_pool(dev, nid, tlb_addr);
 	int index = (tlb_addr - mem->start) >> P_IO_TLB_SHIFT;
 	phys_addr_t orig_addr = mem->slots[index].orig_addr;
 	size_t alloc_size = mem->slots[index].alloc_size;
@@ -1126,30 +1124,28 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 	int index;
 	int try_pool_idx;
 	int i;
-	int capacity, cpuid;
-
-	/* prevent any other reads prior to this time */
-	smp_rmb();
+	int cpuid;
 
 	cpuid = raw_smp_processor_id();
 
 	rcu_read_lock();
-	capacity = mem->capacity;
+
 	for (i = 0; i < 15; i++) {
 		if (i == 0) {
 			pool = mem->pool_addr[0];
 			index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
 						alloc_size, alloc_align_mask);
-		} else if (i == 1 && capacity > (cpuid + 1)) {
+		} else if (i == 1 && mem->capacity > (cpuid + 1)) {
 			pool = mem->pool_addr[cpuid + 1];
 			index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
 						alloc_size, alloc_align_mask);
 		} else {
-			try_pool_idx = get_random_int() % capacity;
+			try_pool_idx = get_random_int() % mem->capacity;
 			pool = mem->pool_addr[try_pool_idx];
 			index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
 							alloc_size, alloc_align_mask);
 		}
+
 		if (index >= 0) {
 			rcu_read_unlock();
 			goto found;
@@ -1163,7 +1159,7 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 	if (!pool)
 		return -1;
 
-    /* retry */
+	/* retry */
 	rcu_read_lock();
 	index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
 					alloc_size, alloc_align_mask);
@@ -1270,6 +1266,7 @@ phys_addr_t pswiotlb_tbl_map_single(struct device *dev, int nid, phys_addr_t ori
 	unsigned int i;
 	unsigned long index;
 	phys_addr_t tlb_addr;
+	struct page *page;
 
 	if (alloc_size > (P_IO_TLB_SEGSIZE << P_IO_TLB_SHIFT)) {
 		dev_warn_ratelimited(dev, "alloc size 0x%lx is larger than segment(0x%x) of pswiotlb\n",
@@ -1307,6 +1304,9 @@ phys_addr_t pswiotlb_tbl_map_single(struct device *dev, int nid, phys_addr_t ori
 	for (i = 0; i < nr_slots(alloc_size + offset); i++)
 		pool->slots[index + i].orig_addr = slot_addr(orig_addr, i);
 	tlb_addr = slot_addr(pool->start, index) + offset;
+	page = pfn_to_page(PFN_DOWN(tlb_addr));
+	set_bit(PG_pswiotlb, &page->flags);
+
 	/*
 	 * When dir == DMA_FROM_DEVICE we could omit the copy from the orig
 	 * to the tlb buffer, if we knew for sure the device will
@@ -1314,12 +1314,12 @@ phys_addr_t pswiotlb_tbl_map_single(struct device *dev, int nid, phys_addr_t ori
 	 * unconditional bounce may prevent leaking pswiotlb content (i.e.
 	 * kernel memory) to user-space.
 	 */
-	pswiotlb_bounce(dev, nid, tlb_addr, mapping_size, DMA_TO_DEVICE);
+	pswiotlb_bounce(dev, nid, tlb_addr, mapping_size, DMA_TO_DEVICE, pool);
 	return tlb_addr;
 }
-static void pswiotlb_release_slots(struct device *dev, int nid, phys_addr_t tlb_addr)
+static void pswiotlb_release_slots(struct device *dev, int nid, phys_addr_t tlb_addr,
+			struct p_io_tlb_pool *mem)
 {
-	struct p_io_tlb_pool *mem = pswiotlb_find_pool(dev, nid, tlb_addr);
 	unsigned long flags;
 	unsigned int offset = pswiotlb_align_offset(dev, tlb_addr);
 	int index = (tlb_addr - offset - mem->start) >> P_IO_TLB_SHIFT;
@@ -1327,6 +1327,7 @@ static void pswiotlb_release_slots(struct device *dev, int nid, phys_addr_t tlb_
 	int aindex = index / mem->area_nslabs;
 	struct p_io_tlb_area *area = &mem->areas[aindex];
 	int count, i;
+	struct page *page = pfn_to_page(PFN_DOWN(tlb_addr));
 
 	/*
 	 * Return the buffer to the free list by setting the corresponding
@@ -1363,6 +1364,7 @@ static void pswiotlb_release_slots(struct device *dev, int nid, phys_addr_t tlb_
 	area->used -= nslots;
 	if ((mem != &p_io_tlb_default_mem[nid].defpool) && (area->used == 0))
 		bitmap_clear(mem->busy_record, aindex, 1);
+	clear_bit(PG_pswiotlb, &page->flags);
 	spin_unlock_irqrestore(&area->lock, flags);
 }
 /*
@@ -1370,7 +1372,7 @@ static void pswiotlb_release_slots(struct device *dev, int nid, phys_addr_t tlb_
  */
 void pswiotlb_tbl_unmap_single(struct device *dev, int nid, phys_addr_t tlb_addr,
 			      size_t offset, size_t mapping_size, enum dma_data_direction dir,
-			      unsigned long attrs)
+			      unsigned long attrs, struct p_io_tlb_pool *pool)
 {
 	struct page *page = pfn_to_page(PFN_DOWN(tlb_addr));
 	/*
@@ -1379,28 +1381,28 @@ void pswiotlb_tbl_unmap_single(struct device *dev, int nid, phys_addr_t tlb_addr
 	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC) &&
 	    (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL) &&
 		(test_bit(PG_pswiotlbsync, &page->flags) == false))
-		pswiotlb_bounce(dev, nid, tlb_addr, mapping_size, DMA_FROM_DEVICE);
+		pswiotlb_bounce(dev, nid, tlb_addr, mapping_size, DMA_FROM_DEVICE, pool);
 
 	tlb_addr -= offset;
-	pswiotlb_release_slots(dev, nid, tlb_addr);
+	pswiotlb_release_slots(dev, nid, tlb_addr, pool);
 
 	clear_bit(PG_pswiotlbsync, &page->flags);
 }
 void pswiotlb_sync_single_for_device(struct device *dev, int nid, phys_addr_t tlb_addr,
-		size_t size, enum dma_data_direction dir)
+		size_t size, enum dma_data_direction dir, struct p_io_tlb_pool *pool)
 {
 	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
-		pswiotlb_bounce(dev, nid, tlb_addr, size, DMA_TO_DEVICE);
+		pswiotlb_bounce(dev, nid, tlb_addr, size, DMA_TO_DEVICE, pool);
 	else
 		WARN_ON(dir != DMA_FROM_DEVICE);
 }
 
 void pswiotlb_sync_single_for_cpu(struct device *dev, int nid, phys_addr_t tlb_addr,
-		size_t size, enum dma_data_direction dir)
+		size_t size, enum dma_data_direction dir, struct p_io_tlb_pool *pool)
 {
 	if (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL) {
 		struct page *page = pfn_to_page(PFN_DOWN(tlb_addr));
-		pswiotlb_bounce(dev, nid, tlb_addr, size, DMA_FROM_DEVICE);
+		pswiotlb_bounce(dev, nid, tlb_addr, size, DMA_FROM_DEVICE, pool);
 		set_bit(PG_pswiotlbsync, &page->flags);
 	} else
 		WARN_ON(dir != DMA_TO_DEVICE);
@@ -1417,20 +1419,13 @@ dma_addr_t pswiotlb_map(struct device *dev, int nid, phys_addr_t paddr, size_t s
 
 	trace_pswiotlb_bounced(dev, phys_to_dma(dev, paddr), size);
 
-	pswiotlb_addr = pswiotlb_tbl_map_single(dev, nid, paddr, size, size, 0, dir,
+	pswiotlb_addr = pswiotlb_tbl_map_single(dev, nid, paddr, size,
+				PAGE_ALIGN(size), PAGE_SIZE - 1, dir,
 			attrs);
 	if (pswiotlb_addr == (phys_addr_t)DMA_MAPPING_ERROR)
 		return DMA_MAPPING_ERROR;
 
 	dma_addr = __phys_to_dma(dev, pswiotlb_addr);
-	if ((!dma_is_in_local_node(dev, nid, dma_addr, size))) {
-		pswiotlb_tbl_unmap_single(dev, nid, pswiotlb_addr, 0, size, dir,
-			attrs | DMA_ATTR_SKIP_CPU_SYNC);
-		dev_WARN_ONCE(dev, 1,
-				"pswiotlb DMA addr %pad+%zu is NOT in local node %d\n",
-				&dma_addr, size, dev->numa_node);
-		return DMA_MAPPING_ERROR;
-	}
 
 	if (!is_device_dma_coherent(dev) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 		__dma_map_area(phys_to_virt(pswiotlb_addr), size, dir);
