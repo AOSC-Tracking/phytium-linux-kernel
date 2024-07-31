@@ -29,6 +29,8 @@
 #define STOP_QUEUE_TRUE		1
 #define STOP_QUEUE_FALSE	0
 
+#define CAN_PHYTIUM_DRV_VERSION "1.1.0"
+
 enum phytium_can_ip_type {
 	PHYTIUM_CAN = 0,
 	PHYTIUM_CANFD,
