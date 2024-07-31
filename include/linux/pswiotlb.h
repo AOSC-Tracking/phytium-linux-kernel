@@ -16,6 +16,7 @@ struct device;
 struct page;
 struct scatterlist;
 extern bool pswiotlb_force_disable;
+struct p_io_tlb_pool;
 
 #define SOC_ID_PS23064	0x8
 #define MIDR_PS23064    0x700F8620
@@ -42,7 +43,7 @@ static bool is_ps23064_socs;
 
 /* default to 256MB */
 #define P_IO_TLB_DEFAULT_SIZE (256UL<<20)
-#define P_IO_TLB_INC_THR (16UL<<20)
+#define P_IO_TLB_INC_THR (64UL<<20)
 
 /* blacklist which incompatible with pswiotlb temporarily */
 #define BL_PCI_VENDOR_ID_NVIDIA          0x10de
@@ -64,12 +65,13 @@ extern void pswiotlb_tbl_unmap_single(struct device *hwdev,
 				     size_t offset,
 				     size_t mapping_size,
 				     enum dma_data_direction dir,
-				     unsigned long attrs);
+				     unsigned long attrs,
+					 struct p_io_tlb_pool *pool);
 
 void pswiotlb_sync_single_for_device(struct device *dev, int nid, phys_addr_t tlb_addr,
-		size_t size, enum dma_data_direction dir);
+		size_t size, enum dma_data_direction dir, struct p_io_tlb_pool *pool);
 void pswiotlb_sync_single_for_cpu(struct device *dev, int nid, phys_addr_t tlb_addr,
-		size_t size, enum dma_data_direction dir);
+		size_t size, enum dma_data_direction dir, struct p_io_tlb_pool *pool);
 dma_addr_t pswiotlb_map(struct device *dev, int nid, phys_addr_t phys,
 		size_t size, enum dma_data_direction dir, unsigned long attrs);
 void pswiotlb_store_local_node(struct pci_dev *dev, struct pci_bus *bus);
@@ -214,11 +216,13 @@ static inline bool is_phytium_ps23064_socs(void)
 		return false;
 }
 
-static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t paddr)
+static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t paddr,
+			struct p_io_tlb_pool **pool)
 {
 	struct p_io_tlb_mem *mem = &dev->dma_p_io_tlb_mem[nid];
+	struct page *page = pfn_to_page(PFN_DOWN(paddr));
 
-	if (!dev_is_pci(dev) || (nid == -1))
+	if (test_bit(PG_pswiotlb, &page->flags) == false)
 		return false;
 
 	if (!mem)
@@ -235,8 +239,12 @@ static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t p
 	 * This barrier pairs with smp_mb() in pswiotlb_find_slots().
 	 */
 	smp_rmb();
-	return READ_ONCE(dev->dma_uses_p_io_tlb) &&
-		pswiotlb_find_pool(dev, nid, paddr);
+
+	*pool = pswiotlb_find_pool(dev, nid, paddr);
+	if (READ_ONCE(dev->dma_uses_p_io_tlb) && *pool)
+		return true;
+
+	return false;
 }
 
 static inline bool dma_is_in_local_node(struct device *dev, int nid, dma_addr_t addr, size_t size)
@@ -267,7 +275,8 @@ static inline void pswiotlb_init(bool addressing_limited, unsigned int flags)
 static inline void pswiotlb_dev_init(struct device *dev)
 {
 }
-static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t paddr)
+static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t paddr,
+			struct p_io_tlb_pool **pool)
 {
 	return false;
 }

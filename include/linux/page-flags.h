@@ -194,7 +194,9 @@ enum pageflags {
 
 #ifdef CONFIG_PSWIOTLB
 	/* check if pswiotlb is sync already */
-	PG_pswiotlbsync,
+	PG_pswiotlbsync = __NR_PAGEFLAGS + 1,
+	/* check if the page is used for pswiotlb */
+	PG_pswiotlb,
 #endif
 };
 
