@@ -30,7 +30,6 @@
 #include "i2c-phytium-core.h"
 
 #define DRV_NAME "i2c-phytium-platform"
-#define I2C_PHYTIUM_PLAT_DRV_VERSION "1.1.0"
 
 static u32 i2c_phytium_get_clk_rate_khz(struct phytium_i2c_dev *dev)
 {
@@ -361,5 +360,5 @@ module_platform_driver(phytium_i2c_driver);
 MODULE_ALIAS("platform:i2c-phytium");
 MODULE_AUTHOR("Chen Baozi <chenbaozi@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium I2C bus adapter");
-MODULE_VERSION(I2C_PHYTIUM_PLAT_DRV_VERSION);
+MODULE_VERSION(I2C_PHYTIUM_DRV_VERSION);
 MODULE_LICENSE("GPL");

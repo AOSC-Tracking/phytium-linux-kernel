@@ -22,7 +22,6 @@
 #include "i2c-phytium-core.h"
 
 #define DRV_NAME "i2c-phytium-pci"
-#define I2C_PHYTIUM_PCI_DRV_VERSION "1.1.0"
 
 static int i2c_msi_enable;
 module_param(i2c_msi_enable, int, 0644);
@@ -249,5 +248,5 @@ module_pci_driver(phytium_i2c_driver);
 MODULE_ALIAS("i2c-phytium-pci");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium PCI I2C bus adapter");
-MODULE_VERSION(I2C_PHYTIUM_PCI_DRV_VERSION);
+MODULE_VERSION(I2C_PHYTIUM_DRV_VERSION);
 MODULE_LICENSE("GPL");

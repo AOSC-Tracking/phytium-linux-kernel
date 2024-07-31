@@ -9,6 +9,8 @@
 #include <linux/pm_qos.h>
 #include <linux/i2c-smbus.h>
 
+#define I2C_PHYTIUM_DRV_VERSION "1.1.0"
+
 #define IC_DEFAULT_FUNCTIONALITY (I2C_FUNC_I2C |		\
 				  I2C_FUNC_SMBUS_BYTE |		\
 				  I2C_FUNC_SMBUS_BYTE_DATA |	\
