@@ -43,6 +43,7 @@ struct p_io_tlb_pool;
 /* default to 256MB */
 #define P_IO_TLB_DEFAULT_SIZE (256UL<<20)
 #define P_IO_TLB_INC_THR (64UL<<20)
+#define P_IO_TLB_EXT_WATERMARK (80)
 
 /* blacklist which incompatible with pswiotlb temporarily */
 #define BL_PCI_VENDOR_ID_NVIDIA          0x10de
@@ -234,6 +235,7 @@ struct p_io_tlb_mem {
 #endif
 	phys_addr_t node_min_addr;
 	phys_addr_t node_max_addr;
+	unsigned long node_total_mem;
 	int numa_node_id;
 };
 

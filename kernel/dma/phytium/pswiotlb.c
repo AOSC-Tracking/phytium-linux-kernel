@@ -280,6 +280,7 @@ static void pswiotlb_record_mem_range(struct p_io_tlb_mem *mem)
 	unsigned long start_pfn, end_pfn;
 	unsigned long min_pfn = (~(phys_addr_t)0 >> PAGE_SHIFT), max_pfn = 0;
 	int i, nid;
+	unsigned long total_pfn = 0;
 
 	for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, &nid) {
 		pr_info(" node %3d: [mem %#018Lx-%#018Lx]\n", nid,
@@ -290,11 +291,13 @@ static void pswiotlb_record_mem_range(struct p_io_tlb_mem *mem)
 				min_pfn = start_pfn;
 			if (max_pfn < end_pfn)
 				max_pfn = end_pfn;
+			total_pfn += end_pfn - start_pfn + 1;
 		}
 	}
 
 	mem->node_min_addr = (u64)min_pfn << PAGE_SHIFT;
 	mem->node_max_addr = ((u64)max_pfn << PAGE_SHIFT) - 1;
+	mem->node_total_mem = (u64)total_pfn << PAGE_SHIFT;
 }
 
 static void pswiotlb_init_io_tlb_pool(struct p_io_tlb_pool *mem, int nid, phys_addr_t start,
@@ -537,6 +540,8 @@ static struct p_io_tlb_pool *pswiotlb_alloc_pool(struct device *dev,
 		nareas = limit_nareas(nareas, nslabs);
 		tlb_size = nslabs << P_IO_TLB_SHIFT;
 	}
+	if (page_to_nid(tlb) != nid)
+		goto error_slots;
 
 	slot_order = get_order(array_size(sizeof(*pool->slots), nslabs));
 	pool->slots = (struct p_io_tlb_slot *)
@@ -637,9 +642,10 @@ static struct p_io_tlb_pool *pswiotlb_formal_alloc(struct device *dev,
 				dynamic_inc_thr_npslabs, mem->phys_limit,
 				0, GFP_NOWAIT | __GFP_NOWARN);
 	if (!pool) {
-		pr_warn_ratelimited("Failed to allocate new formal pool");
+		pr_warn_once("Failed to allocate new formal pool");
 		return NULL;
 	}
+
 	pool->busy_record = bitmap_zalloc(pool->nareas, GFP_KERNEL);
 	if (!pool->busy_record) {
 		pr_warn_ratelimited("%s: Failed to allocate pool busy record.\n", __func__);
@@ -752,8 +758,9 @@ void __init pswiotlb_init(bool addressing_limit, unsigned int flags)
 
 		pswiotlb_init_tlb_mem_dynamic(mem, i);
 		pswiotlb_record_mem_range(mem);
-		pr_info(" node %3d memory range: [%#018Lx-%#018Lx]\n",
-					i, mem->node_min_addr, mem->node_max_addr);
+		pr_info(" node %3d memory range: [%#018Lx-%#018Lx], total memory: %ldMB\n",
+					i, mem->node_min_addr, mem->node_max_addr,
+					mem->node_total_mem >> 20);
 	}
 	/* Get P TLB memory according to numa node id */
 	for (i = 0; i < pswiotlb_node_num; i++)
@@ -1125,6 +1132,9 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 	int try_pool_idx;
 	int i;
 	int cpuid;
+	int current_ratio;
+	unsigned long pswiotlb_mem;
+	unsigned long nslabs_per_pool = dynamic_inc_thr_npslabs;
 
 	cpuid = raw_smp_processor_id();
 
@@ -1152,6 +1162,21 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 		}
 	}
 	rcu_read_unlock();
+	if (nslabs_per_pool > SLABS_PER_PAGE << MAX_ORDER)
+		nslabs_per_pool = SLABS_PER_PAGE << MAX_ORDER;
+
+	nslabs_per_pool = ALIGN(nslabs_per_pool >> 1, P_IO_TLB_SEGSIZE);
+	pswiotlb_mem = P_IO_TLB_DEFAULT_SIZE +
+		(nslabs_per_pool << P_IO_TLB_SHIFT) * (mem->whole_size - 1);
+	current_ratio = (pswiotlb_mem * 100 + mem->node_total_mem / 2) / mem->node_total_mem;
+	if (current_ratio >= P_IO_TLB_EXT_WATERMARK) {
+		dev_warn_once(dev, "Total pswiotlb (%ld MB) exceeds the watermark (%d%%)\n"
+					"of memory (%ld MB) in node %d, pswiotlb expansion is prohibited.\n",
+					pswiotlb_mem >> 20, P_IO_TLB_EXT_WATERMARK,
+					mem->node_total_mem >> 20, nid);
+		return -1;
+	}
+
 	if (!mem->can_grow)
 		return -1;
 
@@ -1290,7 +1315,7 @@ phys_addr_t pswiotlb_tbl_map_single(struct device *dev, int nid, phys_addr_t ori
 				   alloc_size + offset, alloc_align_mask, &pool);
 	if (index == -1) {
 		if (!(attrs & DMA_ATTR_NO_WARN))
-			dev_warn_ratelimited(dev,
+			dev_warn_once(dev,
 	"pswiotlb buffer is full (sz: %zd bytes), total %lu (slots), used %lu (slots)\n",
 				 alloc_size, mem->nslabs, mem_used(mem));
 		return (phys_addr_t)DMA_MAPPING_ERROR;
