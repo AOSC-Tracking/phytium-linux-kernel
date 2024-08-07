@@ -17553,6 +17553,7 @@ F:	drivers/w1/masters/phytium_w1.c
 F:	drivers/staging/phytium-npu/*
 F:	include/asm-generic/mmzone.h
 F:	include/linux/array_size.h
+F:	include/linux/numa_memblks.h
 F:	include/linux/phyt.h
 F:	include/phyt/*
 F:	sound/pci/hda/hda_phytium.*
@@ -17571,6 +17572,7 @@ F:	kernel/dma/phytium/pswiotlb-mapping.c
 F:	kernel/dma/phytium/pswiotlb.c
 F:	kernel/numa.c
 F:	mm/numa.c
+F:	mm/numa_memblks.c
 
 QAT DRIVER
 M:	Giovanni Cabiddu <giovanni.cabiddu@intel.com>
