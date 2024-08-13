@@ -81,7 +81,7 @@ config GPIO_GENERIC
 
 # This symbol is selected by both MMIO and PCI expanders
 config GPIO_PHYTIUM_CORE
-	tristate
+	bool
 
 # This symbol is selected by both I2C and SPI expanders
 config GPIO_MAX730X
@@ -409,7 +409,7 @@ config GPIO_OMAP
 	  Say yes here to enable GPIO support for TI OMAP SoCs.
 
 config GPIO_PHYTIUM_PLAT
-	tristate "Phytium GPIO Platform support"
+	bool "Phytium GPIO Platform support"
 	default y if ARCH_PHYTIUM
 	depends on ARM64
 	select GPIO_PHYTIUM_CORE
@@ -1334,7 +1334,7 @@ config GPIO_PCIE_IDIO_24
 	  filters are deactivated by this driver.
 
 config GPIO_PHYTIUM_PCI
-	tristate "Phytium GPIO PCI support"
+	bool "Phytium GPIO PCI support"
 	select GPIO_PHYTIUM_CORE
 	select IRQ_DOMAIN
 	select GENERIC_IRQ_CHIP
