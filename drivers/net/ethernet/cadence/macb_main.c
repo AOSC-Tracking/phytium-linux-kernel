@@ -1154,6 +1154,7 @@ static void gem_rx_refill(struct macb_queue *queue)
 				break;
 			}
 
+			queue->rx_prepared_head++;
 			queue->rx_skbuff[entry] = skb;
 
 			if (entry == bp->rx_ring_size - 1)
@@ -1172,7 +1173,6 @@ static void gem_rx_refill(struct macb_queue *queue)
 			dma_wmb();
 			desc->addr &= ~MACB_BIT(RX_USED);
 		}
-		queue->rx_prepared_head++;
 	}
 
 	/* Make descriptor updates visible to hardware */
@@ -1244,6 +1244,15 @@ static int gem_rx(struct macb_queue *queue, int budget)
 			queue->stats.rx_dropped++;
 			break;
 		}
+
+		len = ctrl & bp->rx_frm_len_mask;
+		if (unlikely(len <= 0 || len > bp->rx_buffer_size)) {
+			netdev_err(bp->dev, "illegal skb len: %d\n", len);
+			bp->dev->stats.rx_dropped++;
+			queue->stats.rx_dropped++;
+			break;
+		}
+
 		skb = queue->rx_skbuff[entry];
 		if (unlikely(!skb)) {
 			netdev_err(bp->dev,
@@ -1254,7 +1263,6 @@ static int gem_rx(struct macb_queue *queue, int budget)
 		}
 		/* now everything is ready for receiving packet */
 		queue->rx_skbuff[entry] = NULL;
-		len = ctrl & bp->rx_frm_len_mask;
 
 		netdev_vdbg(bp->dev, "gem_rx %u (len %u)\n", entry, len);
 
