@@ -1160,7 +1160,7 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 	cpuid = raw_smp_processor_id();
 
 	rcu_read_lock();
-
+#ifndef CONFIG_ARM64_4K_PAGES
 	for (i = 0; i < 15; i++) {
 		if (i == 0) {
 			pool = mem->pool_addr[0];
@@ -1182,6 +1182,19 @@ static int pswiotlb_find_slots(struct device *dev, int nid, phys_addr_t orig_add
 			goto found;
 		}
 	}
+#else
+	for (i = 0; i < 15; i++) {
+		try_pool_idx = get_random_u32() % mem->capacity;
+		pool = mem->pool_addr[try_pool_idx];
+		index = pswiotlb_pool_find_slots(dev, nid, pool, orig_addr,
+						alloc_size, alloc_align_mask);
+
+		if (index >= 0) {
+			rcu_read_unlock();
+			goto found;
+		}
+	}
+#endif
 	rcu_read_unlock();
 	if (nslabs_per_pool > SLABS_PER_PAGE << MAX_ORDER)
 		nslabs_per_pool = SLABS_PER_PAGE << MAX_ORDER;
