@@ -108,9 +108,9 @@ DEFINE_EVENT(tcp_event_sk_skb, tcp_retransmit_skb,
  */
 DEFINE_EVENT(tcp_event_sk_skb, tcp_send_reset,
 
-	TP_PROTO(const struct sock *sk, const struct sk_buff *skb),
+	TP_PROTO(const struct sock *sk, const struct sk_buff *skb__nullable),
 
-	TP_ARGS(sk, skb)
+	TP_ARGS(sk, skb__nullable)
 );
 
 DEFINE_EVENT(tcp_event_sk_skb, tcp_pkt_recv,
