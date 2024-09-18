@@ -112,6 +112,11 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
 #define _ASM_MC_EXTABLE(from, to)
 #endif
 
+#define _ASM_KACCESS_EXTABLE(from, to)	_ASM_EXTABLE(from, to)
+#define _ASM_UACCESS_EXTABLE(from, to)		\
+		_ASM_EXTABLE(from, to)		\
+		_ASM_MC_EXTABLE(from, to)
+
 /*
  * User access enabling/disabling.
  */
@@ -263,7 +268,7 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
  * The "__xxx_error" versions set the third argument to -EFAULT if an error
  * occurs, and leave it unchanged on success.
  */
-#define __get_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
+#define __get_user_asm(instr, alt_instr, reg, x, addr, err, feature, type)	\
 	asm volatile(							\
 	"1:"ALTERNATIVE(instr "     " reg "1, [%2]\n",			\
 			alt_instr " " reg "1, [%2]\n", feature)		\
@@ -274,11 +279,11 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
 	"	mov	%1, #0\n"					\
 	"	b	2b\n"						\
 	"	.previous\n"						\
-	_ASM_EXTABLE(1b, 3b)						\
+	_ASM_##type##ACCESS_EXTABLE(1b, 3b)				\
 	: "+r" (err), "=&r" (x)						\
 	: "r" (addr), "i" (-EFAULT))
 
-#define __raw_get_user(x, ptr, err)					\
+#define __raw_get_user(x, ptr, err, type)				\
 do {									\
 	unsigned long __gu_val;						\
 	__chk_user_ptr(ptr);						\
@@ -286,19 +291,19 @@ do {									\
 	switch (sizeof(*(ptr))) {					\
 	case 1:								\
 		__get_user_asm("ldrb", "ldtrb", "%w", __gu_val, (ptr),  \
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	case 2:								\
 		__get_user_asm("ldrh", "ldtrh", "%w", __gu_val, (ptr),  \
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	case 4:								\
 		__get_user_asm("ldr", "ldtr", "%w", __gu_val, (ptr),	\
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	case 8:								\
 		__get_user_asm("ldr", "ldtr", "%x",  __gu_val, (ptr),	\
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	default:							\
 		BUILD_BUG();						\
@@ -313,7 +318,7 @@ do {									\
 	might_fault();							\
 	if (access_ok(__p, sizeof(*__p))) {				\
 		__p = uaccess_mask_ptr(__p);				\
-		__raw_get_user((x), __p, (err));			\
+		__raw_get_user((x), __p, (err), U);		\
 	} else {							\
 		(x) = (__force __typeof__(x))0; (err) = -EFAULT;	\
 	}								\
@@ -328,7 +333,7 @@ do {									\
 
 #define get_user	__get_user
 
-#define __put_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
+#define __put_user_asm(instr, alt_instr, reg, x, addr, err, feature, type)	\
 	asm volatile(							\
 	"1:"ALTERNATIVE(instr "     " reg "1, [%2]\n",			\
 			alt_instr " " reg "1, [%2]\n", feature)		\
@@ -338,11 +343,11 @@ do {									\
 	"3:	mov	%w0, %3\n"					\
 	"	b	2b\n"						\
 	"	.previous\n"						\
-	_ASM_EXTABLE(1b, 3b)						\
+	_ASM_##type##ACCESS_EXTABLE(1b, 3b)						\
 	: "+r" (err)							\
 	: "r" (x), "r" (addr), "i" (-EFAULT))
 
-#define __raw_put_user(x, ptr, err)					\
+#define __raw_put_user(x, ptr, err, type)				\
 do {									\
 	__typeof__(*(ptr)) __pu_val = (x);				\
 	__chk_user_ptr(ptr);						\
@@ -350,19 +355,19 @@ do {									\
 	switch (sizeof(*(ptr))) {					\
 	case 1:								\
 		__put_user_asm("strb", "sttrb", "%w", __pu_val, (ptr),	\
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	case 2:								\
 		__put_user_asm("strh", "sttrh", "%w", __pu_val, (ptr),	\
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	case 4:								\
 		__put_user_asm("str", "sttr", "%w", __pu_val, (ptr),	\
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	case 8:								\
 		__put_user_asm("str", "sttr", "%x", __pu_val, (ptr),	\
-			       (err), ARM64_HAS_UAO);			\
+			       (err), ARM64_HAS_UAO, type);		\
 		break;							\
 	default:							\
 		BUILD_BUG();						\
@@ -376,7 +381,7 @@ do {									\
 	might_fault();							\
 	if (access_ok(__p, sizeof(*__p))) {				\
 		__p = uaccess_mask_ptr(__p);				\
-		__raw_put_user((x), __p, (err));			\
+		__raw_put_user((x), __p, (err), U);			\
 	} else	{							\
 		(err) = -EFAULT;					\
 	}								\
