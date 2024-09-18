@@ -243,6 +243,9 @@ alternative_endif
 
 		_asm_extable	8888b,\l;
 		_asm_extable	8889b,\l;
+
+		_asm_mc_extable	8888b,\l;
+		_asm_mc_extable	8889b,\l;
 	.endm
 
 	.macro uao_stp l, reg1, reg2, addr, post_inc
@@ -270,6 +273,8 @@ alternative_endif
 		alternative_endif
 
 		_asm_extable	8888b,\l;
+
+		_asm_mc_extable	8888b,\l;
 	.endm
 #else
 	.macro uao_ldp l, reg1, reg2, addr, post_inc
