@@ -31,6 +31,10 @@ extern int memcmp(const void *, const void *, size_t);
 extern void *memchr(const void *, int, __kernel_size_t);
 #endif
 
+#define __HAVE_ARCH_MEMCPY_MC
+extern void *memcpy_mcs(void *, const void *, __kernel_size_t);
+extern void *__memcpy_mcs(void *, const void *, __kernel_size_t);
+
 #define __HAVE_ARCH_MEMCPY
 extern void *memcpy(void *, const void *, __kernel_size_t);
 extern void *__memcpy(void *, const void *, __kernel_size_t);
@@ -56,6 +60,7 @@ void memcpy_flushcache(void *dst, const void *src, size_t cnt);
  */
 
 #define memcpy(dst, src, len) __memcpy(dst, src, len)
+#define memcpy_mcs(dst, src, len) __memcpy_mcs(dst, src, len)
 #define memmove(dst, src, len) __memmove(dst, src, len)
 #define memset(s, c, n) __memset(s, c, n)
 
