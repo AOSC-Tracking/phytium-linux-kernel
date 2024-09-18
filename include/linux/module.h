@@ -29,6 +29,7 @@
 
 #include <linux/percpu.h>
 #include <asm/module.h>
+#include <linux/kabi.h>
 
 /* Not Yet Implemented */
 #define MODULE_SUPPORTED_DEVICE(name)
@@ -423,6 +424,11 @@ struct module {
 	/* Startup function. */
 	int (*init)(void);
 
+#ifdef CONFIG_ARCH_HAS_MC_EXTABLE
+	/* there is 8-byte hole on all platforms */
+	KABI_FILL_HOLE(unsigned int num_mc_exentries)
+#endif
+
 	/* Core layout: rbtree is accessed frequently, so keep together. */
 	struct module_layout core_layout __module_layout_align;
 	struct module_layout init_layout;
@@ -533,6 +539,10 @@ struct module {
 #ifdef CONFIG_FUNCTION_ERROR_INJECTION
 	struct error_injection_entry *ei_funcs;
 	unsigned int num_ei_funcs;
+#endif
+
+#ifdef CONFIG_ARCH_HAS_MC_EXTABLE
+	KABI_USE(1, struct exception_table_entry *mc_extable)
 #endif
 } ____cacheline_aligned __randomize_layout;
 #ifndef MODULE_ARCH_INIT
