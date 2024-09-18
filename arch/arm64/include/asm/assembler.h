@@ -160,6 +160,10 @@ alternative_endif
 9999:	x;					\
 	_asm_mc_extable	9999b, l
 
+#define CPY_MC(l, x...)				\
+9999:	x;					\
+	_asm_mc_extable 9999b, l
+
 /*
  * Register aliases.
  */
