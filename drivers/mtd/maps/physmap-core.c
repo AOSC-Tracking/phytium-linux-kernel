@@ -40,6 +40,7 @@
 #include <linux/of_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/gpio/consumer.h>
+#include <linux/acpi.h>
 
 #include "physmap-bt1-rom.h"
 #include "physmap-gemini.h"
@@ -409,12 +410,22 @@ static int physmap_flash_of_init(struct platform_device *dev)
 }
 #endif /* IS_ENABLED(CONFIG_MTD_PHYSMAP_OF) */
 
+#if IS_ENABLED(CONFIG_MTD_PHYSMAP_ACPI)
+static const struct acpi_device_id physmap_flash_ids[] = {
+	{ "ACPI0018" },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, physmap_flash_ids);
+#else /* IS_ENABLED(CONFIG_MTD_PHYSMAP_ACPI) */
+#define physmap_flash_ids NULL
+#endif /* IS_ENABLED(CONFIG_MTD_PHYSMAP_ACPI) */
+
 static const char * const rom_probe_types[] = {
 	"cfi_probe", "jedec_probe", "qinfo_probe", "map_rom",
 };
 
 static const char * const part_probe_types[] = {
-	"cmdlinepart", "RedBoot", "afs", NULL
+	"cmdlinepart", "RedBoot", "afs", "acpipart", NULL
 };
 
 static int physmap_flash_pdata_init(struct platform_device *dev)
@@ -423,6 +434,18 @@ static int physmap_flash_pdata_init(struct platform_device *dev)
 	struct physmap_flash_data *physmap_data;
 	unsigned int i;
 	int err;
+
+#ifdef CONFIG_MTD_PHYSMAP_ACPI
+	u32 bankwidth;
+
+	fwnode_property_read_u32(dev->dev.fwnode, "bank-width", &bankwidth);
+
+	struct physmap_flash_data acpi_data = {
+		.width		= bankwidth,
+	};
+
+	dev->dev.platform_data = &acpi_data;
+#endif
 
 	physmap_data = dev_get_platdata(&dev->dev);
 	if (!physmap_data)
@@ -454,7 +477,7 @@ static int physmap_flash_probe(struct platform_device *dev)
 	int err = 0;
 	int i;
 
-	if (!dev->dev.of_node && !dev_get_platdata(&dev->dev))
+	if (!dev->dev.of_node && !dev->dev.fwnode && !dev_get_platdata(&dev->dev))
 		return -EINVAL;
 
 	info = devm_kzalloc(&dev->dev, sizeof(*info), GFP_KERNEL);
@@ -598,6 +621,9 @@ static int physmap_flash_probe(struct platform_device *dev)
 	spin_lock_init(&info->vpp_lock);
 
 	mtd_set_of_node(info->cmtd, dev->dev.of_node);
+
+	mtd_set_fwnode(info->cmtd, dev->dev.fwnode);
+
 	err = mtd_device_parse_register(info->cmtd, info->part_types, NULL,
 					info->parts, info->nparts);
 	if (err)
@@ -631,6 +657,7 @@ static struct platform_driver physmap_flash_driver = {
 	.driver		= {
 		.name	= "physmap-flash",
 		.of_match_table = of_flash_match,
+		.acpi_match_table = physmap_flash_ids,
 	},
 };
 
