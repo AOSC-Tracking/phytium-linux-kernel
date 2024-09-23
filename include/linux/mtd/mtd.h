@@ -458,6 +458,12 @@ static inline void mtd_set_pairing_scheme(struct mtd_info *mtd,
 	mtd->pairing = pairing;
 }
 
+static inline void mtd_set_fwnode(struct mtd_info *mtd,
+				   struct fwnode_handle *fwnode)
+{
+	mtd->dev.fwnode = fwnode;
+}
+
 static inline void mtd_set_of_node(struct mtd_info *mtd,
 				   struct device_node *np)
 {

@@ -75,6 +75,15 @@ config MTD_PHYSMAP_OF
 	  physically into the CPU's memory. The mapping description here is
 	  taken from OF device tree.
 
+config MTD_PHYSMAP_ACPI
+	bool "Memory device in physical memory map based on ACPI description"
+	depends on MTD_PHYSMAP
+	help
+	  This provides a 'mapping' driver which allows the NOR Flash, ROM
+	  and RAM driver code to communicate with chips which are mapped
+	  physically into the CPU's memory. The mapping description here is
+	  taken from ACPI table.
+
 config MTD_PHYSMAP_BT1_ROM
 	bool "Baikal-T1 Boot ROMs OF-based physical memory map handling"
 	depends on MTD_PHYSMAP_OF
