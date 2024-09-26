@@ -422,6 +422,7 @@ static int phytium_mac_config(struct macb *bp)
 {
 	u32 old_ctrl, ctrl;
 	u32 old_ncr, ncr;
+	u32 pcsctrl;
 
 	netdev_dbg(bp->dev, "phytium mac config");
 
@@ -437,7 +438,7 @@ static int phytium_mac_config(struct macb *bp)
 		ctrl &= ~GEM_BIT(GBE);
 
 	if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
-		ctrl |= GEM_BIT(PCSSEL) | GEM_BIT(SGMIIEN);
+		ctrl |= GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL) | GEM_BIT(GBE);
 		ncr |= MACB_BIT(2PT5G);
 	} else if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
 		bp->phy_interface == PHY_INTERFACE_MODE_5GBASER) {
@@ -454,6 +455,12 @@ static int phytium_mac_config(struct macb *bp)
 
 	if (old_ncr ^ ncr)
 		macb_or_gem_writel(bp, NCR, ncr);
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		pcsctrl = gem_readl(bp, PCSCTRL);
+		pcsctrl &= ~GEM_BIT(PCSAUTONEG);
+		gem_writel(bp, PCSCTRL, pcsctrl);
+	}
 
 	return 0;
 }
@@ -514,6 +521,7 @@ static void phytium_gem1p0_sel_clk(struct macb *bp)
 		}
 	} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
 		if (bp->speed == SPEED_2500) {
+			gem_writel(bp, SRC_SEL_LN, 0x1);  /*0x1c04*/
 			gem_writel(bp, DIV_SEL0_LN, 0x1); /*0x1c08*/
 			gem_writel(bp, DIV_SEL1_LN, 0x2); /*0x1c0c*/
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1); /*0x1c10*/
@@ -530,7 +538,22 @@ static void phytium_gem1p0_sel_clk(struct macb *bp)
 			speed = HS_SPEED_2500M;
 		}
 	} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-		if (bp->speed == SPEED_1000) {
+		if (bp->speed == SPEED_2500) {
+			gem_writel(bp, DIV_SEL0_LN, 0x1); /*0x1c08*/
+			gem_writel(bp, DIV_SEL1_LN, 0x2); /*0x1c0c*/
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1); /*0x1c10*/
+			gem_writel(bp, TX_CLK_SEL0, 0x0); /*0x1c20*/
+			gem_writel(bp, TX_CLK_SEL1, 0x1); /*0x1c24*/
+			gem_writel(bp, TX_CLK_SEL2, 0x1); /*0x1c28*/
+			gem_writel(bp, TX_CLK_SEL3, 0x1); /*0x1c2c*/
+			gem_writel(bp, RX_CLK_SEL0, 0x1); /*0x1c30*/
+			gem_writel(bp, RX_CLK_SEL1, 0x0); /*0x1c34*/
+			gem_writel(bp, TX_CLK_SEL3_0, 0x0); /*0x1c70*/
+			gem_writel(bp, TX_CLK_SEL4_0, 0x0); /*0x1c74*/
+			gem_writel(bp, RX_CLK_SEL3_0, 0x0); /*0x1c78*/
+			gem_writel(bp, RX_CLK_SEL4_0, 0x0); /*0x1c7c*/
+			speed = HS_SPEED_2500M;
+		} else if (bp->speed == SPEED_1000) {
 			gem_writel(bp, DIV_SEL0_LN, 0x4); /*0x1c08*/
 			gem_writel(bp, DIV_SEL1_LN, 0x8); /*0x1c0c*/
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1); /*0x1c10*/
@@ -648,6 +671,7 @@ static void macb_handle_link_change(struct net_device *dev)
 	struct phy_device *phydev = dev->phydev;
 	unsigned long flags;
 	int err, status_change = 0;
+	u32 network_ctrl, pcsctrl, old_pcsctrl;
 
 	spin_lock_irqsave(&bp->lock, flags);
 
@@ -665,7 +689,7 @@ static void macb_handle_link_change(struct net_device *dev)
 				reg |= MACB_BIT(FD);
 			if (phydev->speed == SPEED_100)
 				reg |= MACB_BIT(SPD);
-			if (phydev->speed == SPEED_1000 &&
+			if ((phydev->speed == SPEED_1000 || phydev->speed == SPEED_2500) &&
 			    bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE)
 				reg |= GEM_BIT(GBE);
 
@@ -674,6 +698,17 @@ static void macb_handle_link_change(struct net_device *dev)
 			bp->speed = phydev->speed;
 			bp->duplex = phydev->duplex;
 			status_change = 1;
+
+			if (bp->speed == SPEED_2500) {
+				network_ctrl = macb_readl(bp, NCR);
+				network_ctrl |= MACB_BIT(2PT5G);
+				macb_writel(bp, NCR, network_ctrl);
+
+				old_pcsctrl = gem_readl(bp, PCSCTRL);
+				pcsctrl = old_pcsctrl & ~GEM_BIT(PCSAUTONEG);
+				if (old_pcsctrl != pcsctrl)
+					gem_writel(bp, PCSCTRL, pcsctrl);
+			}
 		}
 	}
 
@@ -3578,7 +3613,14 @@ static int macb_get_link_ksettings(struct net_device *ndev,
 				| ADVERTISED_FIBRE | ADVERTISED_Pause;
 			kset->base.port = PORT_FIBRE;
 			kset->base.transceiver = XCVR_INTERNAL;
-		} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+			supported = SUPPORTED_2500baseX_Full
+				    | SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_2500baseX_Full
+				      | ADVERTISED_FIBRE | ADVERTISED_Pause;
+			kset->base.port = PORT_FIBRE;
+			kset->base.transceiver = XCVR_INTERNAL;
+		}  else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 			supported = SUPPORTED_2500baseX_Full | SUPPORTED_1000baseT_Full
 				| SUPPORTED_100baseT_Full | SUPPORTED_10baseT_Full
 				| SUPPORTED_FIBRE | SUPPORTED_Pause;
