@@ -977,6 +977,15 @@ static void rcu_tasks_postscan(struct list_head *hop)
 	}
 
 	/*
+	 * t->on_rq && !t->se.sched_delayed *could* be considered sleeping but
+	 * since it is a spurious state (it will transition into the
+	 * traditional blocked state or get woken up without outside
+	 * dependencies), not considering it such should only affect timing.
+	 *
+	 * Be conservative for now and not include it.
+	 */
+
+	/*
 	 * Exiting tasks may escape the tasklist scan. Those are vulnerable
 	 * until their final schedule() with TASK_DEAD state. To cope with
 	 * this, divide the fragile exit path part in two intersecting
