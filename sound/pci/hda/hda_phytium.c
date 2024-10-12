@@ -493,6 +493,7 @@ static int azx_resume(struct device *dev)
 		}
 
 		azx_dev = get_azx_dev(substream);
+		snd_hdac_stream_start(azx_stream(azx_dev), true);
 		hda->substream = NULL;
 	}
 
