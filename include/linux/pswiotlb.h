@@ -222,7 +222,12 @@ static inline bool is_pswiotlb_buffer(struct device *dev, int nid, phys_addr_t p
 			struct p_io_tlb_pool **pool)
 {
 	struct p_io_tlb_mem *mem = &dev->dma_p_io_tlb_mem[nid];
-	struct page *page = pfn_to_page(PFN_DOWN(paddr));
+	struct page *page;
+
+	if (!paddr)
+		return false;
+
+	page = pfn_to_page(PFN_DOWN(paddr));
 
 	if (test_bit(PG_pswiotlb, &page->flags) == false)
 		return false;
