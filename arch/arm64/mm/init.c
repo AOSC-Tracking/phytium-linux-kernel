@@ -505,7 +505,7 @@ void __init mem_init(void)
 #ifdef CONFIG_PSWIOTLB
 	/* enable pswiotlb default */
 	if ((pswiotlb_force_disable != true) &&
-		is_phytium_ps23064_socs())
+		is_phytium_ps_socs())
 		pswiotlb_init(1, PSWIOTLB_VERBOSE);
 #endif
 

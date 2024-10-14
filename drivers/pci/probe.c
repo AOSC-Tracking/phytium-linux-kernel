@@ -2557,7 +2557,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	dma_set_seg_boundary(&dev->dev, 0xffffffff);
 #ifdef CONFIG_PSWIOTLB
 	if ((pswiotlb_force_disable != true) &&
-		is_phytium_ps23064_socs()) {
+		is_phytium_ps_socs()) {
 		pswiotlb_store_local_node(dev, bus);
 		dma_set_seg_boundary(&dev->dev, 0xffffffffffff);
 	}

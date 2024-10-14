@@ -3140,7 +3140,7 @@ void device_initialize(struct device *dev)
 	swiotlb_dev_init(dev);
 #ifdef CONFIG_PSWIOTLB
 	if ((pswiotlb_force_disable != true) &&
-		is_phytium_ps23064_socs())
+		is_phytium_ps_socs())
 		pswiotlb_dev_init(dev);
 #endif
 }
