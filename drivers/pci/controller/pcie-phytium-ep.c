@@ -341,12 +341,31 @@ static const struct pci_epc_ops phytium_pcie_epc_ops = {
 	.start		= phytium_pcie_ep_start,
 };
 
+static const struct phytium_pcie_ep_config pd2008_pcie_ep_config =
+{
+	.hpb_perf_base_limit_offs = 0xA30,
+};
 
+static const struct phytium_pcie_ep_config pe2204_pcie_ep_config =
+{
+	.hpb_perf_base_limit_offs = 0xA40,
+};
+
+static const struct of_device_id phytium_pcie_ep_of_match[] = {
+	{ .compatible = "phytium,pd2008-pcie-ep",
+	  .data = &pd2008_pcie_ep_config },
+	{ .compatible = "phytium,pe2204-pcie-ep",
+	  .data = &pe2204_pcie_ep_config },
+	{ },
+};
 
 static int phytium_pcie_ep_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	const struct of_device_id *match = NULL;
 	struct phytium_pcie_ep *priv = NULL;
+	const struct phytium_pcie_ep_config *pcie_ep_config = 
+						&pe2204_pcie_ep_config;
 	struct resource *res;
 	struct device_node *np = dev->of_node;
 	struct pci_epc *epc;
@@ -356,6 +375,13 @@ static int phytium_pcie_ep_probe(struct platform_device *pdev)
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
+
+	match = of_match_node(phytium_pcie_ep_of_match, pdev->dev.of_node);
+	if (match && match->data) { 
+		pcie_ep_config = match->data;
+	}
+	priv->hpb_perf_base_limit_offs = 
+			pcie_ep_config->hpb_perf_base_limit_offs;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
 	priv->reg_base = devm_ioremap_resource(dev, res);
@@ -428,13 +454,13 @@ static int phytium_pcie_ep_probe(struct platform_device *pdev)
 		& C0_PREF_BASE_MASK) << C0_PREF_BASE_SHIFT;
 	value |= (((lower_32_bits(priv->mem_res->end) >> C0_PREF_VALUE_SHIFT)
 		& C0_PREF_LIMIT_MASK) << C0_PREF_LIMIT_SHIFT);
-	phytium_hpb_writel(priv, PHYTIUM_HPB_C0_PREF_BASE_LIMIT, value);
+	phytium_hpb_writel(priv, priv->hpb_perf_base_limit_offs, value);
 
 	value = ((upper_32_bits(priv->mem_res->start) >> C0_PREF_UP32_VALUE_SHIFT)
 		& C0_PREF_BASE_UP32_MASK) << C0_PREF_BASE_UP32_SHIFT;
 	value |= (((upper_32_bits(priv->mem_res->end) >> C0_PREF_UP32_VALUE_SHIFT)
 		 & C0_PREF_LIMIT_UP32_MASK) << C0_PREF_LIMIT_UP32_SHIFT);
-	phytium_hpb_writel(priv, PHYTIUM_HPB_C0_PREF_BASE_LIMIT_UP32, value);
+	phytium_hpb_writel(priv, priv->hpb_perf_base_limit_offs + 0x04, value);
 
 	dev_dbg(dev, "exit %s successful\n", __func__);
 	return 0;
@@ -454,11 +480,6 @@ static int phytium_pcie_ep_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
-static const struct of_device_id phytium_pcie_ep_of_match[] = {
-	{ .compatible = "phytium,pd2008-pcie-ep" },
-	{ },
-};
 
 static struct platform_driver phytium_pcie_ep_driver = {
 	.driver = {
