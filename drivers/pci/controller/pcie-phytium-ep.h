@@ -8,13 +8,20 @@
 #ifndef __PCIE_PHYTIUM_EP_H__
 #define __PCIE_PHYTIUM_EP_H__
 
+#include <linux/io.h>
 #include "pcie-phytium-register.h"
 
 #define IRQ_MAPPING_SIZE	0x1000
+
+struct phytium_pcie_ep_config {
+	u32 hpb_perf_base_limit_offs;
+};
+
 struct phytium_pcie_ep {
 	void __iomem		*reg_base;
 	struct resource		*mem_res;
 	void __iomem		*hpb_base;
+	u32 			hpb_perf_base_limit_offs;
 	unsigned int		max_regions;
 	unsigned long		ob_region_map;
 	phys_addr_t		*ob_addr;
