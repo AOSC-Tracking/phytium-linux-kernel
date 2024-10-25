@@ -25,7 +25,7 @@
 #include "pcie-phytium-ep.h"
 #include "pcie-phytium-register.h"
 
-#define PHYTIUM_PCIE_RP_DRIVER_VERSION		"1.1.1"
+#define PHYTIUM_PCIE_EP_DRIVER_VERSION		"1.1.2"
 
 #define PHYTIUM_PCIE_EP_IRQ_PCI_ADDR_NONE	0x0
 #define PHYTIUM_PCIE_EP_IRQ_PCI_ADDR_LEGACY	0x1
@@ -508,6 +508,6 @@ MODULE_DEVICE_TABLE(of, phytium_pcie_ep_of_match);
 module_platform_driver(phytium_pcie_ep_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_VERSION(PHYTIUM_PCIE_RP_DRIVER_VERSION);
+MODULE_VERSION(PHYTIUM_PCIE_EP_DRIVER_VERSION);
 MODULE_AUTHOR("Yang Xun <yangxun@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium Pcie Controller Endpoint driver");
