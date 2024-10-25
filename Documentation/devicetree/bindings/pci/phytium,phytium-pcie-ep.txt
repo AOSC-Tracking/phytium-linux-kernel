@@ -1,7 +1,8 @@
 * Phytium PCIe endpoint controller
 
 Required properties:
-- compatible: Should contain "phytium,phytium-pcie-ep" to identify the IP used.
+- compatible: Should contain "phytium,pcie-ep-1.0" or
+  "phytium,pcie-ep-2.0"
 - reg: Should contain the controller register base address, AXI interface
   region base address and hpb register base address respectively.
 - reg-names: Must be "reg", "mem" and "hpb" respectively.
@@ -11,7 +12,7 @@ Required properties:
 Example:
 
 ep0: ep@0x29030000 {
-	compatible = "phytium,dp2008-pcie-ep";
+	compatible = "phytium,pcie-ep-1.0";
 	reg = <0x0 0x29030000 0x0 0x10000>,
 	      <0x11 0x00000000 0x1 0x00000000>,
 	      <0x0 0x29101000 0x0 0x1000>;
