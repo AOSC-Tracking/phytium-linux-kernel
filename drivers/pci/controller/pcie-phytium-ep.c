@@ -340,21 +340,21 @@ static const struct pci_epc_ops phytium_pcie_epc_ops = {
 	.start		= phytium_pcie_ep_start,
 };
 
-static const struct phytium_pcie_ep_config pd2008_pcie_ep_config =
+static const struct phytium_pcie_ep_config pcie_ep_1p0_config =
 {
 	.hpb_perf_base_limit_offs = 0xA30,
 };
 
-static const struct phytium_pcie_ep_config pe2204_pcie_ep_config =
+static const struct phytium_pcie_ep_config pcie_ep_2p0_config =
 {
 	.hpb_perf_base_limit_offs = 0xA40,
 };
 
 static const struct of_device_id phytium_pcie_ep_of_match[] = {
-	{ .compatible = "phytium,pd2008-pcie-ep",
-	  .data = &pd2008_pcie_ep_config },
-	{ .compatible = "phytium,pe2204-pcie-ep",
-	  .data = &pe2204_pcie_ep_config },
+	{ .compatible = "phytium,pcie-ep-1.0",
+	  .data = &pcie_ep_1p0_config },
+	{ .compatible = "phytium,pcie-ep-2.0",
+	  .data = &pcie_ep_2p0_config },
 	{ },
 };
 
@@ -364,7 +364,7 @@ static int phytium_pcie_ep_probe(struct platform_device *pdev)
 	const struct of_device_id *match = NULL;
 	struct phytium_pcie_ep *priv = NULL;
 	const struct phytium_pcie_ep_config *pcie_ep_config = 
-						&pe2204_pcie_ep_config;
+						&pcie_ep_2p0_config;
 	struct resource *res;
 	struct device_node *np = dev->of_node;
 	struct pci_epc *epc;
