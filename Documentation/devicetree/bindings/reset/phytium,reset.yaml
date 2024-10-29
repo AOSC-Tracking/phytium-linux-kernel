@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+title: Phytium Reset Controller
+======================================
+
+This binding describes a reset-controller for Phytium SoCs.
+
+Required properties:
+- compatible:
+	Usage: required
+	Value type: <string>
+	Definition: must be:
+		    "phytium,reset"
+
+- reg:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: must specify the base address and size of the register
+	            space.
+
+- #reset-cells:
+	Usage: required
+	Value type: <uint>
+	Definition: must be 1; cell entry represents the reset index.
+
+Example:
+
+reset: reset@2807e000 {
+	compatible = "phytium,reset";
+	reg = <0x0 0x2807e000 0x0 0x10>;
+	#reset-cells = <1>;
+};
+
+Specifying reset lines connected to IP modules
+==============================================
+
+Device nodes that need access to reset lines should
+specify them as a reset phandle in their corresponding node.
+
+Example:
+
+i2c0: i2c@28011000 {
+	...
+
+	resets = <&reset 0>;
+
+	...
+};
