@@ -294,6 +294,12 @@ struct iommu_ops {
 	const struct iommu_domain_ops *default_domain_ops;
 	unsigned long pgsize_bitmap;
 	struct module *owner;
+
+#ifdef CONFIG_SMMU_BYPASS_DEV
+#ifndef __GENKSYMS__
+	int (*device_domain_type)(struct device *dev, unsigned int *type);
+#endif
+#endif
 };
 
 /**
