@@ -97,6 +97,7 @@ struct phytium_dp_device {
 	uint32_t trigger_train_fail;
 
 	unsigned char train_set[4];
+	struct edid *detect_edid;
 	struct edid *edp_edid;
 	bool has_audio;
 	bool fast_train_support;
