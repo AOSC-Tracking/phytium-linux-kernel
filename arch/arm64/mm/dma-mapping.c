@@ -600,6 +600,9 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
 	if (WARN(!dev, "cannot create IOMMU mapping for unknown device\n"))
 		return NULL;
 
+#ifdef CONFIG_PSWIOTLB
+	check_if_pswiotlb_is_applicable(dev);
+#endif
 	size = PAGE_ALIGN(size);
 
 	/*
