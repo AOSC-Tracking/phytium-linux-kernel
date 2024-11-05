@@ -17520,6 +17520,7 @@ F:	drivers/pci/controller/pcie-phytium*
 F:	drivers/perf/phytium/*
 F:	drivers/perf/phytium/phytium_pcie_pmu.c
 F:	drivers/pwm/pwm-phytium.c
+F:	drivers/reset/reset-phytium.c
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-common.c
 F:	drivers/spi/spi-phytium-dma.c
