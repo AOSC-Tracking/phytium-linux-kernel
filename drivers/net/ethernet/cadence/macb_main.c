@@ -3710,17 +3710,68 @@ static int macb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 static int macb_get_link_ksettings(struct net_device *netdev,
 				   struct ethtool_link_ksettings *kset)
 {
+	int ret = 0;
 	struct macb *bp = netdev_priv(netdev);
+	u32 supported = 0;
+	u32 advertising = 0;
 
-	return phylink_ethtool_ksettings_get(bp->phylink, kset);
+	if (!phylink_expects_phy(bp->phylink)) {
+		if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
+		    bp->phy_interface == PHY_INTERFACE_MODE_XGMII) {
+			supported = SUPPORTED_10000baseT_Full
+				| SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_10000baseT_Full
+				| ADVERTISED_FIBRE | ADVERTISED_Pause;
+			kset->base.port = PORT_FIBRE;
+			kset->base.transceiver = XCVR_INTERNAL;
+		} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+			supported = SUPPORTED_2500baseX_Full | SUPPORTED_1000baseT_Full
+				| SUPPORTED_100baseT_Full | SUPPORTED_10baseT_Full
+				| SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_2500baseX_Full | ADVERTISED_1000baseT_Full
+				| ADVERTISED_100baseT_Full | ADVERTISED_10baseT_Full
+				| ADVERTISED_FIBRE | ADVERTISED_Pause;
+			kset->base.port = PORT_FIBRE;
+			kset->base.transceiver = XCVR_INTERNAL;
+		}  else if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII) {
+			supported = SUPPORTED_1000baseT_Full | SUPPORTED_100baseT_Full
+				| SUPPORTED_10baseT_Full | SUPPORTED_TP;
+			advertising = ADVERTISED_1000baseT_Full | ADVERTISED_100baseT_Full
+				| ADVERTISED_10baseT_Full | ADVERTISED_TP;
+		} else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII) {
+			supported = SUPPORTED_100baseT_Full
+				| SUPPORTED_10baseT_Full | SUPPORTED_TP;
+			advertising = ADVERTISED_100baseT_Full
+				| ADVERTISED_10baseT_Full | ADVERTISED_TP;
+		}
+
+		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.supported,
+							supported);
+		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.advertising,
+							advertising);
+		kset->base.speed = bp->speed;
+		kset->base.duplex = bp->duplex;
+	} else {
+		phylink_ethtool_ksettings_get(bp->phylink, kset);
+	}
+
+	return ret;
 }
 
 static int macb_set_link_ksettings(struct net_device *netdev,
 				   const struct ethtool_link_ksettings *kset)
 {
 	struct macb *bp = netdev_priv(netdev);
+	int ret = 0;
 
-	return phylink_ethtool_ksettings_set(bp->phylink, kset);
+	if (!phylink_expects_phy(bp->phylink)) {
+		netdev_err(netdev, "fixed link interface not supported set link\n");
+		ret = -EOPNOTSUPP;
+	} else {
+		ret = phylink_ethtool_ksettings_set(bp->phylink, kset);
+	}
+
+	return ret;
 }
 
 static void macb_get_ringparam(struct net_device *netdev,
