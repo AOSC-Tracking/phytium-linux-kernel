@@ -48,6 +48,11 @@ static int pmdk_dp0_init(struct snd_soc_pcm_runtime *runtime)
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
 		return ret;
 	}
+	ret = snd_jack_add_new_kctl(priv->jack0.jack, "HDMI/DP,pcm=0",
+				    SND_JACK_LINEOUT);
+	if (ret)
+		dev_warn(card->dev, "failed creating Jack kctl %d\n", ret);
+
 	snd_soc_component_set_jack(component, &priv->jack0, NULL);
 	return ret;
 }
@@ -66,6 +71,10 @@ static int pmdk_dp1_init(struct snd_soc_pcm_runtime *runtime)
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
 		return ret;
 	}
+	ret = snd_jack_add_new_kctl(priv->jack1.jack, "HDMI/DP,pcm=1",
+				    SND_JACK_LINEOUT);
+	if (ret)
+		dev_warn(card->dev, "failed creating Jack kctl %d\n", ret);
 	snd_soc_component_set_jack(component, &priv->jack1, NULL);
 	return ret;
 }
@@ -84,6 +93,10 @@ static int pmdk_dp2_init(struct snd_soc_pcm_runtime *runtime)
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
 		return ret;
 	}
+	ret = snd_jack_add_new_kctl(priv->jack2.jack, "HDMI/DP,pcm=2",
+				    SND_JACK_LINEOUT);
+	if (ret)
+		dev_warn(card->dev, "failed creating Jack kctl %d\n", ret);
 	snd_soc_component_set_jack(component, &priv->jack2, NULL);
 	return ret;
 }
