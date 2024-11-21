@@ -245,6 +245,9 @@ static void phytium_mci_set_clk(struct phytium_mci_host *host, struct mmc_ios *i
 			readl(host->base + MCI_UHS_REG_EXT), readl(host->base + MCI_CLKDIV),
 			readl(host->base + MCI_CLK_DIVIDER), ((2 * (div & 0xff)) & 0xffff));
 
+		if (cur_cmd_index == SD_SWITCH_VOLTAGE)
+			msleep(40);
+
 		sdr_set_bits(host->base + MCI_CLKENA, MCI_CLKENA_CCLK_ENABLE);
 
 		if (cur_cmd_index == SD_SWITCH_VOLTAGE)
