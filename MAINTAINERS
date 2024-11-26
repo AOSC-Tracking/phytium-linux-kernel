@@ -17512,8 +17512,11 @@ F:	drivers/perf/phytium/*
 F:	drivers/perf/phytium/phytium_pcie_pmu.c
 F:	drivers/pwm/pwm-phytium.c
 F:	drivers/spi/spi-phytium*
+F:	drivers/spi/spi-phytium-common.c
 F:	drivers/spi/spi-phytium-dma.c
+F:	drivers/spi/spi-phytium-plat-v2.c
 F:	drivers/spi/spi-phytium-qspi.c
+F:	drivers/spi/spi-phytium-v2.c
 F:	drivers/tty/serial/phytium-uart.c
 F:	drivers/usb/phytium/*
 F:	drivers/w1/masters/phytium_w1.c
