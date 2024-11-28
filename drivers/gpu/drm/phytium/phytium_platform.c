@@ -136,14 +136,16 @@ phytium_platform_private_init(struct platform_device *pdev)
 				goto failed;
 			}
 			priv->edp_bl_en = gpiod_get(&pdev->dev, "edp-bl-en", GPIOD_OUT_HIGH);
-			if (!priv->edp_bl_en) {
+			if (IS_ERR(priv->edp_bl_en)) {
 				dev_err(&pdev->dev, "Failed to get edp_en gpio\n");
+				priv->edp_bl_en = NULL;
 				goto failed;
 			}
 			priv->edp_power_en = gpiod_get(&pdev->dev, "edp-power-en", GPIOD_OUT_HIGH);
-			if (!priv->edp_power_en) {
+			if (IS_ERR(priv->edp_power_en)) {
 				dev_err(&pdev->dev, "Failed to get edp_pwr_en gpio\n");
-				goto failed;
+				priv->edp_power_en = NULL;
+				goto failed_gpio_power_init;
 			}
 			// set GPIO pin output
 			gpiod_direction_output(priv->edp_power_en, 0);
@@ -176,14 +178,16 @@ phytium_platform_private_init(struct platform_device *pdev)
 				goto failed;
 			}
 			priv->edp_bl_en = gpiod_get(&pdev->dev, "edp-bl-en", GPIOD_OUT_HIGH);
-			if (!priv->edp_bl_en) {
+			if (IS_ERR(priv->edp_bl_en)) {
 				dev_err(&pdev->dev, "Failed to get edp_en gpio\n");
+				priv->edp_bl_en = NULL;
 				goto failed;
 			}
 			priv->edp_power_en = gpiod_get(&pdev->dev, "edp-power-en", GPIOD_OUT_HIGH);
-			if (!priv->edp_power_en) {
+			if (IS_ERR(priv->edp_power_en)) {
 				dev_err(&pdev->dev, "Failed to get edp_pwr_en gpio\n");
-				goto failed;
+				priv->edp_power_en = NULL;
+				goto failed_gpio_power_init;
 			}
 			// set GPIO pin output
 			gpiod_direction_output(priv->edp_power_en, 0);
@@ -219,6 +223,8 @@ phytium_platform_private_init(struct platform_device *pdev)
 
 	return priv;
 
+failed_gpio_power_init:
+	gpiod_put(priv->edp_bl_en);
 failed:
 	devm_kfree(&pdev->dev, platform_priv);
 exit:
@@ -230,6 +236,11 @@ static void phytium_platform_private_fini(struct platform_device *pdev)
 	struct drm_device *dev = dev_get_drvdata(&pdev->dev);
 	struct phytium_display_private *priv = dev->dev_private;
 	struct phytium_platform_private *platform_priv = to_platform_priv(priv);
+
+	if (priv->edp_power_en)
+		gpiod_put(priv->edp_power_en);
+	if (priv->edp_bl_en)
+		gpiod_put(priv->edp_bl_en);
 
 	devm_kfree(&pdev->dev, platform_priv);
 }
