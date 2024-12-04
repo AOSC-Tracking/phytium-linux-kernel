@@ -76,7 +76,9 @@
  * alignment.
  */
 #ifdef RO_EXCEPTION_TABLE_ALIGN
-#define RO_EXCEPTION_TABLE	EXCEPTION_TABLE(RO_EXCEPTION_TABLE_ALIGN)
+#define RO_EXCEPTION_TABLE	\
+	EXCEPTION_TABLE(RO_EXCEPTION_TABLE_ALIGN)	\
+	MC_EXCEPTION_TABLE(RO_EXCEPTION_TABLE_ALIGN)
 #else
 #define RO_EXCEPTION_TABLE
 #endif
@@ -636,6 +638,21 @@
 	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {		\
 		BOUNDED_SECTION_BY(__ex_table, ___ex_table)		\
 	}
+
+#ifdef CONFIG_ARCH_HAS_MC_EXTABLE
+/*
+ * Machine Check Exception table
+ */
+#define MC_EXCEPTION_TABLE(align)					\
+	. = ALIGN(align);						\
+	__mc_ex_table : AT(ADDR(__mc_ex_table) - LOAD_OFFSET) {		\
+		__start___mc_ex_table = .;				\
+		KEEP(*(__mc_ex_table))					\
+		__stop___mc_ex_table = .;				\
+	}
+#else
+#define MC_EXCEPTION_TABLE(align)
+#endif
 
 /*
  * .BTF
