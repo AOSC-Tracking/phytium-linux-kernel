@@ -2252,10 +2252,26 @@ static struct ctl_table vm_table[] = {
 	{ }
 };
 
+static struct ctl_table debug_table[] = {
+#if defined(CONFIG_ARM64) && defined(CONFIG_ARCH_HAS_COPY_MC)
+	{
+		.procname	= "machine_check_safe",
+		.data		= &sysctl_machine_check_safe,
+		.maxlen		= sizeof(sysctl_machine_check_safe),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
+#endif
+	{ }
+};
+
 int __init sysctl_init_bases(void)
 {
 	register_sysctl_init("kernel", kern_table);
 	register_sysctl_init("vm", vm_table);
+	register_sysctl_init("debug", debug_table);
 
 	return 0;
 }
