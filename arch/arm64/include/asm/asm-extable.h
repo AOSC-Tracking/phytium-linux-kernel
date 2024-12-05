@@ -120,7 +120,14 @@
 			  "("						\
 			    EX_DATA_REG(ERR, err) " | "			\
 			    EX_DATA_REG(ZERO, zero)			\
+			  ")")						\
+	__ASM_MC_EXTABLE(#insn, #fixup, 				\
+			  __stringify(EX_TYPE_UACCESS_ERR_ZERO),	\
+			  "("						\
+			    EX_DATA_REG(ERR, err) " | "			\
+			    EX_DATA_REG(ZERO, zero)			\
 			  ")")
+
 
 #define _ASM_EXTABLE_KACCESS_ERR_ZERO(insn, fixup, err, zero)		\
 	__DEFINE_ASM_GPR_NUMS						\
