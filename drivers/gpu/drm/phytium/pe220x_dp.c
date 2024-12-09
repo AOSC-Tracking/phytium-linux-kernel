@@ -410,7 +410,7 @@ static void pe220x_dp_hw_enable_backlight(struct phytium_dp_device *phytium_dp)
 	pwm_get_state(phytium_dp->pwm, &state);
 	state.enabled = true;
 	pwm_set_relative_duty_cycle(&state, 50, 100);
-	ret = pwm_apply_state(phytium_dp->pwm, &state);
+	ret = pwm_apply_might_sleep(phytium_dp->pwm, &state);
 
 	gpiod_set_value(priv->edp_bl_en, 1);
 	if (ret < 0)
@@ -455,7 +455,7 @@ static int pe220x_dp_hw_set_backlight(struct phytium_dp_device *phytium_dp, uint
 
 	pwm_set_relative_duty_cycle(&state, level, 100);
 
-	ret = pwm_apply_state(phytium_dp->pwm, &state);
+	ret = pwm_apply_might_sleep(phytium_dp->pwm, &state);
 	if (ret < 0)
 		DRM_ERROR("%s: failed to set backlight\n", __func__);
 out:
