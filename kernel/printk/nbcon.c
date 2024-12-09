@@ -1081,6 +1081,7 @@ wait_for_event:
 		}
 
 		console_srcu_read_unlock(cookie);
+		cond_resched();
 
 	} while (backlog);
 
@@ -1586,7 +1587,7 @@ void nbcon_acquire(struct uart_port *up)
 	if (!uart_is_nbcon(up))
 		return;
 
-	WARN_ON_ONCE(con->locked_port);
+	WARN_ON_ONCE(up->nbcon_locked_port);
 
 	do {
 		do {
@@ -1597,7 +1598,7 @@ void nbcon_acquire(struct uart_port *up)
 
 	} while (!nbcon_context_enter_unsafe(&ctxt));
 
-	con->locked_port = true;
+	up->nbcon_locked_port = true;
 }
 EXPORT_SYMBOL_GPL(nbcon_acquire);
 
@@ -1623,13 +1624,13 @@ void nbcon_release(struct uart_port *up)
 		.prio		= NBCON_PRIO_NORMAL,
 	};
 
-	if (!con->locked_port)
+	if (!up->nbcon_locked_port)
 		return;
 
 	if (nbcon_context_exit_unsafe(&ctxt))
 		nbcon_context_release(&ctxt);
 
-	con->locked_port = false;
+	up->nbcon_locked_port = false;
 }
 EXPORT_SYMBOL_GPL(nbcon_release);
 
