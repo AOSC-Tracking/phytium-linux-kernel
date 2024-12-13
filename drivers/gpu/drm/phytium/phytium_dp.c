@@ -102,7 +102,7 @@ phytium_dp_hw_aux_transfer_write(struct phytium_dp_device *phytium_dp, struct dr
 			aux_status = phytium_readl_reg(priv, group_offset, PHYTIUM_DP_AUX_STATUS);
 			if ((aux_status & REPLY_RECEIVED) || (aux_status & REPLY_ERROR)
 			    || (interrupt_status & REPLY_TIMEOUT)) {
-				DRM_DEBUG_KMS("aux wait exit\n");
+				drm_dbg_dp(dev, "aux wait exit\n");
 				break;
 			}
 			count_timeout++;
@@ -110,27 +110,27 @@ phytium_dp_hw_aux_transfer_write(struct phytium_dp_device *phytium_dp, struct dr
 
 		phytium_readl_reg(priv, group_offset, PHYTIUM_DP_INTERRUPT_STATUS);
 		if (interrupt_status & REPLY_TIMEOUT) {
-			DRM_DEBUG_KMS("aux write reply timeout\n");
+			drm_dbg_dp(dev, "aux write reply timeout\n");
 			continue;
 		} else if (aux_status & REPLY_ERROR) {
-			DRM_DEBUG_KMS("aux write reply error\n");
+			drm_dbg_dp(dev, "aux write reply error\n");
 			continue;
 		} else if (aux_status & REPLY_RECEIVED) {
-			DRM_DEBUG_KMS("aux write reply received succussful\n");
+			drm_dbg_dp(dev, "aux write reply received succussful\n");
 			break;
 		}
 	}
 
 	if (interrupt_status & REPLY_TIMEOUT) {
-		DRM_NOTE("aux(%d) write reply timeout\n", phytium_dp->port);
+		pr_notice("aux(%d) write reply timeout\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	} else if (aux_status & REPLY_ERROR) {
-		DRM_ERROR("aux(%d) write reply error\n", phytium_dp->port);
+		pr_err("aux(%d) write reply error\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	} else if ((aux_status & REPLY_RECEIVED) != REPLY_RECEIVED) {
-		DRM_ERROR("aux(%d) write reply no response\n", phytium_dp->port);
+		pr_err("aux(%d) write reply no response\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	}
@@ -173,7 +173,7 @@ phytium_dp_hw_aux_transfer_read(struct phytium_dp_device *phytium_dp, struct drm
 			aux_status = phytium_readl_reg(priv, group_offset, PHYTIUM_DP_AUX_STATUS);
 			if ((aux_status & REPLY_RECEIVED) || (aux_status & REPLY_ERROR)
 			   || (interrupt_status & REPLY_TIMEOUT)) {
-				DRM_DEBUG_KMS("aux wait exit\n");
+				drm_dbg_dp(dev, "aux wait exit\n");
 				break;
 			}
 			count_timeout++;
@@ -181,27 +181,27 @@ phytium_dp_hw_aux_transfer_read(struct phytium_dp_device *phytium_dp, struct drm
 
 		phytium_readl_reg(priv, group_offset, PHYTIUM_DP_INTERRUPT_STATUS);
 		if (interrupt_status & REPLY_TIMEOUT) {
-			DRM_DEBUG_KMS("aux read reply timeout\n");
+			drm_dbg_dp(dev, "aux read reply timeout\n");
 			continue;
 		} else if (aux_status & REPLY_ERROR) {
-			DRM_DEBUG_KMS("aux read reply error\n");
+			drm_dbg_dp(dev, "aux read reply error\n");
 			continue;
 		} else if (aux_status & REPLY_RECEIVED) {
-			DRM_DEBUG_KMS("aux read reply received succussful\n");
+			drm_dbg_dp(dev, "aux read reply received succussful\n");
 			break;
 		}
 	}
 
 	if (interrupt_status & REPLY_TIMEOUT) {
-		DRM_NOTE("aux(%d) read reply timeout\n", phytium_dp->port);
+		pr_notice("aux(%d) read reply timeout\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	} else if (aux_status & REPLY_ERROR) {
-		DRM_ERROR("aux(%d) read reply error\n", phytium_dp->port);
+		pr_err("aux(%d) read reply error\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	} else if ((aux_status & REPLY_RECEIVED) != REPLY_RECEIVED) {
-		DRM_ERROR("aux(%d) read reply no response\n", phytium_dp->port);
+		pr_err("aux(%d) read reply no response\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	}
@@ -212,7 +212,7 @@ phytium_dp_hw_aux_transfer_read(struct phytium_dp_device *phytium_dp, struct drm
 	if (ret > msg->size) {
 		ret = msg->size;
 	} else if (ret != msg->size) {
-		DRM_DEBUG_KMS("aux read count error(ret:0x%lx != 0x%lx)\n", ret, msg->size);
+		drm_dbg_dp(dev, "aux read count error(ret:0x%lx != 0x%lx)\n", ret, msg->size);
 		ret = -EBUSY;
 		goto out;
 	}
@@ -411,12 +411,12 @@ static bool phytium_dp_get_dpcd(struct phytium_dp_device *phytium_dp)
 	ret = drm_dp_dpcd_read(&phytium_dp->aux, 0x00, phytium_dp->dpcd,
 			       sizeof(phytium_dp->dpcd));
 	if (ret < 0) {
-		DRM_ERROR("port %d get DPCD capability fail\n", phytium_dp->port);
+		pr_err("port %d get DPCD capability fail\n", phytium_dp->port);
 		return false;
 	}
 
 	if (phytium_dp->dpcd[DP_DPCD_REV] == 0) {
-		DRM_ERROR("DPCD data error: 0x%x\n", phytium_dp->dpcd[DP_DPCD_REV]);
+		pr_err("DPCD data error: 0x%x\n", phytium_dp->dpcd[DP_DPCD_REV]);
 		return false;
 	}
 
@@ -429,13 +429,13 @@ static bool phytium_dp_get_dpcd(struct phytium_dp_device *phytium_dp)
 
 	/* get dpcd sink count */
 	if (drm_dp_dpcd_readb(&phytium_dp->aux, DP_SINK_COUNT, &sink_count) <= 0) {
-		DRM_ERROR("get DPCD sink_count fail\n");
+		pr_err("get DPCD sink_count fail\n");
 		return false;
 	}
 
 	phytium_dp->sink_count = DP_GET_SINK_COUNT(sink_count);
 	if (!phytium_dp->sink_count) {
-		DRM_ERROR("DPCD sink_count should not be zero\n");
+		pr_err("DPCD sink_count should not be zero\n");
 		return false;
 	}
 
@@ -449,7 +449,7 @@ static bool phytium_dp_get_dpcd(struct phytium_dp_device *phytium_dp)
 	ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_DOWNSTREAM_PORT_0,
 			       phytium_dp->downstream_ports, DP_MAX_DOWNSTREAM_PORTS);
 	if (ret < 0) {
-		DRM_ERROR("get DPCD DFP fail\n");
+		pr_err("get DPCD DFP fail\n");
 		return false;
 	}
 
@@ -673,7 +673,7 @@ void phytium_dp_hw_enable_audio(struct phytium_dp_device *phytium_dp)
 
 	n_m = phytium_dp_audio_get_n_m(phytium_dp->link_rate, phytium_dp->audio_info.sample_rate);
 	if (n_m == NULL) {
-		DRM_NOTE("can not get n_m for link_rate(%d) and sample_rate(%d)\n",
+		pr_notice("can not get n_m for link_rate(%d) and sample_rate(%d)\n",
 				phytium_dp->link_rate, phytium_dp->audio_info.sample_rate);
 		phytium_writel_reg(priv, 0, group_offset, PHYTIUM_DP_SEC_MAUD);
 		phytium_writel_reg(priv, 0, group_offset, PHYTIUM_DP_SEC_NAUD);
@@ -724,7 +724,7 @@ phytium_dp_hw_audio_hw_params(struct phytium_dp_device *phytium_dp, struct audio
 	uint32_t fs, ws, fs_accurac;
 	uint32_t group_offset = priv->dp_reg_base[port];
 
-	DRM_DEBUG_KMS("%s:set port%d sample_rate(%d) channels(%d) sample_width(%d)\n",
+	drm_dbg_dp(phytium_dp->dev, "%s:set port%d sample_rate(%d) channels(%d) sample_width(%d)\n",
 			__func__, phytium_dp->port, audio_info.sample_rate,
 			audio_info.channels, audio_info.sample_width);
 
@@ -770,7 +770,7 @@ phytium_dp_hw_audio_hw_params(struct phytium_dp_device *phytium_dp, struct audio
 		fs_accurac = SAMPLING_FREQ_192000;
 		break;
 	default:
-		DRM_ERROR("dp not support sample_rate %d\n", audio_info.sample_rate);
+		pr_err("dp not support sample_rate %d\n", audio_info.sample_rate);
 		goto out;
 	}
 
@@ -788,7 +788,7 @@ phytium_dp_hw_audio_hw_params(struct phytium_dp_device *phytium_dp, struct audio
 		ws = WORD_LENGTH_24;
 		break;
 	default:
-		DRM_ERROR("dp not support sample_width %d\n", audio_info.sample_width);
+		pr_err("dp not support sample_width %d\n", audio_info.sample_width);
 		goto out;
 	}
 
@@ -800,7 +800,7 @@ phytium_dp_hw_audio_hw_params(struct phytium_dp_device *phytium_dp, struct audio
 
 	n_m = phytium_dp_audio_get_n_m(phytium_dp->link_rate, audio_info.sample_rate);
 	if (n_m == NULL) {
-		DRM_NOTE("can not get n_m for link_rate(%d) and sample_rate(%d)\n",
+		pr_notice("can not get n_m for link_rate(%d) and sample_rate(%d)\n",
 			       phytium_dp->link_rate, audio_info.sample_rate);
 		phytium_writel_reg(priv, 0, group_offset, PHYTIUM_DP_SEC_MAUD);
 		phytium_writel_reg(priv, 0, group_offset, PHYTIUM_DP_SEC_NAUD);
@@ -1079,14 +1079,14 @@ static int phytium_dp_dpcd_get_tp_link(struct phytium_dp_device *phytium_dp,
 	ret = drm_dp_dpcd_readb(&phytium_dp->aux, DP_TEST_LANE_COUNT,
 				   test_lane_count);
 	if (ret <= 0) {
-		DRM_DEBUG_KMS("test pattern Lane count read failed(%d)\n", ret);
+		drm_dbg_dp(phytium_dp->dev, "test pattern Lane count read failed(%d)\n", ret);
 		goto failed;
 	}
 
 	ret = drm_dp_dpcd_readb(&phytium_dp->aux, DP_TEST_LINK_RATE,
 				   &test_link_bw);
 	if (ret <= 0) {
-		DRM_DEBUG_KMS("test pattern link rate read failed(%d)\n", ret);
+		drm_dbg_dp(phytium_dp->dev, "test pattern link rate read failed(%d)\n", ret);
 		goto failed;
 	}
 	*test_link_rate = drm_dp_bw_code_to_link_rate(test_link_bw);
@@ -1108,7 +1108,7 @@ static int phytium_dp_dpcd_set_link(struct phytium_dp_device *phytium_dp,
 		link_config[1] |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
 	ret = drm_dp_dpcd_write(&phytium_dp->aux, DP_LINK_BW_SET, link_config, 2);
 	if (ret < 0) {
-		DRM_NOTE("write dpcd DP_LINK_BW_SET fail: ret:%d\n", ret);
+		pr_notice("write dpcd DP_LINK_BW_SET fail: ret:%d\n", ret);
 		goto failed;
 	}
 
@@ -1119,7 +1119,7 @@ static int phytium_dp_dpcd_set_link(struct phytium_dp_device *phytium_dp,
 	link_config[1] = DP_SET_ANSI_8B10B;
 	ret = drm_dp_dpcd_write(&phytium_dp->aux, DP_DOWNSPREAD_CTRL, link_config, 2);
 	if (ret < 0) {
-		DRM_ERROR("write DP_DOWNSPREAD_CTRL fail: ret:%d\n", ret);
+		pr_err("write DP_DOWNSPREAD_CTRL fail: ret:%d\n", ret);
 		goto failed;
 	}
 
@@ -1140,7 +1140,7 @@ static int phytium_dp_dpcd_set_test_pattern(struct phytium_dp_device *phytium_dp
 		value = 0;
 	ret = drm_dp_dpcd_writeb(&phytium_dp->aux, DP_MAIN_LINK_CHANNEL_CODING_SET, value);
 	if (ret < 0) {
-		DRM_ERROR("write DP_MAIN_LINK_CHANNEL_CODING_SET fail: ret:%d\n", ret);
+		pr_err("write DP_MAIN_LINK_CHANNEL_CODING_SET fail: ret:%d\n", ret);
 		goto failed;
 	}
 
@@ -1151,13 +1151,13 @@ static int phytium_dp_dpcd_set_test_pattern(struct phytium_dp_device *phytium_dp
 
 	ret = drm_dp_dpcd_writeb(&phytium_dp->aux, DP_TRAINING_PATTERN_SET, value);
 	if (ret < 0) {
-		DRM_ERROR("write DP_TRAINING_PATTERN_SET fail: ret:%d\n", ret);
+		pr_err("write DP_TRAINING_PATTERN_SET fail: ret:%d\n", ret);
 		goto failed;
 	}
 
 	ret = drm_dp_dpcd_writeb(&phytium_dp->aux, DP_LINK_QUAL_LANE0_SET, test_pattern);
 	if (ret < 0) {
-		DRM_ERROR("write DP_TRAINING_PATTERN_SET fail: ret:%d\n", ret);
+		pr_err("write DP_TRAINING_PATTERN_SET fail: ret:%d\n", ret);
 		goto failed;
 	}
 
@@ -1180,7 +1180,7 @@ static int phytium_dp_dpcd_set_train_pattern(struct phytium_dp_device *phytium_d
 
 	ret = drm_dp_dpcd_writeb(&phytium_dp->aux, DP_TRAINING_PATTERN_SET, value);
 	if (ret < 0) {
-		DRM_NOTE("write DP_TRAINING_PATTERN_SET fail: ret:%d\n", ret);
+		pr_notice("write DP_TRAINING_PATTERN_SET fail: ret:%d\n", ret);
 		goto failed;
 	}
 
@@ -1197,7 +1197,7 @@ phytium_dp_dpcd_set_lane_setting(struct phytium_dp_device *phytium_dp, uint8_t *
 	ret =  drm_dp_dpcd_write(&phytium_dp->aux, DP_TRAINING_LANE0_SET,
 				 phytium_dp->train_set, 4);
 	if (ret < 0) {
-		DRM_ERROR("write DP_TRAINING_LANE0_SET fail: ret:%d\n", ret);
+		pr_err("write DP_TRAINING_LANE0_SET fail: ret:%d\n", ret);
 		return ret;
 	}
 
@@ -1213,7 +1213,7 @@ phytium_dp_dpcd_get_adjust_request(struct phytium_dp_device *phytium_dp, uint8_t
 	ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_LANE0_1_STATUS,
 		       link_status, DP_LINK_STATUS_SIZE);
 	if (ret < 0) {
-		DRM_ERROR("failed to get link status(DP_LANE0_1_STATUS)\n");
+		pr_err("failed to get link status(DP_LANE0_1_STATUS)\n");
 		goto failed;
 	}
 	phytium_get_adjust_train(phytium_dp, link_status, lane_count);
@@ -1241,8 +1241,8 @@ void phytium_dp_dpcd_sink_dpms(struct phytium_dp_device *phytium_dp, int mode)
 	}
 
 	if (ret != 1)
-		DRM_DEBUG_KMS("failed to %s sink power state\n",
-			       mode == DRM_MODE_DPMS_ON ? "enable" : "disable");
+		drm_dbg_dp(phytium_dp->dev, "failed to %s sink power state\n",
+			   mode == DRM_MODE_DPMS_ON ? "enable" : "disable");
 }
 
 static bool phytium_dp_link_training_clock_recovery(struct phytium_dp_device *phytium_dp)
@@ -1260,7 +1260,7 @@ static bool phytium_dp_link_training_clock_recovery(struct phytium_dp_device *ph
 	ret = phytium_dp_dpcd_set_link(phytium_dp, phytium_dp->link_lane_count,
 				       phytium_dp->link_rate);
 	if (ret < 0) {
-		DRM_NOTE("phytium_dp_dpcd_set_link failed(ret=%d)\n", ret);
+		pr_notice("phytium_dp_dpcd_set_link failed(ret=%d)\n", ret);
 		return false;
 	}
 
@@ -1273,14 +1273,14 @@ static bool phytium_dp_link_training_clock_recovery(struct phytium_dp_device *ph
 	phytium_dp_hw_set_train_pattern(phytium_dp, DP_TRAINING_PATTERN_1);
 	ret = phytium_dp_dpcd_set_train_pattern(phytium_dp, DP_TRAINING_PATTERN_1);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_train_pattern fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_train_pattern fail: ret:%d\n", ret);
 		return false;
 	}
 
 	/* config sink's voltage swing and pre-emphasis(103-106) */
 	ret = phytium_dp_dpcd_set_lane_setting(phytium_dp, phytium_dp->train_set);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
 		return false;
 	}
 
@@ -1294,22 +1294,22 @@ static bool phytium_dp_link_training_clock_recovery(struct phytium_dp_device *ph
 		ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_LANE0_1_STATUS,
 				       link_status, DP_LINK_STATUS_SIZE);
 		if (ret < 0) {
-			DRM_ERROR("failed to get link status(DP_LANE0_1_STATUS)\n");
+			pr_err("failed to get link status(DP_LANE0_1_STATUS)\n");
 			return false;
 		}
 
 		if (drm_dp_clock_recovery_ok(link_status, phytium_dp->link_lane_count)) {
-			DRM_DEBUG_KMS("clock revorery ok\n");
+			drm_dbg_dp(phytium_dp->dev, "clock revorery ok\n");
 			return true;
 		}
 
 		if (voltage_tries == 5) {
-			DRM_DEBUG_KMS("Same voltage tried 5 times\n");
+			drm_dbg_dp(phytium_dp->dev, "Same voltage tried 5 times\n");
 			return false;
 		}
 
 		if (max_vswing_tries == 1) {
-			DRM_DEBUG_KMS("Max Voltage Swing reached\n");
+			drm_dbg_dp(phytium_dp->dev, "Max Voltage Swing reached\n");
 			return false;
 		}
 
@@ -1321,7 +1321,7 @@ static bool phytium_dp_link_training_clock_recovery(struct phytium_dp_device *ph
 					       phytium_dp->train_set[0]);
 		ret = phytium_dp_dpcd_set_lane_setting(phytium_dp, phytium_dp->train_set);
 		if (ret < 0) {
-			DRM_ERROR("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
+			drm_dbg_dp(phytium_dp->dev, "phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
 			return false;
 		}
 
@@ -1333,7 +1333,7 @@ static bool phytium_dp_link_training_clock_recovery(struct phytium_dp_device *ph
 		if (phytium_dp->train_set[0] & DP_TRAIN_MAX_SWING_REACHED)
 			++max_vswing_tries;
 
-		DRM_DEBUG_KMS("try train_set:0x%x voltage_tries:%d max_vswing_tries:%d\n",
+		drm_dbg_dp(phytium_dp->dev, "try train_set:0x%x voltage_tries:%d max_vswing_tries:%d\n",
 			       phytium_dp->train_set[0], voltage_tries, max_vswing_tries);
 	}
 }
@@ -1346,13 +1346,13 @@ static unsigned int phytium_dp_get_training_pattern(struct phytium_dp_device *ph
 	if (sink_tps4)
 		return DP_TRAINING_PATTERN_4;
 	else if (phytium_dp->link_rate == 810000)
-		DRM_DEBUG_KMS("8.1 Gbps link rate without sink TPS4 support\n");
+		drm_dbg_dp(phytium_dp->dev, "8.1 Gbps link rate without sink TPS4 support\n");
 
 	sink_tps3 = drm_dp_tps3_supported(phytium_dp->dpcd);
 	if (sink_tps3)
 		return DP_TRAINING_PATTERN_3;
 	else if (phytium_dp->link_rate >= 540000)
-		DRM_DEBUG_KMS(">=5.4/6.48 Gbps link rate without sink TPS3 support\n");
+		drm_dbg_dp(phytium_dp->dev, ">=5.4/6.48 Gbps link rate without sink TPS3 support\n");
 
 	return DP_TRAINING_PATTERN_2;
 }
@@ -1369,7 +1369,7 @@ static bool phytium_dp_link_training_channel_equalization(struct phytium_dp_devi
 				       phytium_dp->train_set[0]);
 	ret = phytium_dp_dpcd_set_lane_setting(phytium_dp, phytium_dp->train_set);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
 		return channel_eq;
 	}
 
@@ -1378,7 +1378,7 @@ static bool phytium_dp_link_training_channel_equalization(struct phytium_dp_devi
 	phytium_dp_hw_set_train_pattern(phytium_dp, training_pattern);
 	ret = phytium_dp_dpcd_set_train_pattern(phytium_dp, training_pattern);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_train_pattern fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_train_pattern fail: ret:%d\n", ret);
 		return channel_eq;
 	}
 
@@ -1389,19 +1389,19 @@ static bool phytium_dp_link_training_channel_equalization(struct phytium_dp_devi
 		ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_LANE0_1_STATUS,
 				       link_status, DP_LINK_STATUS_SIZE);
 		if (ret < 0) {
-			DRM_ERROR("failed to get link status(DP_LANE0_1_STATUS)\n");
+			pr_err("failed to get link status(DP_LANE0_1_STATUS)\n");
 			break;
 		}
 
 		/* Make sure clock is still ok */
 		if (!drm_dp_clock_recovery_ok(link_status, phytium_dp->link_lane_count)) {
-			DRM_DEBUG_KMS("CR check failed, cannot continue channel equalization\n");
+			drm_dbg_dp(phytium_dp->dev, "CR check failed, cannot continue channel equalization\n");
 			break;
 		}
 
 		if (drm_dp_channel_eq_ok(link_status, phytium_dp->link_lane_count)) {
 			channel_eq = true;
-			DRM_DEBUG_KMS("Channel EQ done. DP Training successful\n");
+			drm_dbg_dp(phytium_dp->dev, "Channel EQ done. DP Training successful\n");
 			break;
 		}
 
@@ -1411,14 +1411,14 @@ static bool phytium_dp_link_training_channel_equalization(struct phytium_dp_devi
 					       phytium_dp->train_set[0]);
 		ret = phytium_dp_dpcd_set_lane_setting(phytium_dp, phytium_dp->train_set);
 		if (ret < 0) {
-			DRM_ERROR("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
+			drm_dbg_dp(phytium_dp->dev, "phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
 			break;
 		}
 	}
 
 	/* Try 5 times, else fail and try at lower BW */
 	if (tries == 5)
-		DRM_DEBUG_KMS("Channel equalization failed 5 times\n");
+		drm_dbg_dp(phytium_dp->dev, "Channel equalization failed 5 times\n");
 
 	return channel_eq;
 }
@@ -1429,7 +1429,7 @@ static void phytium_dp_train_retry_work_fn(struct work_struct *work)
 	struct drm_connector *connector;
 
 	connector = &phytium_dp->connector;
-	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id, connector->name);
+	drm_dbg_dp(phytium_dp->dev, "[CONNECTOR:%d:%s]\n", connector->base.id, connector->name);
 	mutex_lock(&connector->dev->mode_config.mutex);
 	drm_connector_set_link_status_property(connector, DRM_MODE_LINK_STATUS_BAD);
 	mutex_unlock(&connector->dev->mode_config.mutex);
@@ -1454,7 +1454,7 @@ int phytium_dp_get_link_train_fallback_values(struct phytium_dp_device *phytium_
 
 	if (phytium_dp->is_edp) {
 		phytium_dp->train_retry_count++;
-		DRM_INFO("Retrying Link training for eDP(%d) with same parameters\n",
+		pr_info("Retrying Link training for eDP(%d) with same parameters\n",
 			  phytium_dp->port);
 		goto out;
 	} else {
@@ -1470,7 +1470,7 @@ int phytium_dp_get_link_train_fallback_values(struct phytium_dp_device *phytium_
 			phytium_dp->train_retry_count++;
 			phytium_dp->link_rate = phytium_dp->max_link_rate;
 			phytium_dp->link_lane_count = phytium_dp->max_link_lane_count;
-			DRM_INFO("Retrying Link training for DP(%d) with maximal parameters\n",
+			pr_info("Retrying Link training for DP(%d) with maximal parameters\n",
 				  phytium_dp->port);
 			ret = -1;
 		}
@@ -1490,7 +1490,7 @@ phytium_dp_stop_link_train(struct phytium_dp_device *phytium_dp)
 
 	ret = phytium_dp_dpcd_set_train_pattern(phytium_dp, DP_TRAINING_PATTERN_DISABLE);
 	if (ret < 0) {
-		DRM_NOTE("phytium_dp_dpcd_set_train_pattern fail: ret:%d\n", ret);
+		pr_notice("phytium_dp_dpcd_set_train_pattern fail: ret:%d\n", ret);
 		return ret;
 	}
 
@@ -1517,7 +1517,7 @@ int phytium_dp_start_link_train(struct phytium_dp_device *phytium_dp)
 
 	ret = phytium_dp_stop_link_train(phytium_dp);
 	if (ret < 0) {
-		DRM_NOTE("phytium_dp_stop_link_train failed: ret = %d\n", ret);
+		pr_notice("phytium_dp_stop_link_train failed: ret = %d\n", ret);
 		goto out;
 	}
 
@@ -1527,22 +1527,22 @@ int phytium_dp_start_link_train(struct phytium_dp_device *phytium_dp)
 	}
 	phytium_dp->train_retry_count = 0;
 
-	DRM_DEBUG_KMS("[CONNECTOR:%d:%s] Link Training Pass at Link Rate = %d, Lane count = %d\n",
-		      phytium_dp->connector.base.id,
-		      phytium_dp->connector.name, phytium_dp->link_rate,
-		      phytium_dp->link_lane_count);
+	drm_dbg_dp(phytium_dp->dev, "[CONNECTOR:%d:%s] Link Training Pass at Link Rate = %d, Lane count = %d\n",
+		   phytium_dp->connector.base.id,
+		   phytium_dp->connector.name, phytium_dp->link_rate,
+		   phytium_dp->link_lane_count);
 
 	return 0;
 
 failure_handling:
-	DRM_INFO("[CONNECTOR:%d:%s] Link Training failed at Link Rate = %d, Lane count = %d",
-	      phytium_dp->connector.base.id,
-	      phytium_dp->connector.name,
-	      phytium_dp->link_rate, phytium_dp->link_lane_count);
+	pr_info("[CONNECTOR:%d:%s] Link Training failed at Link Rate = %d, Lane count = %d",
+		phytium_dp->connector.base.id,
+		phytium_dp->connector.name,
+		phytium_dp->link_rate, phytium_dp->link_lane_count);
 
 	ret = phytium_dp_stop_link_train(phytium_dp);
 	if (ret < 0) {
-		DRM_NOTE("phytium_dp_stop_link_train failed: ret = %d\n", ret);
+		pr_notice("phytium_dp_stop_link_train failed: ret = %d\n", ret);
 		goto out;
 	}
 
@@ -1550,8 +1550,8 @@ failure_handling:
 	if (phytium_dp->train_retry_count < 5)
 		schedule_work(&phytium_dp->train_retry_work);
 	else
-		DRM_ERROR("DP(%d) Link Training Unsuccessful, and stop Training\n",
-			   phytium_dp->port);
+		pr_err("DP(%d) Link Training Unsuccessful, and stop Training\n",
+			phytium_dp->port);
 
 out:
 	return -1;
@@ -1566,29 +1566,29 @@ static bool phytium_dp_needs_link_retrain(struct phytium_dp_device *phytium_dp)
 	ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_LANE0_1_STATUS,
 			       link_status, DP_LINK_STATUS_SIZE);
 	if (ret < 0) {
-		DRM_ERROR("failed to get link status(DP_LANE0_1_STATUS)\n");
+		pr_err("failed to get link status(DP_LANE0_1_STATUS)\n");
 		return true;
 	}
 
 	if ((phytium_dp->link_rate == 0) ||  (phytium_dp->link_lane_count == 0)) {
-		DRM_DEBUG_KMS("link_rate(%d) or lane_count(%d) is invalid\n",
-			       phytium_dp->link_rate, phytium_dp->link_lane_count);
+		drm_dbg_dp(phytium_dp->dev, "link_rate(%d) or lane_count(%d) is invalid\n",
+			   phytium_dp->link_rate, phytium_dp->link_lane_count);
 		return true;
 	}
 
 	/* Make sure clock is still ok */
 	if (!drm_dp_clock_recovery_ok(link_status, phytium_dp->link_lane_count)) {
-		DRM_DEBUG_KMS("Clock recovery check failed\n");
+		drm_dbg_dp(phytium_dp->dev, "Clock recovery check failed\n");
 		return true;
 	}
 
 	if (!drm_dp_channel_eq_ok(link_status, phytium_dp->link_lane_count)) {
-		DRM_DEBUG_KMS("Channel EQ check failed\n");
+		drm_dbg_dp(phytium_dp->dev, "Channel EQ check failed\n");
 		return true;
 	}
 
 	if (!phytium_dp_hw_output_is_enable(phytium_dp)) {
-		DRM_DEBUG_KMS("check DP output enable failed\n");
+		drm_dbg_dp(phytium_dp->dev, "check DP output enable failed\n");
 		return true;
 	}
 	return false;
@@ -1617,7 +1617,7 @@ static uint8_t phytium_dp_autotest_phy_pattern(struct phytium_dp_device *phytium
 				   &phytium_phy_tp.raw,
 				   sizeof(phytium_phy_tp));
 	if (ret <= 0) {
-		DRM_DEBUG_KMS("Could not read DP_TEST_PHY_PATTERN\n");
+		drm_dbg_dp(phytium_dp->dev, "Could not read DP_TEST_PHY_PATTERN\n");
 		goto failed;
 	}
 
@@ -1628,7 +1628,7 @@ static uint8_t phytium_dp_autotest_phy_pattern(struct phytium_dp_device *phytium
 					   test_80_bit_pattern,
 					   sizeof(test_80_bit_pattern));
 		if (ret <= 0) {
-			DRM_DEBUG_KMS("Could not read DP_TEST_PHY_PATTERN\n");
+			drm_dbg_dp(phytium_dp->dev, "Could not read DP_TEST_PHY_PATTERN\n");
 			goto failed;
 		}
 	}
@@ -1637,7 +1637,7 @@ static uint8_t phytium_dp_autotest_phy_pattern(struct phytium_dp_device *phytium
 	ret = phytium_dp_dpcd_get_tp_link(phytium_dp, &phytium_dp->compliance.test_lane_count,
 				    &phytium_dp->compliance.test_link_rate);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_get_tp_link fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_get_tp_link fail: ret:%d\n", ret);
 		goto failed;
 	}
 
@@ -1646,7 +1646,7 @@ static uint8_t phytium_dp_autotest_phy_pattern(struct phytium_dp_device *phytium
 	ret = phytium_dp_dpcd_set_link(phytium_dp, phytium_dp->compliance.test_lane_count,
 				       phytium_dp->compliance.test_link_rate);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_link fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_link fail: ret:%d\n", ret);
 		goto failed_dpcd_set_link;
 	}
 
@@ -1654,14 +1654,14 @@ static uint8_t phytium_dp_autotest_phy_pattern(struct phytium_dp_device *phytium
 	ret = phytium_dp_dpcd_get_adjust_request(phytium_dp,
 						 phytium_dp->compliance.test_lane_count);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_get_adjust_request fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_get_adjust_request fail: ret:%d\n", ret);
 		goto failed_dpcd_get_adjust_request;
 	}
 	phytium_dp_hw_set_lane_setting(phytium_dp, phytium_dp->compliance.test_link_rate,
 				       phytium_dp->train_set[0]);
 	ret = phytium_dp_dpcd_set_lane_setting(phytium_dp, phytium_dp->train_set);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_lane_setting fail: ret:%d\n", ret);
 		goto failed_dpcd_set_lane_setting;
 	}
 
@@ -1671,7 +1671,7 @@ static uint8_t phytium_dp_autotest_phy_pattern(struct phytium_dp_device *phytium
 				       sizeof(test_80_bit_pattern));
 	ret = phytium_dp_dpcd_set_test_pattern(phytium_dp, test_pattern);
 	if (ret < 0) {
-		DRM_ERROR("phytium_dp_dpcd_set_test_pattern fail: ret:%d\n", ret);
+		pr_err("phytium_dp_dpcd_set_test_pattern fail: ret:%d\n", ret);
 		goto failed_dpcd_set_tp;
 	}
 
@@ -1696,7 +1696,7 @@ static void phytium_dp_handle_test_request(struct phytium_dp_device *phytium_dp)
 
 	status = drm_dp_dpcd_readb(&phytium_dp->aux, DP_TEST_REQUEST, &request);
 	if (status <= 0) {
-		DRM_DEBUG_KMS("Could not read test request from sink\n");
+		drm_dbg_dp(phytium_dp->dev, "Could not read test request from sink\n");
 		goto update_status;
 	}
 
@@ -1704,22 +1704,22 @@ static void phytium_dp_handle_test_request(struct phytium_dp_device *phytium_dp)
 	case DP_TEST_LINK_TRAINING:
 	case DP_TEST_LINK_VIDEO_PATTERN:
 	case DP_TEST_LINK_EDID_READ:
-		DRM_DEBUG_KMS("Not support test request '%02x'\n", request);
+		drm_dbg_dp(phytium_dp->dev, "Not support test request '%02x'\n", request);
 		response = DP_TEST_NAK;
 		break;
 	case DP_TEST_LINK_PHY_TEST_PATTERN:
-		DRM_DEBUG_KMS("PHY_PATTERN test requested\n");
+		drm_dbg_dp(phytium_dp->dev, "PHY_PATTERN test requested\n");
 		response = phytium_dp_autotest_phy_pattern(phytium_dp);
 		break;
 	default:
-		DRM_DEBUG_KMS("Invalid test request '%02x'\n", request);
+		drm_dbg_dp(phytium_dp->dev, "Invalid test request '%02x'\n", request);
 		break;
 	}
 
 update_status:
 	status = drm_dp_dpcd_writeb(&phytium_dp->aux, DP_TEST_RESPONSE, response);
 	if (status <= 0)
-		DRM_DEBUG_KMS("Could not write test response to sink\n");
+		drm_dbg_dp(phytium_dp->dev, "Could not write test response to sink\n");
 
 }
 
@@ -1753,7 +1753,7 @@ static int phytium_dp_long_pulse(struct drm_connector *connector, bool hpd_raw_s
 		phytium_dp->max_link_lane_count = phytium_dp->common_max_lane_count;
 		phytium_dp->link_rate = phytium_dp->max_link_rate;
 		phytium_dp->link_lane_count = phytium_dp->max_link_lane_count;
-		DRM_DEBUG_KMS("common_max_lane_count: %d, common_max_rate:%d\n",
+		drm_dbg_dp(phytium_dp->dev, "common_max_lane_count: %d, common_max_rate:%d\n",
 			       phytium_dp->max_link_lane_count, phytium_dp->max_link_rate);
 
 		video_enable = phytium_dp_hw_video_is_enable(phytium_dp);
@@ -1794,7 +1794,7 @@ static int phytium_dp_short_pulse(struct drm_connector *connector)
 		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST)
 			phytium_dp_handle_test_request(phytium_dp);
 		if (sink_irq_vector & (DP_CP_IRQ | DP_SINK_SPECIFIC_IRQ))
-			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
+			drm_dbg_driver(phytium_dp->dev, "CP or sink specific irq unhandled\n");
 	}
 	if (!phytium_dp_needs_link_retrain(phytium_dp)) {
 		status = connector_status_connected;
@@ -1821,7 +1821,7 @@ void phytium_dp_hpd_poll_handler(struct phytium_display_private *priv)
 	bool changed = false;
 
 	mutex_lock(&dev->mode_config.mutex);
-	DRM_DEBUG_KMS("running encoder hotplug poll functions\n");
+	drm_dbg_kms(dev, "running encoder hotplug poll functions\n");
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		if (connector->force)
@@ -1833,10 +1833,10 @@ void phytium_dp_hpd_poll_handler(struct phytium_display_private *priv)
 
 			old = drm_get_connector_status_name(old_status);
 			new = drm_get_connector_status_name(connector->status);
-			DRM_DEBUG_KMS("[CONNECTOR:%d:%s] status updated from %s to %s\n",
-					connector->base.id,
-					connector->name,
-					old, new);
+			drm_dbg_kms(dev, "[CONNECTOR:%d:%s] status updated from %s to %s\n",
+				    connector->base.id,
+				    connector->name,
+				    old, new);
 			changed = true;
 		}
 	}
@@ -1893,7 +1893,7 @@ void phytium_dp_hpd_work_func(struct work_struct *work)
 	bool changed = false;
 
 	mutex_lock(&dev->mode_config.mutex);
-	DRM_DEBUG_KMS("running encoder hotplug work functions\n");
+	drm_dbg_kms(dev, "running encoder hotplug work functions\n");
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		if (connector->force)
@@ -1905,10 +1905,10 @@ void phytium_dp_hpd_work_func(struct work_struct *work)
 
 			old = drm_get_connector_status_name(old_status);
 			new = drm_get_connector_status_name(connector->status);
-			DRM_DEBUG_KMS("[CONNECTOR:%d:%s] status updated from %s to %s\n",
-					connector->base.id,
-					connector->name,
-					old, new);
+			drm_dbg_kms(dev, "[CONNECTOR:%d:%s] status updated from %s to %s\n",
+				    connector->base.id,
+				    connector->name,
+				    old, new);
 			changed = true;
 		}
 	}
@@ -1955,8 +1955,8 @@ static void phytium_dp_fast_link_train_detect(struct phytium_dp_device *phytium_
 {
 	phytium_dp->fast_train_support = !!(phytium_dp->dpcd[DP_MAX_DOWNSPREAD]
 					    & DP_NO_AUX_HANDSHAKE_LINK_TRAINING);
-	DRM_DEBUG_KMS("fast link training %s\n",
-		       phytium_dp->fast_train_support ? "supported" : "unsupported");
+	drm_dbg_dp(phytium_dp->dev, "fast link training %s\n",
+		   phytium_dp->fast_train_support ? "supported" : "unsupported");
 }
 
 bool phytium_dp_fast_link_train(struct phytium_dp_device *phytium_dp)
@@ -1991,17 +1991,17 @@ bool phytium_dp_fast_link_train(struct phytium_dp_device *phytium_dp)
 		ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_LANE0_1_STATUS,
 				       link_status, DP_LINK_STATUS_SIZE);
 		if (ret < 0) {
-			DRM_ERROR("failed to get link status(DP_LANE0_1_STATUS)\n");
+			pr_err("failed to get link status(DP_LANE0_1_STATUS)\n");
 			return false;
 		}
 
 		if (!drm_dp_clock_recovery_ok(link_status, phytium_dp->link_lane_count)) {
-			DRM_DEBUG_KMS("check clock recovery failed\n");
+			drm_dbg_dp(phytium_dp->dev, "check clock recovery failed\n");
 			return false;
 		}
 
 		if (!drm_dp_channel_eq_ok(link_status, phytium_dp->link_lane_count)) {
-			DRM_DEBUG_KMS("check channel equalization failed\n");
+			drm_dbg_dp(phytium_dp->dev, "check channel equalization failed\n");
 			return false;
 		}
 	}
@@ -2071,13 +2071,13 @@ phytium_dp_connector_register(struct drm_connector *connector)
 		phytium_edp_init_connector(phytium_dp);
 		ret = phytium_edp_backlight_device_register(phytium_dp);
 		if (ret)
-			DRM_ERROR("failed to register port(%d) backlight device(ret=%d)\n",
-				   phytium_dp->port, ret);
+			pr_err("failed to register port(%d) backlight device(ret=%d)\n",
+			       phytium_dp->port, ret);
 	}
 
 	ret = phytium_debugfs_connector_add(connector);
 	if (ret)
-		DRM_ERROR("failed to register phytium connector debugfs(ret=%d)\n", ret);
+		pr_err("failed to register phytium connector debugfs(ret=%d)\n", ret);
 
 	return 0;
 }
@@ -2163,18 +2163,18 @@ void phytium_dp_adjust_link_train_parameter(struct phytium_dp_device *phytium_dp
 		bs_limit = 8192 / (phytium_dp->link_rate/1000);
 		link_bw = phytium_dp->link_rate * phytium_dp->link_lane_count;
 		rate = 10 * date_rate / link_bw;
-		DRM_DEBUG_KMS("adjust link rate(%d), lane count(%d)\n",
-			       phytium_dp->link_rate, phytium_dp->link_lane_count);
-		DRM_DEBUG_KMS("for crtc_clock(%d) bs_request(%ld) bs_limit(%ld) rate(%d)\n",
-			       phytium_dp->mode.crtc_clock, bs_request, bs_limit, rate);
+		drm_dbg_dp(phytium_dp->dev, "adjust link rate(%d), lane count(%d)\n",
+			   phytium_dp->link_rate, phytium_dp->link_lane_count);
+		drm_dbg_dp(phytium_dp->dev, "for crtc_clock(%d) bs_request(%ld) bs_limit(%ld) rate(%d)\n",
+			   phytium_dp->mode.crtc_clock, bs_request, bs_limit, rate);
 		if ((link_dynamic_adjust && (bs_request < bs_limit) && rate < 10) ||
 		   ((!link_dynamic_adjust) && (rate < 10)))
 			break;
 		phytium_dp_get_link_train_fallback_values(phytium_dp);
 	}
 
-	DRM_DEBUG_KMS("Try link training at Link Rate = %d, Lane count = %d\n",
-		       phytium_dp->link_rate, phytium_dp->link_lane_count);
+	drm_dbg_dp(phytium_dp->dev, "Try link training at Link Rate = %d, Lane count = %d\n",
+		   phytium_dp->link_rate, phytium_dp->link_lane_count);
 }
 
 static void phytium_encoder_enable(struct drm_encoder *encoder)
@@ -2222,13 +2222,13 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 	case 8:
 		break;
 	default:
-		DRM_INFO("not support bpc(%d)\n", display_info->bpc);
+		pr_info("not support bpc(%d)\n", display_info->bpc);
 		display_info->bpc = 8;
 		break;
 	}
 
 	if ((display_info->color_formats & DRM_COLOR_FORMAT_RGB444) == 0) {
-		DRM_INFO("not support color_format(%d)\n", display_info->color_formats);
+		pr_info("not support color_format(%d)\n", display_info->color_formats);
 		display_info->color_formats = DRM_COLOR_FORMAT_RGB444;
 	}
 
@@ -2236,8 +2236,8 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 	actual = phytium_dp->max_link_rate * phytium_dp->max_link_lane_count / 100;
 	actual = actual * 8 / 10;
 	if (requested >= actual) {
-		DRM_DEBUG_KMS("requested=%d, actual=%d, clock=%d\n", requested, actual,
-				mode->clock);
+		drm_dbg_kms(phytium_dp->dev, "requested=%d, actual=%d, clock=%d\n",
+			    requested, actual, mode->clock);
 		return MODE_CLOCK_HIGH;
 	}
 
@@ -2361,7 +2361,7 @@ static int phytium_dp_audio_hw_params(struct device *dev, void *data,
 	};
 
 	if (daifmt->fmt != HDMI_I2S) {
-		DRM_ERROR("invalid audio format %d\n", daifmt->fmt);
+		pr_err("invalid audio format %d\n", daifmt->fmt);
 		ret = -EINVAL;
 		goto failed;
 	}
@@ -2445,7 +2445,7 @@ static long phytium_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_ms
 	struct phytium_dp_device *phytium_dp = container_of(aux, struct phytium_dp_device, aux);
 	long ret = 0;
 
-	DRM_DEBUG_KMS("msg->size: 0x%lx\n", msg->size);
+	drm_dbg_dp(phytium_dp->dev, "msg->size: 0x%lx\n", msg->size);
 
 	if (WARN_ON(msg->size > 16))
 		return -E2BIG;
@@ -2455,12 +2455,13 @@ static long phytium_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_ms
 	case DP_AUX_I2C_WRITE:
 	case DP_AUX_I2C_WRITE_STATUS_UPDATE:
 		ret = phytium_dp_hw_aux_transfer_write(phytium_dp, msg);
-		DRM_DEBUG_KMS("aux write reply:0x%x ret:0x%lx\n", msg->reply, ret);
+		drm_dbg_dp(phytium_dp->dev, "aux write reply:0x%x ret:0x%lx\n",
+			   msg->reply, ret);
 		break;
 	case DP_AUX_NATIVE_READ:
 	case DP_AUX_I2C_READ:
 		ret = phytium_dp_hw_aux_transfer_read(phytium_dp, msg);
-		DRM_DEBUG_KMS("aux read ret:0x%lx\n", ret);
+		drm_dbg_dp(phytium_dp->dev, "aux read ret:0x%lx\n", ret);
 		break;
 	default:
 		ret = -EINVAL;
@@ -2513,13 +2514,13 @@ static bool phytium_edp_init_connector(struct phytium_dp_device *phytium_dp)
 
 	status = phytium_dp_detect_dpcd(phytium_dp);
 	if (status == connector_status_disconnected) {
-		DRM_ERROR("detect edp dpcd failed\n");
+		pr_err("detect edp dpcd failed\n");
 		return false;
 	}
 
 	phytium_dp->edp_edid = drm_get_edid(connector, &phytium_dp->aux.ddc);
 	if (!phytium_dp->edp_edid) {
-		DRM_ERROR("get edp edid failed\n");
+		pr_err("get edp edid failed\n");
 		return false;
 	}
 
@@ -2528,8 +2529,8 @@ static bool phytium_edp_init_connector(struct phytium_dp_device *phytium_dp)
 	phytium_dp->max_link_lane_count = phytium_dp->common_max_lane_count;
 	phytium_dp->link_rate = phytium_dp->max_link_rate;
 	phytium_dp->link_lane_count = phytium_dp->max_link_lane_count;
-	DRM_DEBUG_KMS("common_max_lane_count: %d, common_max_rate:%d\n",
-		       phytium_dp->max_link_lane_count, phytium_dp->max_link_rate);
+	drm_dbg_dp(phytium_dp->dev, "common_max_lane_count: %d, common_max_rate:%d\n",
+		   phytium_dp->max_link_lane_count, phytium_dp->max_link_rate);
 
 	return true;
 }
@@ -2556,7 +2557,7 @@ int phytium_dp_resume(struct drm_device *drm_dev)
 		}
 		ret = phytium_dp_hw_init(phytium_dp);
 		if (ret) {
-			DRM_ERROR("failed to initialize dp %d\n", phytium_dp->port);
+			pr_err("failed to initialize dp %d\n", phytium_dp->port);
 			return -EIO;
 		}
 	}
@@ -2570,7 +2571,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 	struct phytium_dp_device *phytium_dp = NULL;
 	int ret, type;
 
-	DRM_DEBUG_KMS("%s: port %d\n", __func__, port);
+	drm_dbg_driver(dev, "%s: port %d\n", __func__, port);
 	phytium_dp = kzalloc(sizeof(*phytium_dp), GFP_KERNEL);
 	if (!phytium_dp) {
 		ret = -ENOMEM;
@@ -2604,7 +2605,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 
 	ret = phytium_dp_hw_init(phytium_dp);
 	if (ret) {
-		DRM_ERROR("failed to initialize dp %d\n", phytium_dp->port);
+		pr_err("failed to initialize dp %d\n", phytium_dp->port);
 		goto failed_init_dp;
 	}
 
@@ -2612,7 +2613,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 			       &phytium_encoder_funcs,
 			       DRM_MODE_ENCODER_TMDS, "DP %d", port);
 	if (ret) {
-		DRM_ERROR("failed to initialize encoder with drm\n");
+		pr_err("failed to initialize encoder with drm\n");
 		goto failed_encoder_init;
 	}
 	drm_encoder_helper_add(&phytium_dp->encoder, &phytium_encoder_helper_funcs);
@@ -2623,7 +2624,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 	ret = drm_connector_init(dev, &phytium_dp->connector, &phytium_connector_funcs,
 				 type);
 	if (ret) {
-		DRM_ERROR("failed to initialize connector with drm\n");
+		pr_err("failed to initialize connector with drm\n");
 		goto failed_connector_init;
 	}
 	drm_connector_helper_add(&phytium_dp->connector, &phytium_connector_helper_funcs);
@@ -2631,7 +2632,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 
 	ret = phytium_dp_audio_codec_init(phytium_dp, port);
 	if (ret) {
-		DRM_ERROR("failed to initialize audio codec\n");
+		pr_err("failed to initialize audio codec\n");
 		goto failed_connector_init;
 	}
 
