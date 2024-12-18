@@ -542,6 +542,7 @@ static int es8388_set_sysclk(struct snd_soc_dai *codec_dai,
 		break;
 	case 22579200:
 		mclkdiv2 = 1;
+		fallthrough;
 		/* fallthru */
 	case 11289600:
 		es8388->sysclk_constraints = &constraints_11289;
@@ -549,6 +550,7 @@ static int es8388_set_sysclk(struct snd_soc_dai *codec_dai,
 		break;
 	case 24576000:
 		mclkdiv2 = 1;
+		fallthrough;
 		/* fallthru */
 	case 12288000:
 		es8388->sysclk_constraints = &constraints_12288;
