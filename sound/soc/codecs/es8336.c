@@ -37,6 +37,8 @@
 #include <linux/regmap.h>
 #include "es8336.h"
 
+#define ES8336_MUTE (1 << 5)
+
 static struct snd_soc_component *es8336_component;
 
 static const struct reg_default es8336_reg_defaults[] = {
@@ -679,19 +681,19 @@ static int es8336_mute(struct snd_soc_dai *dai, int mute, int direction)
 
 	es8336->muted = mute;
 
-	if (mute) {
-		es8336_enable_spk(es8336, false);
-		msleep(100);
-		snd_soc_component_write(component, ES8336_DAC_SET1_REG30, 0x20);
-	}
-
-	snd_soc_component_write(component, ES8336_DAC_SET1_REG30, 0x00);
-	msleep(130);
-
 	if (!es8336->hp_inserted)
 		es8336_enable_spk(es8336, true);
+	else
+		es8336_enable_spk(es8336, false);
 
-	return 0;
+	if (direction)
+		return snd_soc_component_update_bits(dai->component,
+			ES8336_ADC_MUTE_REG26, ES8336_MUTE,
+			mute ? ES8336_MUTE : 0);
+	else
+		return snd_soc_component_update_bits(dai->component,
+			ES8336_DAC_SET1_REG30, ES8336_MUTE,
+			mute ? ES8336_MUTE : 0);
 }
 
 static int es8336_set_bias_level(struct snd_soc_component *component,
