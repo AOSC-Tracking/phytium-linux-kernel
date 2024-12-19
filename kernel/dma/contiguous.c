@@ -24,6 +24,10 @@
 #include <linux/dma-contiguous.h>
 #include <linux/cma.h>
 
+#ifdef CONFIG_PSWIOTLB
+#include "./phytium/pswiotlb-dma.h"
+#endif
+
 #ifdef CONFIG_CMA_SIZE_MBYTES
 #define CMA_SIZE_MBYTES CONFIG_CMA_SIZE_MBYTES
 #else
@@ -192,6 +196,10 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
 struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
 				       unsigned int align, bool no_warn)
 {
+#ifdef CONFIG_PSWIOTLB
+	if (check_if_pswiotlb_is_applicable(dev))
+		return NULL;
+#endif
 	if (align > CONFIG_CMA_ALIGNMENT)
 		align = CONFIG_CMA_ALIGNMENT;
 
@@ -211,6 +219,10 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
 bool dma_release_from_contiguous(struct device *dev, struct page *pages,
 				 int count)
 {
+#ifdef CONFIG_PSWIOTLB
+	if (check_if_pswiotlb_is_applicable(dev))
+		return false;
+#endif
 	return cma_release(dev_get_cma_area(dev), pages, count);
 }
 
