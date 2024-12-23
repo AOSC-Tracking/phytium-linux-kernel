@@ -53,7 +53,7 @@ struct sifive_fu540_macb_mgmt {
 #define RX_BUFFER_MULTIPLE	64  /* bytes */
 
 #define DEFAULT_RX_RING_SIZE	512 /* must be power of 2 */
-#define MIN_RX_RING_SIZE	64
+#define MIN_RX_RING_SIZE	128
 #define MAX_RX_RING_SIZE	8192
 #define RX_RING_BYTES(bp)	(macb_dma_desc_get_size(bp)	\
 				 * (bp)->rx_ring_size)
