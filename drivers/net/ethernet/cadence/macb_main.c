@@ -5449,11 +5449,16 @@ static int macb_remove(struct platform_device *pdev)
 		pm_runtime_disable(&pdev->dev);
 		pm_runtime_dont_use_autosuspend(&pdev->dev);
 		if (!pm_runtime_suspended(&pdev->dev)) {
-			clk_disable_unprepare(bp->tx_clk);
-			clk_disable_unprepare(bp->hclk);
-			clk_disable_unprepare(bp->pclk);
-			clk_disable_unprepare(bp->rx_clk);
-			clk_disable_unprepare(bp->tsu_clk);
+			if (__clk_is_enabled(bp->tx_clk))
+				clk_disable_unprepare(bp->tx_clk);
+			if (__clk_is_enabled(bp->hclk))
+				clk_disable_unprepare(bp->hclk);
+			if (__clk_is_enabled(bp->pclk))
+				clk_disable_unprepare(bp->pclk);
+			if (__clk_is_enabled(bp->rx_clk))
+				clk_disable_unprepare(bp->rx_clk);
+			if (__clk_is_enabled(bp->tsu_clk))
+				clk_disable_unprepare(bp->tsu_clk);
 			pm_runtime_set_suspended(&pdev->dev);
 		}
 		phylink_destroy(bp->phylink);
@@ -5633,12 +5638,17 @@ static int __maybe_unused macb_runtime_suspend(struct device *dev)
 	struct macb *bp = netdev_priv(netdev);
 
 	if (!(device_may_wakeup(dev))) {
-		clk_disable_unprepare(bp->tx_clk);
-		clk_disable_unprepare(bp->hclk);
-		clk_disable_unprepare(bp->pclk);
-		clk_disable_unprepare(bp->rx_clk);
+		if (__clk_is_enabled(bp->tx_clk))
+			clk_disable_unprepare(bp->tx_clk);
+		if (__clk_is_enabled(bp->hclk))
+			clk_disable_unprepare(bp->hclk);
+		if (__clk_is_enabled(bp->pclk))
+			clk_disable_unprepare(bp->pclk);
+		if (__clk_is_enabled(bp->rx_clk))
+			clk_disable_unprepare(bp->rx_clk);
 	}
-	clk_disable_unprepare(bp->tsu_clk);
+	if (__clk_is_enabled(bp->tsu_clk))
+		clk_disable_unprepare(bp->tsu_clk);
 
 	return 0;
 }
