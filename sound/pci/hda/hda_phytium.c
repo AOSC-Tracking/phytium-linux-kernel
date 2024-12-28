@@ -68,6 +68,11 @@ static int probe_only[SNDRV_CARDS];
 static int jackpoll_ms[SNDRV_CARDS];
 static int single_cmd = -1;
 static int enable_msi = -1;
+#ifdef CONFIG_PM
+static int power_save = 1;
+#else
+#define power_save	0
+#endif
 #ifdef CONFIG_SND_HDA_INPUT_BEEP
 static bool beep_mode[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] =
 					CONFIG_SND_HDA_INPUT_BEEP_MODE};
@@ -103,7 +108,17 @@ MODULE_PARM_DESC(beep_mode, "Select HDA Beep registration mode "
 			    "(0=off, 1=on) (default=1).");
 #endif
 
-#define power_save 0
+#ifdef CONFIG_PM
+static int param_set_xint(const char *val, const struct kernel_param *kp);
+static const struct kernel_param_ops param_ops_xint = {
+	.set = param_set_xint,
+	.get = param_get_int,
+};
+#define param_check_xint param_check_int
+
+module_param(power_save, xint, 0644);
+MODULE_PARM_DESC(power_save, "Automatic power-saving timeout (in second, 0 = disable).");
+#endif /* CONFIG_PM */
 
 static int align_buffer_size = -1;
 module_param(align_buffer_size, bint, 0644);
@@ -419,6 +434,28 @@ static void azx_del_card_list(struct azx *chip)
 	mutex_lock(&card_list_lock);
 	list_del_init(&hda->list);
 	mutex_unlock(&card_list_lock);
+}
+
+/* trigger power-save check at writing parameter */
+static int param_set_xint(const char *val, const struct kernel_param *kp)
+{
+	struct hda_ft *hda;
+	struct azx *chip;
+	int prev = power_save;
+	int ret = param_set_int(val, kp);
+
+	if (ret || prev == power_save)
+		return ret;
+
+	mutex_lock(&card_list_lock);
+	list_for_each_entry(hda, &card_list, list) {
+		chip = &hda->chip;
+		if (!hda->probe_continued || chip->disabled)
+			continue;
+		snd_hda_set_power_save(&chip->bus, power_save * 1000);
+	}
+	mutex_unlock(&card_list_lock);
+	return 0;
 }
 
 #else
@@ -1152,6 +1189,7 @@ static int azx_probe_continue(struct azx *chip)
 
 	if (azx_has_pm_runtime(chip))
 		pm_runtime_put_noidle(hddev);
+
 	return err;
 
 out_free:
