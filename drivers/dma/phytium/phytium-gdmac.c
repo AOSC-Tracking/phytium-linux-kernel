@@ -753,8 +753,6 @@ static irqreturn_t phytium_dma_interrupt(int irq, void *dev_id)
 
 			if (gdma->chan[i].desc) {
 				phytium_chan_irq_handler(gdma_chan);
-				phytium_chan_disable(gdma_chan);
-				phytium_chan_clk_disable(gdma_chan);
 			}
 		}
 	}
