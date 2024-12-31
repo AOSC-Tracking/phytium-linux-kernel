@@ -475,8 +475,6 @@ static int phytium_gdma_terminate_all(struct dma_chan *chan)
 {
 	struct phytium_gdma_chan *gdma_chan = to_gdma_chan(chan);
 	unsigned long flags = 0;
-	u32 val = 0;
-	int ret = 0;
 	LIST_HEAD(head);
 
 	spin_lock_irqsave(&gdma_chan->vchan.lock, flags);
@@ -487,12 +485,9 @@ static int phytium_gdma_terminate_all(struct dma_chan *chan)
 		vchan_terminate_vdesc(&gdma_chan->desc->vdesc);
 		gdma_chan->desc = NULL;
 		phytium_chan_disable(gdma_chan);
-		ret = readl_poll_timeout(gdma_chan->base + DMA_CX_STATE, val,
-					 ~(val & BIT(4)), 10, 10000);
-		if (ret)
-			dev_err(chan_to_dev(gdma_chan),
-				"failed to complete writes\n");
 		phytium_chan_reset(gdma_chan);
+		phytium_chan_irq_disable(gdma_chan);
+		phytium_chan_clk_disable(gdma_chan);
 	}
 
 	vchan_get_all_descriptors(&gdma_chan->vchan, &head);
