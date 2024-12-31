@@ -519,10 +519,11 @@ static void phytium_gdma_free_chan_resources(struct dma_chan *chan)
 
 	phytium_chan_disable(gdma_chan);
 	phytium_chan_irq_disable(gdma_chan);
+	phytium_chan_clk_disable(gdma_chan);
 
 	vchan_free_chan_resources(&gdma_chan->vchan);
 
-	dev_dbg(gdma->dev, "free channel %d\n", gdma_chan->id);
+	dev_info(gdma->dev, "free channel %d\n", gdma_chan->id);
 }
 
 static int phytium_gdma_slave_config(struct dma_chan *chan,
