@@ -2,7 +2,9 @@
 #ifndef _I8042_IO_H
 #define _I8042_IO_H
 
-
+#ifdef CONFIG_ARCH_PHYTIUM
+#include "../../acpi/phytium_base_ctrl.h"
+#endif
 /*
  * Names.
  */
@@ -42,22 +44,34 @@ extern int of_i8042_aux_irq;
 
 static inline int i8042_read_data(void)
 {
-	return inb(I8042_DATA_REG);
+	if (phytium_check_cpu() == true)
+		return base_ctrl_readb(I8042_DATA_REG);
+	else
+		return inb(I8042_DATA_REG);
 }
 
 static inline int i8042_read_status(void)
 {
-	return inb(I8042_STATUS_REG);
+	if (phytium_check_cpu() == true)
+		return base_ctrl_readb(I8042_STATUS_REG);
+	else
+		return inb(I8042_STATUS_REG);
 }
 
 static inline void i8042_write_data(int val)
 {
-	outb(val, I8042_DATA_REG);
+	if (phytium_check_cpu() == true)
+		base_ctrl_writeb(I8042_DATA_REG, val);
+	else
+		outb(val, I8042_DATA_REG);
 }
 
 static inline void i8042_write_command(int val)
 {
-	outb(val, I8042_COMMAND_REG);
+	if (phytium_check_cpu() == true)
+		base_ctrl_writeb(I8042_COMMAND_REG, val);
+	else
+		outb(val, I8042_COMMAND_REG);
 }
 
 static inline int i8042_platform_init(void)
