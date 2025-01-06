@@ -1907,6 +1907,8 @@ F:	drivers/mfd/phytium_px210_i2s_lsd.c
 F:	drivers/mfd/phytium_px210_i2s_mmd.c
 F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
+F:	drivers/mmc/host/phytium-mci-v2*
+F:	drivers/mmc/host/phytium-mci-plat-v2.c
 F:	drivers/mtd/maps/phytium_lbc.c
 F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/mtd/spi-nor/phytium-quadspi.c
