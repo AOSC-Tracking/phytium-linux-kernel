@@ -114,6 +114,15 @@ config ARM_RK3399_DMC_DEVFREQ
           It sets the frequency for the memory controller and reads the usage counts
           from hardware.
 
+config ARM_PHYTIUM_NOC_DEVFREQ
+	tristate "ARM PHYTIUM NOC DEVFREQ Driver"
+	depends on ARCH_PHYTIUM || COMPILE_TEST
+	depends on ACPI
+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+	help
+	  This adds the DEVFREQ driver for Phytium Net On Chip.
+	  It adjusts frequency for noc based on load bandwidth obtained from register.
+
 source "drivers/devfreq/event/Kconfig"
 
 endif # PM_DEVFREQ
