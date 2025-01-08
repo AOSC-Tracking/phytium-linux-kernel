@@ -1901,6 +1901,7 @@ F:	drivers/gpu/drm/phytium/*
 F:	drivers/hwmon/tacho-phytium.c
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
+F:	drivers/i2c/busses/phytium_i2c_v2/*
 F:	drivers/iio/adc/phytium-adc.c
 F:	drivers/input/keyboard/phytium-keypad.c
 F:	drivers/input/serio/phytium-ps2.c
