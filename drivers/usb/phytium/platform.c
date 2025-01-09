@@ -1,4 +1,8 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: GPL-2.0
+
+/*
+ * Copyright (c) 2022, Phytium Technology Co., Ltd.
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -12,7 +16,7 @@
 #include "core.h"
 #include "hw-regs.h"
 
-#define PHYTIUM_OTG_V1_VERSION "1.0.1"
+#define PHYTIUM_OTG_V1_VERSION "1.0.2"
 #define PHYTIUM_OTG_USB_LOADED  3
 #define USB2_2_BASE_ADDRESS 0x31800000
 
