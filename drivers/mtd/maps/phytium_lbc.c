@@ -41,7 +41,7 @@
 #define LBC_FTIM1_CS_GPCM(n)		(0x1a0+0xc*n)
 #define LBC_FTIM2_CS_GPCM(n)		(0x1a4+0xc*n)
 
-#define LBC_DEVICE_ADDR			0x10000000
+static uint64_t LBC_DEVICE_ADDR;
 #define PHYTIUM_MAX_SRAM_BLOCK		8
 
 #define PHYTIUM_LOCALBUS_DRIVER_VERSION	"1.0.0"
@@ -313,7 +313,7 @@ static int phytium_lbc_of_setup(struct phytium_lbc *lbc,
 	}
 
 	if (!lbc->dev[dev_num].mtd) {
-		dev_err(&pdev->dev, "probing failed\n");
+		dev_err(&pdev->dev, "device tree probing failed\n");
 		return -ENXIO;
 	}
 
@@ -425,7 +425,7 @@ static int phytium_lbc_acpi_setup(struct phytium_lbc *lbc,
 	}
 
 	if (!lbc->dev[dev_num].mtd) {
-		dev_err(&pdev->dev, "probing failed\n");
+		dev_err(&pdev->dev, "acpi probing failed\n");
 		return -ENXIO;
 	}
 
@@ -500,7 +500,7 @@ static int phytium_lbc_probe(struct platform_device *pdev)
 			return ret;
 		}
 	}
-
+	LBC_DEVICE_ADDR = res->start;
 	lbc->mm_size = resource_size(res);
 	lbc->total_device_size = 0;
 
