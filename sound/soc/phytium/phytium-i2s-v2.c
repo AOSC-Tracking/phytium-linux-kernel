@@ -119,12 +119,16 @@ static void phyt_pcm_free(struct snd_soc_component *component,
 
 static int phyt_pcm_component_probe(struct snd_soc_component *component)
 {
+	struct phytium_i2s *priv = snd_soc_component_get_drvdata(component);
 	struct snd_soc_card *card = component->card;
 	int ret;
 
+	if (priv->insert < 0)
+		return 0;
+
 	ret = snd_soc_card_jack_new(card, "Headset Jack", SND_JACK_HEADSET,
-				    &hs_jack, hs_jack_pins,
-				    ARRAY_SIZE(hs_jack_pins));
+				&hs_jack, hs_jack_pins,
+				ARRAY_SIZE(hs_jack_pins));
 	if (ret < 0) {
 		dev_err(component->dev, "Cannot create jack\n");
 		return ret;
@@ -1045,7 +1049,8 @@ static int phyt_i2s_probe(struct platform_device *pdev)
 		goto failed_request_irq;
 	}
 
-	gpio_irq = platform_get_irq(pdev, 1);
+	gpio_irq = platform_get_irq_optional(pdev, 1);
+	priv->insert = -1;
 	if (gpio_irq > 0) {
 		phyt_writel_reg(priv->regfile_base, PHYTIUM_REGFILE_GPIO_PORTA_EOI, BIT(0));
 		ret = phyt_i2s_disable_gpioint(priv);
