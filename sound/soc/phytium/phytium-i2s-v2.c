@@ -389,7 +389,7 @@ static snd_pcm_uframes_t phyt_pcm_pointer(struct snd_soc_component *component,
 int phyt_i2s_msg_set_cmd(struct phytium_i2s *priv, struct phyti2s_cmd *msg)
 {
 	struct phyti2s_cmd *ans_msg;
-	int timeout = 10, ret = 0;
+	int timeout = 40, ret = 0;
 
 	mutex_lock(&priv->sharemem_mutex);
 	memcpy(priv->sharemem_base, msg, sizeof(struct phyti2s_cmd));
