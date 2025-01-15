@@ -18,3 +18,6 @@ obj-$(CONFIG_SND_SOC_PHYTIUM_I2S_V2) += snd-soc-phytium-i2s-v2.o
 
 snd-soc-phytium-machine-v2-objs := phytium-machine-v2.o
 obj-$(CONFIG_SND_SOC_PHYTIUM_MACHINE_V2) += snd-soc-phytium-machine-v2.o
+
+snd-soc-pmdk-ma1026-objs :=pmdk_ma1026.o
+obj-$(CONFIG_SND_PMDK_MA1026) += snd-soc-pmdk-ma1026.o
