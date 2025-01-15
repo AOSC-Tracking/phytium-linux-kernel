@@ -286,29 +286,6 @@ static int phytium_qspi_flash_capacity_encode(u32 size, u32 *cap)
 	return ret;
 }
 
-static void phytium_qspi_clear_wr(struct phytium_qspi *qspi,
-		struct phytium_qspi_flash *flash)
-{
-	u32 cmd = 0;
-	u32 state = 0;
-	int ret = 0;
-
-	cmd |= 0x05 << QSPI_CMD_PORT_CMD_SHIFT;
-	cmd |= BIT(QSPI_CMD_PORT_TRANSFER_SHIFT);
-	cmd |= flash->cs << QSPI_CMD_PORT_CS_SHIFT;
-
-	writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
-	readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG);
-
-	ret = readl_poll_timeout(qspi->io_base + QSPI_LD_PORT_REG,
-				 state, !(state & 0x01), 10, 100000);
-	if (ret)
-		dev_err(qspi->dev, "wait device timeout\n");
-
-	/* clear wr_cfg */
-	writel_relaxed(0x0, qspi->io_base + QSPI_WR_CFG_REG);
-}
-
 static int phytium_qspi_write_port(struct phytium_qspi *qspi,
 				   const u8 *buf, const size_t len)
 {
@@ -513,6 +490,7 @@ static int phytium_qspi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 
 		cmd |= QSPI_WR_CFG_WR_MODE_MASK;
 		cmd |= flash->clk_div & QSPI_WR_CFG_WR_SCK_SEL_MASK;
+		writel_relaxed(cmd, qspi->io_base + QSPI_WR_CFG_REG);
 		qspi->wr_cfg_reg = cmd;
 	} else {
 		ret = -EINVAL;
@@ -550,9 +528,6 @@ static ssize_t phytium_qspi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 	size_t mask = 0x03;
 	u_char tmp[4] = {0};
 
-	/* set wr_cfg for drimap write */
-	writel_relaxed(qspi->wr_cfg_reg, qspi->io_base + QSPI_WR_CFG_REG);
-
 	if (offs & 0x03) {
 		dev_err(qspi->dev, "Addr not four-byte aligned!\n");
 		return -EINVAL;
@@ -569,8 +544,6 @@ static ssize_t phytium_qspi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 
 	//write cache data to flash
 	writel_relaxed(QSPI_FLUSH_EN, qspi->io_base + QSPI_FLUSH_REG);
-
-	phytium_qspi_clear_wr(qspi, flash);
 
 	return len;
 }
@@ -796,6 +769,11 @@ static int phytium_qspi_remove(struct platform_device *pdev)
 
 static int __maybe_unused phytium_qspi_suspend(struct device *dev)
 {
+	struct phytium_qspi *qspi = dev_get_drvdata(dev);
+
+	/* clear rd_cfg reg and wr_cfg reg when suspend */
+	writel_relaxed(0, qspi->io_base + QSPI_RD_CFG_REG);
+	writel_relaxed(0, qspi->io_base + QSPI_WR_CFG_REG);
 	return pm_runtime_force_suspend(dev);
 }
 
@@ -803,8 +781,9 @@ static int __maybe_unused phytium_qspi_resume(struct device *dev)
 {
 	struct phytium_qspi *qspi = dev_get_drvdata(dev);
 
-	/* set rd_cfg reg and flash_capacity reg after resume */
+	/* set rd_cfg reg, wr_cfg reg and flash_capacity reg after resume */
 	writel_relaxed(qspi->rd_cfg_reg, qspi->io_base + QSPI_RD_CFG_REG);
+	writel_relaxed(qspi->wr_cfg_reg, qspi->io_base + QSPI_WR_CFG_REG);
 	writel_relaxed(qspi->flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
 	return pm_runtime_force_resume(dev);
 }
