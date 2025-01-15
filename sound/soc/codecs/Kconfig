@@ -146,6 +146,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_SI476X if MFD_SI476X_CORE
 	select SND_SOC_SIMPLE_AMPLIFIER
 	select SND_SOC_SIRF_AUDIO_CODEC
+	select SND_SOC_MA1026 if I2C
 	select SND_SOC_SPDIF
 	select SND_SOC_SSM2305
 	select SND_SOC_SSM2518 if I2C
@@ -913,6 +914,9 @@ config SND_SOC_SIMPLE_AMPLIFIER
 config SND_SOC_SIRF_AUDIO_CODEC
 	tristate "SiRF SoC internal audio codec"
 	select REGMAP_MMIO
+
+config SND_SOC_MA1026
+	tristate "Cubiclattice MA1026 CODEC"
 
 config SND_SOC_SPDIF
 	tristate "S/PDIF CODEC"
