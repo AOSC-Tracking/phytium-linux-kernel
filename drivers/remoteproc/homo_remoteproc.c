@@ -33,8 +33,10 @@
 /* cpu0 handling interrupt */
 #define RPROC_IRQ_HANDLE_CPU        0
 
+/* PSCI cpu_on code */
 #define CPU_ON                      0xc4000003
 
+/* stop flag use in resource table */
 #define REMOTE_PROC_STOP            0x0001U
 
 /* wait for 1s */
@@ -78,7 +80,7 @@ static int homo_find_rproc_offset_irq(int rproc_irq)
 {
 	int i;
 
-	for(i = 0; i < homo_rproc_num; i++) {
+	for (i = 0; i < homo_rproc_num; i++) {
 		if (g_homo_rproc[i]->mapped_irq == rproc_irq) {
 			return i;
 		}
@@ -268,7 +270,7 @@ static int homo_rproc_starting_cpu(unsigned int cpu)
 	int i;
 	int irq;
 
-	for(i = 0; i < homo_rproc_num; i++) {
+	for (i = 0; i < homo_rproc_num; i++) {
 		irq = g_homo_rproc[i]->mapped_irq;
 		enable_percpu_irq(irq, irq_get_trigger_type(irq));
 	}
@@ -383,7 +385,7 @@ static int homo_core_of_init(struct platform_device *pdev)
 	rproc_irq = irq_create_of_mapping(&oirq);
 	if (rproc_irq <= 0) {
 		ret = -EINVAL;
-		goto err;
+		goto err_free;
 	}
 
 	priv->mapped_irq = rproc_irq;
@@ -411,13 +413,12 @@ err_add:
 	rproc_del(rproc);
 	rproc_free(rproc);
 
-err:
 	devres_release_group(dev, homo_core_of_init);
 	return ret;
 }
 
 /*
- * free the resources when init fail
+ * release each remote processor
  */
 static void homo_core_of_exit(struct platform_device *pdev)
 {
@@ -431,13 +432,16 @@ static void homo_core_of_exit(struct platform_device *pdev)
 	devres_release_group(dev, homo_core_of_init);
 }
 
+/*
+ * free the resources when init fail or driver remove
+ */
 static void homo_cluster_of_exit(void)
 {
 	struct rproc *rproc;
 	struct platform_device *cpdev;
 	int i;
 
-	for(i = 0; i < homo_rproc_num; i++) {
+	for (i = 0; i < homo_rproc_num; i++) {
 		rproc = g_homo_rproc[i]->rproc;
 		cpdev = to_platform_device(rproc->dev.parent);
 		homo_core_of_exit(cpdev);
@@ -446,6 +450,9 @@ static void homo_cluster_of_exit(void)
 	homo_rproc_num = 0;
 }
 
+/*
+ * Create remote processors by identifying the child nodes of homo_rproc in the dts
+ */
 static int homo_cluster_of_init(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -466,8 +473,7 @@ static int homo_cluster_of_init(struct platform_device *pdev)
 
 		ret = homo_core_of_init(cpdev);
 		if (ret) {
-			dev_err(dev, "homo_core_of_init failed, ret = %d\n",
-				ret);
+			dev_err(dev, "homo_core_of_init failed, ret = %d\n", ret);
 			put_device(&cpdev->dev);
 			of_node_put(child);
 			goto fail;
@@ -492,8 +498,6 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	int num_cores;
 
 	num_cores = of_get_available_child_count(np);
-
-	dev_info(dev, "num_cores = %d\n", num_cores);
 
 	if (num_cores > RPROC_CORE_MAX_NUM) {
 		dev_err(dev, "core number (%d) out of range\n", num_cores);
