@@ -1030,6 +1030,7 @@ static int scmi_wait_for_reply(struct device *dev, const struct scmi_desc *desc,
 			       struct scmi_xfer *xfer, unsigned int timeout_ms)
 {
 	int ret = 0;
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
 
 	if (xfer->hdr.poll_completion) {
 		/*
@@ -1045,7 +1046,8 @@ static int scmi_wait_for_reply(struct device *dev, const struct scmi_desc *desc,
 
 			spin_until_cond(scmi_xfer_done_no_timeout(cinfo,
 								  xfer, stop));
-			if (ktime_after(ktime_get(), stop)) {
+			if (ktime_after(ktime_get(), stop) &&
+			    !info->desc->ops->poll_done(cinfo, xfer)) {
 				dev_err(dev,
 					"timed out in resp(caller: %pS) - polling\n",
 					(void *)_RET_IP_);
