@@ -120,6 +120,7 @@ static struct snd_soc_dai_link pmdk_dai0 = {
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp0_init,
 	SND_SOC_DAILINK_REG(pmdk_dp0_dai),
+	.playback_only = 1,
 };
 
 static struct snd_soc_dai_link pmdk_dai1 = {
@@ -128,6 +129,7 @@ static struct snd_soc_dai_link pmdk_dai1 = {
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp1_init,
 	SND_SOC_DAILINK_REG(pmdk_dp1_dai),
+	.playback_only = 1,
 };
 
 static struct snd_soc_dai_link pmdk_dai2 = {
@@ -136,6 +138,7 @@ static struct snd_soc_dai_link pmdk_dai2 = {
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp2_init,
 	SND_SOC_DAILINK_REG(pmdk_dp2_dai),
+	.playback_only = 1,
 };
 
 static struct snd_soc_card pmdk = {
