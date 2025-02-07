@@ -280,7 +280,7 @@
 
 		snoop: snoop@28010000 {
 			compatible = "phytium,snoop-ctrl";
-			reg = <0x0 0x28010000 0x1000>;
+			reg = <0x0 0x28010000 0x0 0x1000>;
 			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
 			snoop-ports = <0x80>;
 		};
