@@ -332,7 +332,7 @@ static const struct pci_epc_features phytium_pcie_epc_features = {
 };
 
 static const struct pci_epc_features*
-phytium_pcie_ep_get_features(struct pci_epc *epc, u8 func_no)
+phytium_pcie_ep_get_features(struct pci_epc *epc, u8 func_no, u8 vfunc_no)
 {
 	return &phytium_pcie_epc_features;
 }
