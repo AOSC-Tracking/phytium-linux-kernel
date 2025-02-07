@@ -19,8 +19,6 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 
-#include <linux/acpi.h>
-#include <linux/property.h>
 #include "mtdcore.h"
 
 /*
@@ -506,14 +504,12 @@ EXPORT_SYMBOL_GPL(deregister_mtd_parser);
 static const char * const default_mtd_part_types[] = {
 	"cmdlinepart",
 	"ofpart",
-	"acpipart",
 	NULL
 };
 
 /* Check DT only when looking for subpartitions. */
 static const char * const default_subpartition_types[] = {
 	"ofpart",
-	"acpipart",
 	NULL
 };
 
@@ -577,44 +573,6 @@ static struct mtd_part_parser *mtd_part_get_compatible_parser(const char *compat
 	return ret;
 }
 
-static int mtd_part_acpi_parse(struct mtd_info *master,
-						struct mtd_partitions *pparts)
-{
-	struct mtd_part_parser *parser;
-	struct acpi_device *adev;
-	struct fwnode_handle *child;
-	const char *compat;
-	const char *fixed = "acpi-partitions";
-	int ret, err = 0;
-	int compare = 1;
-	struct device *dev = &master->dev;
-
-	if (has_acpi_companion(dev))
-		adev = ACPI_COMPANION(dev);
-	if (!mtd_is_partition(master)) {
-		fwnode_property_read_string(dev->fwnode, "fixed", &compat);
-		if (compat)
-			compare = strcmp(compat, fixed);
-	}
-
-	device_for_each_child_node(dev, child) {
-		if (compat && !compare) {
-			parser = mtd_part_parser_get(fixed);
-			if (!parser && !request_module("%s", fixed))
-				parser = mtd_part_parser_get(fixed);
-			if (parser) {
-				ret = mtd_part_do_parse(parser, master, pparts, NULL);
-				if (ret > 0)
-					return ret;
-				mtd_part_parser_put(parser);
-				if (ret < 0 && !err)
-					err = ret;
-			}
-		}
-	}
-	return err;
-}
-
 static int mtd_part_of_parse(struct mtd_info *master,
 			     struct mtd_partitions *pparts)
 {
@@ -633,7 +591,7 @@ static int mtd_part_of_parse(struct mtd_info *master,
 		dev = master->dev.parent;
 
 	np = mtd_get_of_node(master);
-	if (mtd_is_partition(master) && np)
+	if (mtd_is_partition(master))
 		of_node_get(np);
 	else
 		np = of_get_child_by_name(np, "partitions");
@@ -654,8 +612,7 @@ static int mtd_part_of_parse(struct mtd_info *master,
 		ret = mtd_part_do_parse(parser, master, pparts, NULL);
 		if (ret > 0) {
 			of_platform_populate(np, NULL, NULL, dev);
-			if (np)
-				of_node_put(np);
+			of_node_put(np);
 			return ret;
 		}
 		mtd_part_parser_put(parser);
@@ -663,8 +620,7 @@ static int mtd_part_of_parse(struct mtd_info *master,
 			err = ret;
 	}
 	of_platform_populate(np, NULL, NULL, dev);
-	if (np)
-		of_node_put(np);
+	of_node_put(np);
 
 	/*
 	 * For backward compatibility we have to try the "fixed-partitions"
@@ -722,9 +678,7 @@ int parse_mtd_partitions(struct mtd_info *master, const char *const *types,
 		 * should be used. It requires a bit different logic so it is
 		 * handled in a separated function.
 		 */
-		if (!strcmp(*types, "acpipart")) {
-			ret = mtd_part_acpi_parse(master, &pparts);
-		} else if (!strcmp(*types, "ofpart")) {
+		if (!strcmp(*types, "ofpart")) {
 			ret = mtd_part_of_parse(master, &pparts);
 		} else {
 			pr_debug("%s: parsing partitions %s\n", master->name,
