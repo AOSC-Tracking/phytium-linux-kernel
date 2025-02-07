@@ -232,6 +232,8 @@ static int phyt_pstate_set_energy_pref_index(struct phyt_cpudata *cpudata,
 	return ret;
 }
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,6,58)// in v6.6.58, cppc_acpi already export these API below
 unsigned int cppc_perf_to_khz(struct cppc_perf_caps *caps, unsigned int perf)
 {
 	s64 retval, offset = 0;
@@ -271,6 +273,7 @@ unsigned int cppc_khz_to_perf(struct cppc_perf_caps *caps, unsigned int freq)
 		return retval;
 	return 0;
 }
+#endif
 
 static int phyt_pstate_init_perf(struct phyt_cpudata *cpudata)
 {
