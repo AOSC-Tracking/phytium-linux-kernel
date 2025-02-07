@@ -12,7 +12,7 @@ menuconfig PHYTIUM_NPU
 if PHYTIUM_NPU
 choice
 	prompt "Select the Phytium NPU Hardware"
-	default y
+	default NPU_PLATFORM
 	help
 	  You need to select a suitable NPU controller in the current board.
 	  This option allows you to decide which Phytium NPU will be built
