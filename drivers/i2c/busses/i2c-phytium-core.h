@@ -2,17 +2,19 @@
 /*
  * Phytium I2C adapter driver.
  *
- * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
+ * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
  */
 
 #include <linux/i2c.h>
 #include <linux/pm_qos.h>
 #include <linux/i2c-smbus.h>
+#include <linux/types.h>
 
-#define I2C_PHYTIUM_DRV_VERSION "1.1.0"
+#define I2C_PHYTIUM_DRV_VERSION "1.1.1"
 
 #define IC_DEFAULT_FUNCTIONALITY (I2C_FUNC_I2C |		\
 				  I2C_FUNC_SMBUS_BYTE |		\
+				  I2C_FUNC_SMBUS_QUICK |	\
 				  I2C_FUNC_SMBUS_BYTE_DATA |	\
 				  I2C_FUNC_SMBUS_WORD_DATA |	\
 				  I2C_FUNC_SMBUS_BLOCK_DATA |	\
@@ -90,7 +92,6 @@
 #define IC_INTR_SMBALERT_IN_N		0x20000
 
 #define IC_INTR_DEFAULT_MASK		(IC_INTR_RX_FULL | \
-					 IC_INTR_TX_ABRT | \
 					 IC_INTR_STOP_DET)
 #define IC_INTR_MASTER_MASK		(IC_INTR_DEFAULT_MASK | \
 					 IC_INTR_TX_EMPTY)
@@ -101,7 +102,8 @@
 #define IC_INTR_SMBUS_MASK		(IC_INTR_MASTER_MASK | \
 					 IC_INTR_SMBCLK_EXT_LOW_TIMEOUT | \
 					 IC_INTR_SMBCLK_TMO_LOW_TIMEOUT | \
-					 IC_INTR_SMBSDA_LOW_TIMEOUT)
+					 IC_INTR_SMBSDA_LOW_TIMEOUT | \
+					 IC_INTR_SMBALERT_IN_N)
 
 #define IC_STATUS_ACTIVITY		0x1
 #define IC_STATUS_TFE			BIT(2)
@@ -112,6 +114,15 @@
 #define IC_SDA_HOLD_RX_MASK		GENMASK(23, IC_SDA_HOLD_RX_SHIFT)
 
 #define IC_ERR_TX_ABRT			0x1
+#define IC_ERR_SMBLK_READ_ZERO		BIT(31)
+
+#define IC_ENABLE_EN			BIT(0)
+#define IC_ENABLE_ALERT_EN		BIT(5)
+#define IC_ENABLE_RXDATA_ADVANCE_EN	BIT(11)
+#define IC_ENABLE_MASK			(IC_ENABLE_EN | \
+					 IC_ENABLE_ALERT_EN | \
+					 IC_ENABLE_RXDATA_ADVANCE_EN)
+#define IC_DISABLE_MASK			IC_ENABLE_ALERT_EN
 
 #define IC_TAR_10BITADDR_MASTER		BIT(12)
 
@@ -128,6 +139,15 @@
 #define PHYTIUM_IC_MASTER		0
 #define PHYTIUM_IC_SLAVE		1
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+enum i2c_slave_state {
+	SLAVE_STATE_IDLE,
+	SLAVE_STATE_RECV,
+	SLAVE_STATE_SEND,
+	SLAVE_STATE_REQUEST,
+	SLAVE_STATE_RESPONSE
+};
+#endif
 #define ABRT_7B_ADDR_NOACK		0
 #define ABRT_10ADDR1_NOACK		1
 #define ABRT_10ADDR2_NOACK		2
@@ -175,6 +195,12 @@ struct phytium_i2c_dev {
 	struct clk		*clk;
 	struct reset_control	*rst;
 	int			mode;
+
+	u32			capability;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	enum i2c_slave_state	slave_state;
+#endif
+	spinlock_t		i2c_lock;
 	struct i2c_client	*slave;
 	u32			(*get_clk_rate_khz)(struct phytium_i2c_dev *dev);
 
@@ -217,6 +243,7 @@ struct phytium_i2c_dev {
 	u16			hs_lcnt;
 
 	bool			pm_disabled;
+	bool			first_time_init_master;
 	void			(*disable)(struct phytium_i2c_dev *dev);
 	void			(*disable_int)(struct phytium_i2c_dev *dev);
 	int			(*init)(struct phytium_i2c_dev *dev);
@@ -230,7 +257,7 @@ u32 phytium_readl(struct phytium_i2c_dev *dev, int offset);
 void phytium_writel(struct phytium_i2c_dev *dev, u32 b, int offset);
 unsigned long i2c_phytium_clk_rate(struct phytium_i2c_dev *dev);
 int i2c_phytium_prepare_clk(struct phytium_i2c_dev *dev, bool prepare);
-int i2c_phytium_wait_bus_not_busy(struct phytium_i2c_dev *dev);
+int i2c_phytium_check_bus_not_busy(struct phytium_i2c_dev *dev);
 int i2c_phytium_handle_tx_abort(struct phytium_i2c_dev *dev);
 u32 i2c_phytium_func(struct i2c_adapter *adap);
 void i2c_phytium_disable(struct phytium_i2c_dev *dev);
@@ -241,16 +268,14 @@ u32 i2c_phytium_scl_lcnt(u32 ic_clk, u32 tLOW, u32 tf, int offset);
 
 static inline void __i2c_phytium_enable(struct phytium_i2c_dev *dev)
 {
-	phytium_writel(dev, 1, IC_ENABLE);
+	phytium_writel(dev, IC_ENABLE_MASK, IC_ENABLE);
 }
 
 static inline void __i2c_phytium_disable_nowait(struct phytium_i2c_dev *dev)
 {
-	phytium_writel(dev, 0, IC_ENABLE);
+	phytium_writel(dev, IC_DISABLE_MASK, IC_ENABLE);
 }
 
 void __i2c_phytium_disable(struct phytium_i2c_dev *dev);
-
+void i2c_phytium_configure_master(struct phytium_i2c_dev *dev);
 extern int i2c_phytium_probe(struct phytium_i2c_dev *dev);
-
-extern int i2c_phytium_probe_slave(struct phytium_i2c_dev *dev);
