@@ -192,18 +192,6 @@ static struct platform_driver phytium_base_ctrl_driver = {
 
 module_platform_driver(phytium_base_ctrl_driver);
 
-static int __init phytium_base_ctrl_init(void)
-{
-	platform_driver_register(&phytium_base_ctrl_driver);
-	return 0;
-}
-
-static void __exit phytium_base_ctrl_exit(void)
-{
-	platform_driver_unregister(&phytium_base_ctrl_driver);
-}
-
-early_initcall(phytium_base_ctrl_init);
 MODULE_AUTHOR("Li Yuze <liyuze@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium base_ctrl driver");
 MODULE_LICENSE("GPL");
