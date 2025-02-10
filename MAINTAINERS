@@ -1881,6 +1881,7 @@ F:	Documentation/devicetree/bindings/pci/phytium,phytium-pcie-ep.txt
 F:	Documentation/devicetree/bindings/pwm/pwm-phytium.txt
 F:	Documentation/devicetree/bindings/reset/phytium,reset.yaml
 F:	Documentation/devicetree/bindings/rng/phytium-rng.txt
+F:	Documentation/devicetree/bindings/serial/phytium,uart-2.0.yaml
 F:	Documentation/devicetree/bindings/sound/phytium,codec-2.0.txt
 F:	Documentation/devicetree/bindings/sound/phytium,hda.yaml
 F:	Documentation/devicetree/bindings/sound/phytium,i2s-2.0.txt
