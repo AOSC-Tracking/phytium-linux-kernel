@@ -573,6 +573,17 @@ config TPS6594_PFSM
 	  This driver can also be built as a module.  If so, the module
 	  will be called tps6594-pfsm.
 
+config PHYTIUM_POWER_MONITOR
+	tristate "Phytium power monitor support"
+	depends on ARCH_PHYTIUM
+	default m
+	help
+	  Select this option will enable the power monitor driver in
+	  Phytium platform, allowing user to obtain power information
+	  in SoC through procfs, such as power consumption, voltage.
+
+	  If unsure, say N.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
