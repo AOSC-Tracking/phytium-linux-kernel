@@ -225,7 +225,7 @@
 };
 
 &macb2 {
-	phy-mode = "rgmii";
+	phy-mode = "rgmii-id";
 	use-mii;
 	status = "okay";
 };
