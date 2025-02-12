@@ -111,6 +111,7 @@ static struct snd_soc_dai_link pmdk_dai_local[] = {
 	.codec_name = "hdmi-audio-codec.1346918656",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp0_init,
+	.nonatomic = true,
 	.playback_only = 1,
 },{
 	.name = "Phytium dp1-audio",
@@ -121,6 +122,7 @@ static struct snd_soc_dai_link pmdk_dai_local[] = {
 	.codec_name = "hdmi-audio-codec.1346918657",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp1_init,
+	.nonatomic = true,
 	.playback_only = 1,
 },
 {
@@ -132,6 +134,7 @@ static struct snd_soc_dai_link pmdk_dai_local[] = {
 	.codec_name = "hdmi-audio-codec.1346918658",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp2_init,
+	.nonatomic = true,
 	.playback_only = 1,
 },
 };
