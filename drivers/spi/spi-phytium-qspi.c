@@ -5,6 +5,7 @@
  * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  */
 
+#include <linux/acpi.h>
 #include <linux/clk.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
@@ -20,7 +21,7 @@
 #include <linux/spi/spi-mem.h>
 #include <linux/mtd/spi-nor.h>
 
-#define DRIVER_VERSION	"1.0.1"
+#define DRIVER_VERSION	"1.0.2"
 
 #define PHYTIUM_CPU_PART_FTC862		0x862
 
@@ -152,6 +153,8 @@
 #define XFER_PROTO_4_4_4		0x6
 
 #define WR_CFG_NODIR_VALUE		0x5000000
+
+#define QSPI_DEFAULT_CLK		500000000
 
 struct phytium_qspi_flash {
 	u32 cs;
@@ -666,6 +669,7 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 	struct spi_mem *mem;
 	struct spi_nor *nor;
 	bool new_capacity = false;
+	u32 clk_rate = QSPI_DEFAULT_CLK;
 
 	ctrl = spi_alloc_master(dev, sizeof(*qspi));
 	if (!ctrl)
@@ -702,29 +706,34 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 	}
 	qspi->used_size = 0;
 
-	qspi->clk = devm_clk_get(dev, NULL);
-	if (IS_ERR(qspi->clk)) {
-		ret = PTR_ERR(qspi->clk);
-		goto probe_master_put;
-	}
+	if (dev->of_node) {
+		qspi->clk = devm_clk_get(dev, NULL);
+		if (IS_ERR(qspi->clk)) {
+			ret = PTR_ERR(qspi->clk);
+			goto probe_master_put;
+		}
 
-	qspi->clk_rate = clk_get_rate(qspi->clk);
-	if (!qspi->clk_rate) {
-		ret = -EINVAL;
-		goto probe_master_put;
-	}
+		qspi->clk_rate = clk_get_rate(qspi->clk);
+		if (!qspi->clk_rate) {
+			ret = -EINVAL;
+			goto probe_master_put;
+		}
 
-	pm_runtime_enable(dev);
-	ret = pm_runtime_get_sync(dev);
-	if (ret < 0) {
-		pm_runtime_put_noidle(dev);
-		goto probe_master_put;
-	}
+		pm_runtime_enable(dev);
+		ret = pm_runtime_get_sync(dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(dev);
+			goto probe_master_put;
+		}
 
-	ret = clk_prepare_enable(qspi->clk);
-	if (ret) {
-		dev_err(dev, "Failed to enable PCLK of the controller.\n");
-		goto probe_clk_failed;
+		ret = clk_prepare_enable(qspi->clk);
+		if (ret) {
+			dev_err(dev, "Failed to enable PCLK of the controller.\n");
+			goto probe_clk_failed;
+		}
+	} else if (has_acpi_companion(dev)) {
+		fwnode_property_read_u32(dev->fwnode, "spi-clock", &clk_rate);
+		qspi->clk_rate = clk_rate;
 	}
 
 	qspi->nodirmap = device_property_present(dev, "no-direct-mapping");
