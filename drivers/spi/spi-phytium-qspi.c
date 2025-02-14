@@ -20,6 +20,7 @@
 #include <linux/spi/spi-mem.h>
 #include <linux/mtd/spi-nor.h>
 
+#define DRIVER_VERSION	"1.0.0"
 
 #define QSPI_FLASH_CAP_REG		0x00
 #define  QSPI_FLASH_CAP_NUM_SHIFT	3
@@ -813,3 +814,4 @@ module_platform_driver(phytium_qspi_driver);
 MODULE_AUTHOR("Chen Baozi <chenbaozi@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium Quad SPI driver");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(DRIVER_VERSION);
