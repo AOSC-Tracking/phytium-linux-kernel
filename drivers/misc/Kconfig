@@ -172,6 +172,16 @@ config SGI_IOC4
 	  If you have an SGI Altix with an IOC4-based card say Y.
 	  Otherwise say N.
 
+config PHYTIUM_SNOOP_CTRL
+        tristate "Phytium snoop controller support"
+        depends on ARCH_PHYTIUM && REGMAP && MFD_SYSCON
+	default n
+        help
+	  Say Y here if you want BMC to snoop 80h port.
+          Provides a driver to control the phytium snoop interface which
+          allows the BMC to listen on and save the data written by the
+	  host to an arbitrary I/O port.
+
 config TIFM_CORE
 	tristate "TI Flash Media interface support"
 	depends on PCI
