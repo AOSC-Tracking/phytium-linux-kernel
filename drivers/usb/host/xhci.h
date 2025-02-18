@@ -236,6 +236,8 @@ struct xhci_op_regs {
 /* USBSTS - USB status - status bitmasks */
 /* HC not running - set to 1 when run/stop bit is cleared. */
 #define STS_HALT	XHCI_STS_HALT
+/* event wakeup interrupt */
+#define STS_WAKEUP	(1 << 1)
 /* serious error, e.g. PCI parity error.  The HC will clear the run/stop bit. */
 #define STS_FATAL	(1 << 2)
 /* event interrupt - clear this prior to clearing any IP flags in IR set*/
@@ -1877,6 +1879,7 @@ struct xhci_hcd {
 #define XHCI_RESET_PLL_ON_DISCONNECT	BIT_ULL(34)
 #define XHCI_SNPS_BROKEN_SUSPEND    BIT_ULL(35)
 #define XHCI_DISABLE_SPARSE	BIT_ULL(38)
+#define XHCI_S1_SUSPEND_WAKEUP	BIT_ULL(39)
 
 	unsigned int		num_active_eps;
 	unsigned int		limit_active_eps;

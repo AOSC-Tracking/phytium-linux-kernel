@@ -1056,6 +1056,17 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 			return -ETIMEDOUT;
 		}
 	}
+
+	if (xhci->quirks & XHCI_S1_SUSPEND_WAKEUP) {
+		if (device_may_wakeup(xhci_to_hcd(xhci)->self.controller) && do_wakeup) {
+			if (enable_irq_wake(hcd->irq))
+				xhci_err(xhci, "failed to enable irq wakes\n");
+			set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+			if (xhci->shared_hcd)
+				set_bit(HCD_FLAG_HW_ACCESSIBLE, &xhci->shared_hcd->flags);
+		}
+	}
+
 	spin_unlock_irq(&xhci->lock);
 
 	/*
@@ -1104,6 +1115,13 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 			time_before(jiffies,
 				xhci->bus_state[1].next_statechange))
 		msleep(100);
+
+	if (xhci->quirks & XHCI_S1_SUSPEND_WAKEUP) {
+		if (device_may_wakeup(xhci_to_hcd(xhci)->self.controller)) {
+			if (disable_irq_wake(hcd->irq))
+				xhci_err(xhci, "failed to disable irq wakes\n");
+		}
+	}
 
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &xhci->shared_hcd->flags);
