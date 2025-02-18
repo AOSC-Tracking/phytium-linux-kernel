@@ -114,7 +114,7 @@ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
 };
 
 static const struct xhci_plat_priv xhci_plat_phytium_pe220x = {
-	.quirks = XHCI_RESET_ON_RESUME,
+	.quirks = XHCI_RESET_ON_RESUME | XHCI_S1_SUSPEND_WAKEUP,
 };
 
 static const struct of_device_id usb_xhci_of_match[] = {
