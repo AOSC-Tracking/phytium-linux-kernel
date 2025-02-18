@@ -2927,6 +2927,12 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 		goto out;
 	}
 
+	if ((status & STS_WAKEUP) && (xhci->quirks & XHCI_S1_SUSPEND_WAKEUP)) {
+		status |= STS_WAKEUP;
+		writel(status, &xhci->op_regs->status);
+		ret = IRQ_HANDLED;
+	}
+
 	if (!(status & STS_EINT))
 		goto out;
 
