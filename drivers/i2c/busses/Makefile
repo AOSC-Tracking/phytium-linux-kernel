@@ -124,7 +124,7 @@ obj-$(CONFIG_I2C_XLP9XX)	+= i2c-xlp9xx.o
 obj-$(CONFIG_I2C_RCAR)		+= i2c-rcar.o
 obj-$(CONFIG_I2C_ZX2967)	+= i2c-zx2967.o
 obj-$(CONFIG_I2C_PHYTIUM_CORE)      += i2c-phytium-core.o
-i2c-phytium-core-objs := i2c-phytium-common.o i2c-phytium-master.o i2c-phytium-slave.o
+i2c-phytium-core-objs		:= i2c-phytium-common.o i2c-phytium-mix.o
 obj-$(CONFIG_I2C_PHYTIUM_PCI)       += i2c-phytium-pci.o
 obj-$(CONFIG_I2C_PHYTIUM_PLATFORM)  += i2c-phytium-platform.o
 

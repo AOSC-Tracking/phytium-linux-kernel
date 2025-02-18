@@ -64,9 +64,7 @@ static int phytium_i2c_acpi_configure(struct platform_device *pdev)
 	struct phytium_i2c_dev *dev = platform_get_drvdata(pdev);
 	struct i2c_timings *t = &dev->timings;
 	u32 ss_ht = 0, fp_ht = 0, hs_ht = 0, fs_ht = 0;
-	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
 	const struct acpi_device_id *id;
-	struct acpi_device *adev;
 
 	dev->adapter.nr = -1;
 	dev->tx_fifo_depth = 32;
@@ -101,9 +99,6 @@ static int phytium_i2c_acpi_configure(struct platform_device *pdev)
 	if (id && id->driver_data)
 		dev->flags |= (u32)id->driver_data;
 
-	if (acpi_bus_get_device(handle, &adev))
-		return -ENODEV;
-
 	return 0;
 }
 
@@ -118,29 +113,6 @@ static inline int phytium_i2c_acpi_configure(struct platform_device *pdev)
 	return -ENODEV;
 }
 #endif
-
-static void i2c_phytium_configure_master(struct phytium_i2c_dev *dev)
-{
-	struct i2c_timings *t = &dev->timings;
-
-	dev->functionality = I2C_FUNC_10BIT_ADDR | IC_DEFAULT_FUNCTIONALITY;
-
-	dev->master_cfg = IC_CON_MASTER | IC_CON_SLAVE_DISABLE |
-			  IC_CON_RESTART_EN;
-
-	dev->mode = PHYTIUM_IC_MASTER;
-
-	switch (t->bus_freq_hz) {
-	case 100000:
-		dev->master_cfg |= IC_CON_SPEED_STD;
-		break;
-	case 3400000:
-		dev->master_cfg |= IC_CON_SPEED_HIGH;
-		break;
-	default:
-		dev->master_cfg |= IC_CON_SPEED_FAST;
-	}
-}
 
 static void i2c_phytium_configure_slave(struct phytium_i2c_dev *dev)
 {
@@ -180,6 +152,11 @@ static int phytium_i2c_plat_probe(struct platform_device *pdev)
 
 	dev->dev = &pdev->dev;
 	dev->irq = irq;
+	dev->first_time_init_master = false;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	dev->slave_state = SLAVE_STATE_IDLE;
+#endif
+	spin_lock_init(&dev->i2c_lock);
 	platform_set_drvdata(pdev, dev);
 
 	dev->rst = devm_reset_control_get_optional_exclusive(&pdev->dev, NULL);
@@ -231,11 +208,12 @@ static int phytium_i2c_plat_probe(struct platform_device *pdev)
 		goto exit_reset;
 	}
 
-	if (i2c_detect_slave_mode(&pdev->dev))
+	if (i2c_detect_slave_mode(&pdev->dev)) {
 		i2c_phytium_configure_slave(dev);
-	else
+	} else {
+		dev->first_time_init_master = true;
 		i2c_phytium_configure_master(dev);
-
+	}
 	dev->clk = devm_clk_get(&pdev->dev, NULL);
 	if (!i2c_phytium_prepare_clk(dev, true)) {
 		u64 clk_khz;
@@ -257,6 +235,9 @@ static int phytium_i2c_plat_probe(struct platform_device *pdev)
 	adap->class = I2C_CLASS_DEPRECATED;
 	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
 	adap->dev.of_node = pdev->dev.of_node;
+	adap->dev.fwnode = pdev->dev.fwnode;
+
+	dev->capability = 0;
 
 	dev_pm_set_driver_flags(&pdev->dev,
 				DPM_FLAG_SMART_PREPARE |
@@ -272,10 +253,7 @@ static int phytium_i2c_plat_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 
-	if (dev->mode == PHYTIUM_IC_SLAVE)
-		ret = i2c_phytium_probe_slave(dev);
-	else
-		ret = i2c_phytium_probe(dev);
+	ret = i2c_phytium_probe(dev);
 
 	if (ret)
 		goto exit_probe;
