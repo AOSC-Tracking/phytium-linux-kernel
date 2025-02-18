@@ -16,7 +16,7 @@
 
 #define PHYTMAC_DRV_NAME		"phytium-mac"
 #define PHYTMAC_DRV_DESC		"PHYTIUM Ethernet Driver"
-#define PHYTMAC_DRIVER_VERSION		"1.0.32"
+#define PHYTMAC_DRIVER_VERSION		"1.0.33"
 #define PHYTMAC_DEFAULT_MSG_ENABLE	  \
 		(NETIF_MSG_DRV		| \
 		NETIF_MSG_PROBE	| \
@@ -432,8 +432,8 @@ struct phytmac_msg {
 	u32			tx_msg_rd_tail;
 	u32			rx_msg_head;
 	u32			rx_msg_tail;
-	/* use msg_mutex to protect msg */
-	struct mutex		msg_mutex;
+	/* use msg_lock to protect msg */
+	spinlock_t                      msg_lock;
 };
 
 struct ts_ctrl {
@@ -471,8 +471,6 @@ struct phytmac {
 	struct work_struct		restart_task;
 	/* Lock to protect mac config */
 	spinlock_t			lock;
-	/* Lock to protect msg tx */
-	spinlock_t			msg_lock;
 	u32				rx_ring_size;
 	u32				tx_ring_size;
 	u32				dma_data_width;
