@@ -54,7 +54,8 @@
 #define	TIMER_TACHO_UNDER_REG	0x34
 #define	TIMER_START_VALUE_REG	0x38
 
-#define	TIMER_INT_CLR_MASK	GENMASK(5, 0)
+#define	TIMER_INT_CLR_MASK		GENMASK(5, 0)
+#define TIMER_TACHO_DEFAULT_FREQ	0x2FAF080
 
 enum tacho_modes {
 tacho_mode = 1,
@@ -62,8 +63,8 @@ capture_mode,
 };
 
 enum edge_modes {
-rising_edge,
 falling_edge,
+rising_edge,
 double_edge,
 };
 
@@ -281,6 +282,7 @@ static int phytium_tacho_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct phytium_tacho *tacho;
 	int ret;
+	u32 fre;
 
 	tacho = devm_kzalloc(dev, sizeof(*tacho), GFP_KERNEL);
 	if (!tacho)
@@ -297,19 +299,20 @@ static int phytium_tacho_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "region map failed\n");
 		return PTR_ERR(tacho->base);
 	}
-	if (dev->of_node) {
-		tacho->clk = devm_clk_get(&pdev->dev, NULL);
-		if (IS_ERR(tacho->clk))
-			return PTR_ERR(tacho->clk);
-		ret = clk_prepare_enable(tacho->clk);
-		if (ret)
-			return ret;
 
-		tacho->freq = clk_get_rate(tacho->clk);
-	} else if (has_acpi_companion(dev)){
-		if(fwnode_property_read_u32(dev_fwnode(dev),"clock-frequency", (u32 *)&(tacho->freq) ) <0)
-			tacho->freq = 50000000;
-    }
+	tacho->freq = TIMER_TACHO_DEFAULT_FREQ;
+	if (!has_acpi_companion(tacho->dev)) {
+		tacho->clk = devm_clk_get(&pdev->dev, NULL);
+		if (IS_ERR(tacho->clk) || clk_prepare_enable(tacho->clk))
+			dev_err(&pdev->dev, "Tacho get clocks failed\n");
+		else
+			tacho->freq = clk_get_rate(tacho->clk);
+	} else {
+		if (fwnode_property_read_u32(tacho->dev->fwnode, "clock-frequency", &fre))
+			dev_err(&pdev->dev, "Tacho get clock-frequency failed\n");
+		else
+			tacho->freq = fre;
+	}
 
 	tacho->irq = platform_get_irq(pdev, 0);
 	if (tacho->irq < 0) {
