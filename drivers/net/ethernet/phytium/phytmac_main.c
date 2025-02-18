@@ -364,6 +364,7 @@ static int phytmac_free_tx_resource(struct phytmac *pdata)
 	struct phytmac_dma_desc *tx_ring_base = NULL;
 	dma_addr_t tx_ring_base_addr;
 	unsigned int q;
+	int tx_offset;
 	int size;
 
 	queue = pdata->queues;
@@ -381,8 +382,9 @@ static int phytmac_free_tx_resource(struct phytmac *pdata)
 	}
 
 	if (tx_ring_base) {
-		size = pdata->queues_num * (TX_RING_BYTES(pdata) + pdata->tx_bd_prefetch +
-					    RING_ADDR_INTERVAL);
+		tx_offset = TX_RING_BYTES(pdata) + pdata->tx_bd_prefetch + RING_ADDR_INTERVAL;
+		tx_offset = ALIGN(tx_offset, 4096);
+		size = pdata->queues_num * tx_offset;
 		dma_free_coherent(pdata->dev, size, tx_ring_base, tx_ring_base_addr);
 	}
 
@@ -395,6 +397,7 @@ static int phytmac_free_rx_resource(struct phytmac *pdata)
 	struct phytmac_dma_desc *rx_ring_base = NULL;
 	dma_addr_t rx_ring_base_addr;
 	unsigned int q;
+	int rx_offset;
 	int size;
 
 	queue = pdata->queues;
@@ -421,8 +424,9 @@ static int phytmac_free_rx_resource(struct phytmac *pdata)
 	}
 
 	if (rx_ring_base) {
-		size = pdata->queues_num * (RX_RING_BYTES(pdata) + pdata->rx_bd_prefetch +
-					    RING_ADDR_INTERVAL);
+		rx_offset = RX_RING_BYTES(pdata) + pdata->rx_bd_prefetch + RING_ADDR_INTERVAL;
+		rx_offset = ALIGN(rx_offset, 4096);
+		size = pdata->queues_num * rx_offset;
 		dma_free_coherent(pdata->dev, size, rx_ring_base, rx_ring_base_addr);
 	}
 
