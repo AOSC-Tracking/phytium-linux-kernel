@@ -21,6 +21,14 @@ config SND_PMDK_ES8336
 	 Say Y if you want to add Phytium machine support for
 	 ES8336 codecs.
 
+config SND_PMDK_MA1026
+	tristate "Phytium machine support with MA1026"
+	depends on I2C && SND_SOC_PHYTIUM_I2S
+	select SND_SOC_MA1026
+	help
+	 Say Y if you want to add Phytium machine support for 
+	 MA1026 codecs.
+
 config SND_PMDK_DP
 	tristate "Phytium machine support with DP"
 	depends on I2C && SND_SOC_PHYTIUM_I2S
@@ -29,9 +37,3 @@ config SND_PMDK_DP
 	 Say Y if you want to add Phytium machine support for
 	 Displayport on Px210.
 
-config SND_PMDK_MA1026
-	tristate "Phytium machine support with MA1026"
-	depends on I2C && SND_SOC_PHYTIUM_I2S
-	select SND_SOC_MA1026
-	help
-	 Say Y if you want to add Phytium machine support for MA1026
