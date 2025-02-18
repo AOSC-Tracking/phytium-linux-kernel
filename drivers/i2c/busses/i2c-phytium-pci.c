@@ -177,6 +177,10 @@ static int i2c_phytium_pci_probe(struct pci_dev *pdev,
 	dev->irq = pdev->irq;
 	dev->flags |= controller->flags;
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	dev->slave_state = SLAVE_STATE_IDLE;
+#endif
+	spin_lock_init(&dev->i2c_lock);
 	dev->functionality = controller->functionality | IC_DEFAULT_FUNCTIONALITY;
 	dev->master_cfg = controller->bus_cfg;
 	if (controller->scl_sda_cfg) {
@@ -199,6 +203,8 @@ static int i2c_phytium_pci_probe(struct pci_dev *pdev,
 	ACPI_COMPANION_SET(&adapter->dev, ACPI_COMPANION(&pdev->dev));
 	adapter->nr = controller->bus_num;
 
+	dev->capability = 0;
+	dev->first_time_init_master = true;
 	ret = i2c_phytium_probe(dev);
 	if (ret)
 		goto out;
@@ -230,8 +236,8 @@ static void i2c_phytium_pci_remove(struct pci_dev *pdev)
 }
 
 static const struct pci_device_id i2_phytium_pci_ids[] = {
-	{ PCI_DEVICE(0x1db7, 0xdc32), 0, 0, octopus_i2c },
-	{ PCI_DEVICE(0x1db7, 0xdc30), 0, 0, octopus_i2c },
+	{ PCI_VDEVICE(PHYTIUM, 0xdc32), octopus_i2c },
+	{ PCI_VDEVICE(PHYTIUM, 0xdc30), octopus_i2c },
 	{ }
 };
 MODULE_DEVICE_TABLE(pci, i2_phytium_pci_ids);
