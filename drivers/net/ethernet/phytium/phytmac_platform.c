@@ -206,7 +206,7 @@ static int phytmac_plat_probe(struct platform_device *pdev)
 	}
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	pdata->mac_regs = devm_ioremap_resource(&pdev->dev, regs);
+	pdata->mac_regs = phytmac_devm_ioremap_resource_np(&pdev->dev, regs);
 	if (IS_ERR(pdata->mac_regs)) {
 		dev_err(&pdev->dev, "mac_regs ioremap failed\n");
 		ret = PTR_ERR(pdata->mac_regs);
