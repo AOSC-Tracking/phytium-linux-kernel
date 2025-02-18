@@ -16,7 +16,7 @@
 
 #define PHYTMAC_DRV_NAME		"phytium-mac"
 #define PHYTMAC_DRV_DESC		"PHYTIUM Ethernet Driver"
-#define PHYTMAC_DRIVER_VERSION		"1.0.34"
+#define PHYTMAC_DRIVER_VERSION		"1.0.35"
 #define PHYTMAC_DEFAULT_MSG_ENABLE	  \
 		(NETIF_MSG_DRV		| \
 		NETIF_MSG_PROBE	| \
@@ -111,9 +111,6 @@
 
 #define PHYTMAC_MSG_READ(_pdata, _reg)					\
 	__raw_readl((_pdata)->mac_regs + (_reg))
-
-#define PHYTMAC_WRITE(_pdata, _reg, _val)				\
-	__raw_writel((_val), (_pdata)->mac_regs + (_reg))
 
 #define LSO_UFO		1
 #define LSO_TSO		2
