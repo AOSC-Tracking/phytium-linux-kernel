@@ -62,7 +62,7 @@ MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
 /* Max length of transmit frame must be a multiple of 8 bytes */
 #define PHYTMAC_TX_LEN_ALIGN		8
-/* Limit maximum TX length as per Cadence TSO errata. This is to avoid a
+/* Limit maximum TX length as per TSO errata. This is to avoid a
  * false amba_error in TX path from the DMA assuming there is not enough
  * space in the SRAM (16KB) even when there is.
  */
