@@ -2868,6 +2868,62 @@ void phytmac_drv_shutdown(struct phytmac *pdata)
 }
 EXPORT_SYMBOL_GPL(phytmac_drv_shutdown);
 
+static void phytmac_devm_iounmap_np(struct device *dev, void *res)
+{
+	iounmap(*(void __iomem **)res);
+}
+
+static void __iomem *phytmac_devm_ioremap_np(struct device *dev, resource_size_t offset,
+					     resource_size_t size)
+{
+	void __iomem **ptr, *addr = NULL;
+
+	ptr = devres_alloc_node(phytmac_devm_iounmap_np, sizeof(*ptr), GFP_KERNEL,
+				dev_to_node(dev));
+	if (!ptr)
+		return NULL;
+
+	addr = phytmac_ioremap_np(offset, size);
+	if (addr) {
+		*ptr = addr;
+		devres_add(dev, ptr);
+	} else
+		devres_free(ptr);
+
+	return addr;
+}
+
+void __iomem *
+phytmac_devm_ioremap_resource_np(struct device *dev, const struct resource *res)
+{
+	resource_size_t size;
+	const char *name;
+	void __iomem *dest_ptr;
+
+	if (!res || resource_type(res) != IORESOURCE_MEM) {
+		dev_err(dev, "invalid resource\n");
+		return IOMEM_ERR_PTR(-EINVAL);
+	}
+
+	size = resource_size(res);
+	name = res->name ?: dev_name(dev);
+
+	if (!devm_request_mem_region(dev, res->start, size, name)) {
+		dev_err(dev, "can't request region for resource %pR\n", res);
+		return IOMEM_ERR_PTR(-EBUSY);
+	}
+
+	dest_ptr = phytmac_devm_ioremap_np(dev, res->start, size);
+	if (!dest_ptr) {
+		dev_err(dev, "ioremap failed for resource %pR\n", res);
+		devm_release_mem_region(dev, res->start, size);
+		dest_ptr = IOMEM_ERR_PTR(-ENOMEM);
+	}
+
+	return dest_ptr;
+}
+EXPORT_SYMBOL_GPL(phytmac_devm_ioremap_resource_np);
+
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Phytium Ethernet driver");
 MODULE_AUTHOR("Wenting Song");
