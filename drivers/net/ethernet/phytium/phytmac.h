@@ -16,7 +16,7 @@
 
 #define PHYTMAC_DRV_NAME		"phytium-mac"
 #define PHYTMAC_DRV_DESC		"PHYTIUM Ethernet Driver"
-#define PHYTMAC_DRIVER_VERSION		"1.0.33"
+#define PHYTMAC_DRIVER_VERSION		"1.0.34"
 #define PHYTMAC_DEFAULT_MSG_ENABLE	  \
 		(NETIF_MSG_DRV		| \
 		NETIF_MSG_PROBE	| \
@@ -676,6 +676,10 @@ struct phytmac_hw_if {
 #define PHYTMAC_RX_PAGE_ORDER	0
 #define PHYTMAC_RX_PAGE_SIZE	(PAGE_SIZE << PHYTMAC_RX_PAGE_ORDER)
 
+#define phytmac_ioremap_np(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRnE))
+
+void __iomem *
+phytmac_devm_ioremap_resource_np(struct device *dev, const struct resource *res);
 struct phytmac_tx_skb *phytmac_get_tx_skb(struct phytmac_queue *queue,
 					  unsigned int index);
 struct phytmac_dma_desc *phytmac_get_tx_desc(struct phytmac_queue *queue,
