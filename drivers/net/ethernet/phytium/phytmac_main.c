@@ -2719,8 +2719,6 @@ int phytmac_drv_probe(struct phytmac *pdata)
 	if (hw_if->init_msg_ring)
 		hw_if->init_msg_ring(pdata);
 
-	mutex_init(&pdata->msg_ring.msg_mutex);
-
 	if (pdata->use_mii && !pdata->mii_bus) {
 		ret = phytmac_mdio_register(pdata);
 		if (ret) {
@@ -2787,8 +2785,6 @@ int phytmac_drv_remove(struct phytmac *pdata)
 
 		if (pdata->phylink)
 			phylink_destroy(pdata->phylink);
-
-		mutex_destroy(&pdata->msg_ring.msg_mutex);
 	}
 
 	return 0;
@@ -2898,7 +2894,7 @@ struct phytmac *phytmac_alloc_pdata(struct device *dev)
 	pdata->dev = dev;
 
 	spin_lock_init(&pdata->lock);
-	spin_lock_init(&pdata->msg_lock);
+	spin_lock_init(&pdata->msg_ring.msg_lock);
 	spin_lock_init(&pdata->ts_clk_lock);
 	pdata->msg_enable = netif_msg_init(debug, PHYTMAC_DEFAULT_MSG_ENABLE);
 
