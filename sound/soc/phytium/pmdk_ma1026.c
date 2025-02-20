@@ -38,13 +38,13 @@ static const struct snd_soc_dapm_route pmdk_ma1026_audio_map[] = {
 
 SND_SOC_DAILINK_DEFS(pmdk_ma1026,
 	DAILINK_COMP_ARRAY(COMP_CPU("phytium-i2s-lsd")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("i2c-MA1026:00", "ma1026-hifi")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("i2c-MAMA1026:00", "ma1026-asp")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 static struct snd_soc_dai_link pmdk_dai[] = {
 	{
-		.name = "MA1026 HIFI",
-		.stream_name = "MA1026 HIFI",
+		.name = "MA1026 ASP",
+		.stream_name = "MA1026 ASP",
 		.dai_fmt = PMDK_DAI_FMT,
 		SND_SOC_DAILINK_REG(pmdk_ma1026),
 	},
@@ -55,13 +55,6 @@ static struct snd_soc_card pmdk = {
 	.owner = THIS_MODULE,
 	.dai_link = pmdk_dai,
 	.num_links = ARRAY_SIZE(pmdk_dai),
-
-	.dapm_widgets = pmdk_ma1026_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(pmdk_ma1026_dapm_widgets),
-	.controls = pmdk_ma1026_controls,
-	.num_controls = ARRAY_SIZE(pmdk_ma1026_controls),
-	.dapm_routes = pmdk_ma1026_audio_map,
-	.num_dapm_routes = ARRAY_SIZE(pmdk_ma1026_audio_map),
 };
 
 static int pmdk_sound_probe(struct platform_device *pdev)
@@ -98,6 +91,6 @@ static struct platform_driver pmdk_sound_driver = {
 
 module_platform_driver(pmdk_sound_driver);
 
-MODULE_AUTHOR("harry guo <harry@cubiclattice.com>");
-MODULE_DESCRIPTION("ALSA SoC PMDK CL1026");
+MODULE_AUTHOR("Shi Guangyuan <shiguangyuan1029@phytium.com.cn>");
+MODULE_DESCRIPTION("ALSA SoC PMDK MA1026");
 MODULE_LICENSE("GPL");

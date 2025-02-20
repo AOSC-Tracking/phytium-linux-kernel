@@ -224,7 +224,6 @@ config SND_SOC_ALL_CODECS
 	imply SND_SOC_SIMPLE_AMPLIFIER
 	imply SND_SOC_SIMPLE_MUX
 	imply SND_SOC_SMA1303
-	imply SND_SOC_MA1026 if I2C
 	imply SND_SOC_SPDIF
 	imply SND_SOC_SRC4XXX_I2C
 	imply SND_SOC_SSM2305
@@ -1136,6 +1135,10 @@ config SND_SOC_LOCHNAGAR_SC
 	  This driver support the sound card functionality of the Cirrus
 	  Logic Lochnagar audio development board.
 
+config SND_SOC_MA1026
+	tristate "Cubiclattice MA1026 CODEC"
+	depends on I2C
+
 config SND_SOC_MADERA
 	tristate
 	default y if SND_SOC_CS47L15=y
@@ -1700,9 +1703,6 @@ config SND_SOC_SMA1303
 	depends on I2C
 	help
 	  Enable support for Iron Device SMA1303 Boosted Class-D amplifier
-
-config SND_SOC_MA1026
-	tristate "Cubiclattice MA1026 CODEC"
 
 config SND_SOC_SPDIF
 	tristate "S/PDIF CODEC"
