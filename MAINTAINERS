@@ -17469,6 +17469,7 @@ F:	drivers/acpi/phytium_base_ctrl.c
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
+F:	drivers/devfreq/phytium_noc.c
 F:	drivers/dma/phytium/phytium*
 F:	drivers/edac/phytium_edac.c
 F:	drivers/gpio/gpio-phytium*
