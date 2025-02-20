@@ -43,7 +43,7 @@
 		snd_soc_component_write(codec, addr, value);
 	#define snd_soc_update_ma1026(component, reg, mask, val)	\
 		snd_soc_component_update_bits(component, reg, mask, val)
-#elif (LINUX_VERSION_CODE < KERNEL_VERSION(6, 00, 0))
+#else
 	#define snd_soc_write_ma1026(codec, addr, value)		\
 		snd_soc_component_write(codec, addr, value);
 	#define snd_soc_update_ma1026(component, reg, mask, val)	\
@@ -56,7 +56,7 @@
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 00, 0))
 	#define snd_soc_read_ma1026(codec, addr)			\
 		snd_soc_component_read32(codec, addr);
-#elif (LINUX_VERSION_CODE < KERNEL_VERSION(6, 00, 0))
+#else
 	#define snd_soc_read_ma1026(codec, addr)			\
 		snd_soc_component_read(codec, addr);
 #endif
@@ -185,7 +185,7 @@ static int ma1026_set_bias_level(
 	struct snd_soc_codec *codec,
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 00, 0))
 	struct snd_soc_component *codec,
-#elif (LINUX_VERSION_CODE < KERNEL_VERSION(6, 00, 0))
+#else
 	struct snd_soc_component *codec,
 #endif
 	enum snd_soc_bias_level level)
@@ -1017,6 +1017,11 @@ static void ma1026_i2c_shutdown(struct i2c_client *client)
 	}
 }
 
+static const struct i2c_device_id ma1026_id[] = {
+	{"ma1026", 0},
+	{}
+};
+MODULE_DEVICE_TABLE(i2c, ma1026_id);
 
 static const struct of_device_id ma1026_of_match[] = {
 	{.compatible = "Phytium, ma1026", },
@@ -1025,16 +1030,17 @@ static const struct of_device_id ma1026_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, ma1026_of_match);
 
-static const struct i2c_device_id ma1026_id[] = {
-	{"ma1026", 0},
-	{}
+static const struct acpi_device_id ma1026_acpi_match[] = {
+	{ "MAMA1026", 0},
+	{ }
 };
-MODULE_DEVICE_TABLE(i2c, ma1026_id);
+MODULE_DEVICE_TABLE(acpi, ma1026_acpi_match);
 
 static struct i2c_driver ma1026_i2c_driver = {
 	.driver = {
 		.name = "ma1026",
 		.of_match_table = ma1026_of_match,
+		.acpi_match_table = ma1026_acpi_match,
 	},
 	.probe = ma1026_i2c_probe,
 	.remove = ma1026_i2c_remove,
