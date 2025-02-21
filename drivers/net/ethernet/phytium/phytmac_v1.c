@@ -560,13 +560,13 @@ static int phytmac_set_wake(struct phytmac *pdata, int wake)
 static void phytmac_mdio_idle(struct phytmac *pdata)
 {
 	u32 val;
+	int ret;
 
 	/* wait for end of transfer */
-	val = PHYTMAC_READ(pdata, PHYTMAC_NSTATUS);
-	while (!(val & PHYTMAC_BIT(MDIO_IDLE))) {
-		cpu_relax();
-		val = PHYTMAC_READ(pdata, PHYTMAC_NSTATUS);
-	}
+	ret = readx_poll_timeout(PHYTMAC_READ_NSTATUS, pdata, val, val & PHYTMAC_BIT(MDIO_IDLE),
+				 1, PHYTMAC_MDIO_TIMEOUT);
+	if (ret)
+		netdev_err(pdata->ndev, "mdio wait for idle time out!");
 }
 
 static int phytmac_mdio_data_read(struct phytmac *pdata, int mii_id, int regnum, int is_c45)
