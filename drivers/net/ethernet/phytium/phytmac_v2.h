@@ -239,6 +239,8 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 #define PHYTMAC_CLK_DIV128	6
 #define PHYTMAC_CLK_DIV224	7
 
+#define PHYTMAC_RETRY_TIMES	50000
+
 enum phytmac_msg_cmd_id {
 	PHYTMAC_MSG_CMD_DEFAULT = 0,
 	PHYTMAC_MSG_CMD_SET,
