@@ -441,13 +441,13 @@ static void phytmac_v2_get_hw_stats(struct phytmac *pdata)
 static void phytmac_v2_mdio_idle(struct phytmac *pdata)
 {
 	u32 val;
+	int ret;
 
 	/* wait for end of transfer */
-	val = PHYTMAC_READ(pdata, PHYTMAC_NETWORK_STATUS);
-	while (!(val & PHYTMAC_BIT(MIDLE))) {
-		cpu_relax();
-		val = PHYTMAC_READ(pdata, PHYTMAC_NETWORK_STATUS);
-	}
+	ret = readx_poll_timeout(PHYTMAC_READ_NSR, pdata, val, val & PHYTMAC_BIT(MIDLE),
+				 1, PHYTMAC_MDIO_TIMEOUT);
+	if (ret)
+		netdev_err(pdata->ndev, "mdio wait for idle time out!");
 }
 
 static int phytmac_v2_mdio_data_read(struct phytmac *pdata, int mii_id, int regnum, int is_c45)

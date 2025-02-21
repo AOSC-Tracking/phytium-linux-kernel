@@ -241,6 +241,8 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 
 #define PHYTMAC_RETRY_TIMES	50000
 
+#define PHYTMAC_READ_NSR(pdata)	PHYTMAC_READ(pdata, PHYTMAC_NETWORK_STATUS)
+
 enum phytmac_msg_cmd_id {
 	PHYTMAC_MSG_CMD_DEFAULT = 0,
 	PHYTMAC_MSG_CMD_SET,
