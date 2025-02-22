@@ -175,7 +175,8 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
 	dma_addr_t dev_addr;
 
 #ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
+	if (check_if_pswiotlb_is_applicable(dev) &&
+				!pswiotlb_bypass_is_needed(dev, 0, dir)) {
 		dev_addr = pswiotlb_dma_direct_map_page_distribute(dev,
 					page, offset, size, dir, attrs);
 		return dev_addr;
@@ -215,7 +216,8 @@ static int __swiotlb_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
 	int i, ret;
 
 #ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
+	if (check_if_pswiotlb_is_applicable(dev) &&
+				!pswiotlb_bypass_is_needed(dev, nelems, dir)) {
 		ret = pswiotlb_dma_direct_map_sg_attrs_distribute(dev, sgl, nelems, dir, attrs);
 		return ret;
 	}
@@ -838,7 +840,8 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
 #ifdef CONFIG_PSWIOTLB
 	dma_addr_t dev_addr;
 
-	if (check_if_pswiotlb_is_applicable(dev)) {
+	if (check_if_pswiotlb_is_applicable(dev) &&
+				!pswiotlb_bypass_is_needed(dev, 0, dir)) {
 		dev_addr =
 			pswiotlb_dma_iommu_map_page_distribute(dev, page, offset, size, dir, attrs);
 
@@ -920,7 +923,8 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
 	bool coherent = is_device_dma_coherent(dev);
 
 #ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
+	if (check_if_pswiotlb_is_applicable(dev) &&
+				!pswiotlb_bypass_is_needed(dev, nelems, dir)) {
 		if ((dir == DMA_TO_DEVICE) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 			pswiotlb_dma_iommu_sync_sg_for_device_distribute(dev, sgl, nelems, dir);
 
