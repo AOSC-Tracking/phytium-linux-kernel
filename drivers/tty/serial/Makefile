@@ -92,6 +92,7 @@ obj-$(CONFIG_SERIAL_MILBEAUT_USIO) += milbeaut_usio.o
 obj-$(CONFIG_SERIAL_SIFIVE)	+= sifive.o
 
 obj-$(CONFIG_SERIAL_PHYTIUM_PCI) += phytium-uart.o
+obj-$(CONFIG_SERIAL_PHYTIUM_UART_V2) += phytium-uart-v2.o
 
 # GPIOLIB helpers for modem control lines
 obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
