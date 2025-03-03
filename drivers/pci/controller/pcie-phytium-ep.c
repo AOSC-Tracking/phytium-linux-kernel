@@ -9,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/module.h>
 #include <linux/pci-epc.h>
 #include <linux/pci-epf.h>
@@ -371,10 +372,8 @@ static const struct of_device_id phytium_pcie_ep_of_match[] = {
 static int phytium_pcie_ep_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	const struct of_device_id *match = NULL;
 	struct phytium_pcie_ep *priv = NULL;
-	const struct phytium_pcie_ep_config *pcie_ep_config = 
-						&pcie_ep_2p0_config;
+	const struct phytium_pcie_ep_config *pcie_ep_config = NULL;
 	struct resource *res;
 	struct device_node *np = dev->of_node;
 	struct pci_epc *epc;
@@ -384,10 +383,10 @@ static int phytium_pcie_ep_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
-	match = of_match_node(phytium_pcie_ep_of_match, pdev->dev.of_node);
-	if (match && match->data) { 
-		pcie_ep_config = match->data;
-	}
+	pcie_ep_config = of_device_get_match_data(&pdev->dev);
+	if (!pcie_ep_config)
+		return -ENODEV;
+
 	priv->hpb_perf_base_limit_offs = 
 			pcie_ep_config->hpb_perf_base_limit_offs;
 
