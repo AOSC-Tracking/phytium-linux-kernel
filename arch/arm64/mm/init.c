@@ -320,6 +320,24 @@ static void __init fdt_enforce_memory_region(void)
 		memblock_cap_memory_range(reg.base, reg.size);
 }
 
+#define SOCID_PS23064 0x8
+#define MIDR_PS23064 0x700F8620
+#define SYS_AIDR_EL1 sys_reg(3, 1, 0, 0, 7)
+
+static inline bool is_phytium_ps23064(void)
+{
+	return read_sysreg_s(SYS_AIDR_EL1) == SOCID_PS23064 &&
+		read_cpuid_id() == MIDR_PS23064;
+}
+
+
+#define PS23064_MAX_ADDR 0x510783f00000
+static inline void phytium_ps23064_quirk(void)
+{
+	pr_warn("Enable Phytium S5000C-128 Core quirk\n");
+	memblock_remove(PS23064_MAX_ADDR, (1ULL << PHYS_MASK_SHIFT) - PS23064_MAX_ADDR);
+}
+
 void __init arm64_memblock_init(void)
 {
 	const s64 linear_region_size = BIT(vabits_actual - 1);
@@ -330,6 +348,8 @@ void __init arm64_memblock_init(void)
 	/* Remove memory above our supported physical address size */
 	memblock_remove(1ULL << PHYS_MASK_SHIFT, ULLONG_MAX);
 
+	if (IS_ENABLED(CONFIG_KASAN) && is_phytium_ps23064())
+		phytium_ps23064_quirk();
 	/*
 	 * Select a suitable value for the base of physical memory.
 	 */
