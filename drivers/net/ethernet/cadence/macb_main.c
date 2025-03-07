@@ -1103,6 +1103,7 @@ static int macb_phylink_connect(struct macb *bp)
 			netdev_err(dev, "no PHY found\n");
 			return -ENXIO;
 		}
+		phydev->force_mode = bp->force_phy_mode;
 
 		/* attach the mac to the phy */
 		if (phylink_expects_phy(bp->phylink))
@@ -5798,6 +5799,10 @@ static int macb_probe(struct platform_device *pdev)
 	err = init(pdev);
 	if (err)
 		goto err_out_free_netdev;
+
+	if (device_property_read_bool(&pdev->dev, "force-phy-mode")) {
+		bp->force_phy_mode = 1;
+	}
 
 	err = macb_mii_init(bp);
 	if (err)
