@@ -1381,7 +1381,7 @@ static int ytphy_wol_feature_set(struct phy_device *phydev,
 static int yt8521_config_init(struct phy_device *phydev)
 {
 	int ret;
-	int val;
+	int val, chip_config;
 
 	struct yt8xxx_priv *priv = phydev->priv;
 
@@ -1393,6 +1393,16 @@ static int yt8521_config_init(struct phy_device *phydev)
 	wol.wolopts |= WAKE_MAGIC;
 	ytphy_wol_feature_set(phydev, &wol);
 #endif
+
+	if (phydev->force_mode) {
+		chip_config = ytphy_read_ext(phydev, 0xa001) & 0x7;
+		chip_config = chip_config & 0x7ff8;
+		chip_config = chip_config | 0x140;
+		ytphy_write_ext(phydev, 0xa001, chip_config);
+
+		priv->chip_mode = chip_config & 0x7;
+		priv->polling_mode = YT_PHY_MODE_UTP;
+	}
 
 	phydev->irq = PHY_POLL;
 
