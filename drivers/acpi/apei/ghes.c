@@ -714,6 +714,12 @@ static bool ghes_do_proc(struct ghes *ghes,
 		}
 		else if (guid_equal(sec_type, &CPER_SEC_PROC_ARM)) {
 			queued = ghes_handle_arm_hw_error(gdata, sev, sync);
+		} else if (guid_equal(sec_type, &CPER_SEC_PHYT_ERR)) {
+			struct cper_sec_phyt_err *phyt = acpi_hest_get_payload(gdata);
+			int sec_sev;
+
+			sec_sev = ghes_severity(gdata->error_severity);
+			log_phyt_err_event(phyt, sec_sev);
 		} else {
 			void *err = acpi_hest_get_payload(gdata);
 

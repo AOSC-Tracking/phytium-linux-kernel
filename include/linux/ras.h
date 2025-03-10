@@ -25,6 +25,7 @@ void log_non_standard_event(const guid_t *sec_type,
 			    const guid_t *fru_id, const char *fru_text,
 			    const u8 sev, const u8 *err, const u32 len);
 void log_arm_hw_error(struct cper_sec_proc_arm *err, const u8 sev);
+void log_phyt_err_event(struct cper_sec_phyt_err *err, const u8 sev);
 #else
 static inline void
 log_non_standard_event(const guid_t *sec_type,
@@ -33,6 +34,8 @@ log_non_standard_event(const guid_t *sec_type,
 { return; }
 static inline void
 log_arm_hw_error(struct cper_sec_proc_arm *err, const u8 sev) { return; }
+static inline void
+log_phyt_err_event(struct cper_sec_phyt_err *err, const u8 sev) { return; }
 #endif
 
 #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)

@@ -198,6 +198,11 @@ enum {
 	GUID_INIT(0x036F84E1, 0x7F37, 0x428c, 0xA7, 0x9E, 0x57, 0x5F,	\
 		  0xDF, 0xAA, 0x84, 0xEC)
 
+/* Phytium Error Record */
+#define CPER_SEC_PHYT_ERR						\
+	GUID_INIT(0x253C8E21, 0xB0B5, 0x4B1A, 0x8C, 0x45, 0x5A, 0x0F,	\
+		  0x5C, 0x06, 0x69, 0x8D)
+
 #define CPER_PROC_VALID_TYPE			0x0001
 #define CPER_PROC_VALID_ISA			0x0002
 #define CPER_PROC_VALID_ERROR_TYPE		0x0004
@@ -548,6 +553,19 @@ struct cper_sec_fw_err_rec_ref {
 	u8 reserved[6];
 	u64 record_identifier;
 	guid_t record_identifier_guid;
+};
+
+/* Phytium Error Record, Phytium RAS V1.1 */
+struct cper_sec_phyt_err {
+	u8 type;
+	u8 subtype;
+	u16 id;
+	u32 error_status;
+	u64 phys_address;
+	u64 misc0;
+	u64 misc1;
+	u64 misc2;
+	u64 misc3;
 };
 
 /* Reset to default packing */

@@ -26,6 +26,10 @@
 #include <ras/ras_event.h>
 #include "cper_cxl.h"
 
+#ifndef PHYT_ERR_OTHER
+#define PHYT_ERR_OTHER 0xff
+#endif
+
 /*
  * CPER record ID need to be unique even after reboot, because record
  * ID is used as index for ERST storage, while CPER records from
@@ -502,6 +506,36 @@ static void cper_print_fw_err(const char *pfx,
 	print_hex_dump(pfx, "", DUMP_PREFIX_OFFSET, 16, 4, buf, length, true);
 }
 
+static const char * const phyt_err_type_strs[] = {
+	"Core",
+	"L3C",
+	"LSD",
+	"SMMU",
+	"GIC",
+	"DDR",
+	"PCIE",
+	"C2C",
+};
+
+static void cper_print_phyt_err(const char *pfx,
+				const struct cper_sec_phyt_err *phyt)
+{
+	if (phyt->type == PHYT_ERR_OTHER)
+		pr_err("%sPhytium Error Record Type: %s\n", pfx, "Other");
+	else
+		pr_err("%sPhytium Error Record Type: %s\n", pfx,
+			phyt->type < ARRAY_SIZE(phyt_err_type_strs) ?
+			phyt_err_type_strs[phyt->type] : "unknown");
+	pr_err("%sSubtype: %d\n", pfx, phyt->subtype);
+	pr_err("%sID: 0x%x\n", pfx, phyt->id);
+	pr_err("%sError Status: 0x%x\n", pfx, phyt->error_status);
+	pr_err("%sPhysical Address: 0x%llx\n", pfx, phyt->phys_address);
+	pr_err("%sMISC0: 0x%llx\n", pfx, phyt->misc0);
+	pr_err("%sMISC1: 0x%llx\n", pfx, phyt->misc1);
+	pr_err("%sMISC2: 0x%llx\n", pfx, phyt->misc2);
+	pr_err("%sMISC3: 0x%llx\n", pfx, phyt->misc3);
+}
+
 static void cper_print_tstamp(const char *pfx,
 				   struct acpi_hest_generic_data_v300 *gdata)
 {
@@ -605,6 +639,14 @@ cper_estatus_print_section(const char *pfx, struct acpi_hest_generic_data *gdata
 		printk("%ssection_type: CXL Protocol Error\n", newpfx);
 		if (gdata->error_data_length >= sizeof(*prot_err))
 			cper_print_prot_err(newpfx, prot_err);
+		else
+			goto err_section_too_small;
+	} else if (guid_equal(sec_type, &CPER_SEC_PHYT_ERR)) {
+		struct cper_sec_phyt_err *phyt_err = acpi_hest_get_payload(gdata);
+
+		pr_err("%ssection_type: Phytium Error Record\n", newpfx);
+		if (gdata->error_data_length >= sizeof(*phyt_err))
+			cper_print_phyt_err(newpfx, phyt_err);
 		else
 			goto err_section_too_small;
 	} else {
