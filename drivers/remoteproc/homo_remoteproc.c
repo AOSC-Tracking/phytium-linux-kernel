@@ -64,11 +64,11 @@ struct homo_rproc {
 
 	int irq;
 	int cpu;
+	struct work_struct vq_work;
 };
 
 static int homo_rproc_irq;
 static struct homo_rproc *g_priv;
-static struct work_struct workqueue;
 
 #define MPIDR_TO_SGI_AFFINITY(cluster_id, level)        (MPIDR_AFFINITY_LEVEL(cluster_id, level) << ICC_SGI1R_AFFINITY_## level ## _SHIFT)
 
@@ -119,9 +119,9 @@ static void homo_rproc_clear_stop_flag(struct homo_resource_table *table_ptr)
 	*flag &= ~REMOTE_PROC_STOP;
 }
 
-static void homo_rproc_vq_irq(struct work_struct *work)
+static void homo_rproc_vq_irq(struct work_struct *vq_work)
 {
-	struct homo_rproc *priv = g_priv;
+	struct homo_rproc *priv = container_of(vq_work, struct homo_rproc, vq_work);
 	struct homo_resource_table *rsc = priv->rsc;
 	struct rproc *rproc = priv->rproc;
 
@@ -139,7 +139,7 @@ static int homo_rproc_start(struct rproc *rproc)
 	if (err == 0)
 		remove_cpu(priv->cpu);
 
-	INIT_WORK(&workqueue, homo_rproc_vq_irq);
+	INIT_WORK(&priv->vq_work, homo_rproc_vq_irq);
 
 	priv->rsc = (struct homo_resource_table *)rproc->table_ptr;
 
@@ -238,7 +238,8 @@ static void __iomem *homo_ioremap_prot(phys_addr_t addr, size_t size, pgprot_t p
 
 static irqreturn_t homo_rproc_irq_handler(int irq, void *data)
 {
-	schedule_work(&workqueue);
+	struct homo_rproc *priv = g_priv;
+	schedule_work(&priv->vq_work);
 	return IRQ_HANDLED;
 }
 
