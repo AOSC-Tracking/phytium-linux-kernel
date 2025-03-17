@@ -557,7 +557,7 @@ static int phytmac_set_wake(struct phytmac *pdata, int wake)
 	return 0;
 }
 
-static void phytmac_mdio_idle(struct phytmac *pdata)
+static int phytmac_mdio_idle(struct phytmac *pdata)
 {
 	u32 val;
 	int ret;
@@ -567,6 +567,8 @@ static void phytmac_mdio_idle(struct phytmac *pdata)
 				 1, PHYTMAC_MDIO_TIMEOUT);
 	if (ret)
 		netdev_err(pdata->ndev, "mdio wait for idle time out!");
+
+	return ret;
 }
 
 static int phytmac_mdio_data_read(struct phytmac *pdata, int mii_id, int regnum, int is_c45)
@@ -1408,6 +1410,7 @@ struct phytmac_hw_if phytmac_1p0_hw = {
 	.get_stats = phytmac_get_hw_stats,
 	.set_mac_address = phytmac_set_mac_addr,
 	.get_mac_address = phytmac_get_mac_addr,
+	.mdio_idle = phytmac_mdio_idle,
 	.mdio_read = phytmac_mdio_data_read,
 	.mdio_write = phytmac_mdio_data_write,
 	.poweron = phytmac_powerup_hw,
