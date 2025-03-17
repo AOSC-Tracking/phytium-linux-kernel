@@ -995,7 +995,7 @@ static unsigned int phytmac_rx_clean_desc(struct phytmac_queue *queue, u32 count
 static unsigned int phytmac_zero_rx_desc_addr(struct phytmac_dma_desc *desc)
 {
 	desc->desc2 = 0;
-	desc->desc0 = PHYTMAC_BIT(RX_USED);
+	desc->desc0 = (desc->desc0 & PHYTMAC_BIT(RX_TS_VALID)) | PHYTMAC_BIT(RX_USED);
 
 	return 0;
 }
