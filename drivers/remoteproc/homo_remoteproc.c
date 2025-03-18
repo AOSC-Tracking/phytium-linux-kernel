@@ -33,12 +33,7 @@
 /* cpu0 handling interrupt */
 #define RPROC_IRQ_HANDLE_CPU        0
 
-#define PSCI_VERSION                0x84000000
-#define CPU_SUSPEND                 0xc4000001
-#define CPU_OFF                     0x84000002
 #define CPU_ON                      0xc4000003
-#define AFFINITY_INFO               0xc4000004
-#define MIGRATE                     0xc4000005
 
 #define REMOTE_PROC_STOP            0x0001U
 
@@ -77,22 +72,8 @@ struct homo_rproc {
 
 static struct homo_rproc *g_homo_rproc[RPROC_CORE_MAX_NUM];
 static int homo_rproc_num;
-static int homo_rproc_offset;
 
 #define MPIDR_TO_SGI_AFFINITY(cluster_id, level)        (MPIDR_AFFINITY_LEVEL(cluster_id, level) << ICC_SGI1R_AFFINITY_## level ## _SHIFT)
-
-static int homo_find_rproc_offset_cpu(int cpu)
-{
-	int i;
-
-	for(i = 0; i < homo_rproc_num; i++) {
-		if (g_homo_rproc[i]->cpu == cpu) {
-			return i;
-		}
-	}
-
-	return -1;
-}
 
 static int homo_find_rproc_offset_irq(int rproc_irq)
 {
@@ -169,14 +150,10 @@ static int homo_rproc_start(struct rproc *rproc)
 	struct homo_rproc *priv = rproc->priv;
 	int phys_cpuid = cpu_logical_map(priv->cpu);
 	struct arm_smccc_res smc_res;
-	int offset;
 
 	err = psci_ops.affinity_info(phys_cpuid, 0);
 	if (err == 0)
 		remove_cpu(priv->cpu);
-
-	offset = homo_find_rproc_offset_cpu(priv->cpu);
-	homo_rproc_offset = offset;
 
 	INIT_WORK(&priv->vq_work, homo_rproc_vq_irq);
 
