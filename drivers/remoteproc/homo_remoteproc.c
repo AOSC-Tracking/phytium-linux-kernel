@@ -27,7 +27,11 @@
 
 #define RPROC_RESOURCE_ENTRIES      8
 
+/* Support up to two cores */
 #define RPROC_CORE_MAX_NUM          2
+
+/* cpu0 handling interrupt */
+#define RPROC_IRQ_HANDLE_CPU        0
 
 #define PSCI_VERSION                0x84000000
 #define CPU_SUSPEND                 0xc4000001
@@ -275,6 +279,12 @@ static irqreturn_t homo_rproc_irq_handler(int irq, void *data)
 {
 	int offset;
 	struct homo_rproc *priv;
+	int cpu = smp_processor_id();
+
+	/* Return immediately if not the designated CPU */
+	if (cpu != RPROC_IRQ_HANDLE_CPU) {
+		return IRQ_HANDLED;
+	}
 
 	offset = homo_find_rproc_offset_irq(irq);
 	priv = g_homo_rproc[offset];
