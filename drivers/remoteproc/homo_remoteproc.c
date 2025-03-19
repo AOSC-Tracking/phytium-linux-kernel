@@ -1,8 +1,7 @@
 /*
  * Homogeneous Remote Processor Control Driver
  *
- * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
- * Author: Shaojun Yang <yangshaojun@phytium.com.cn>
+ * Copyright (c) 2022-2025 Phytium Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it under the terms
  * of the GNU General Public License version 2 as published by the Free Software Foundation.
@@ -40,7 +39,32 @@
 #define REMOTE_PROC_STOP            0x0001U
 
 /* wait for 1s */
-#define HOMO_MAX_WAIT_TIME_NS	(1000 * NSEC_PER_MSEC)
+#define HOMO_MAX_WAIT_TIME_NS  (1000 * NSEC_PER_MSEC)
+
+/* offset of the carveout relative to the starting address of the memory region */
+#define HOMO_IMGLOAD_OFFSET            0
+#define HOMO_VDEV_VIRING0_OFFSET       0x10200000
+#define HOMO_VDEV_VIRING1_OFFSET       0x10210000
+#define HOMO_VDEV_BUFFER_OFFSET        0x10220000
+
+/* size of each carveout */
+#define HOMO_IMGLOAD_SIZE              0x10200000
+#define HOMO_VDEV_VIRING0_SIZE         0x00008000
+#define HOMO_VDEV_VIRING1_SIZE         0x00008000
+#define HOMO_VDEV_BUFFER_SIZE          0x00080000
+
+#define HOMO_ADD_CARVEOUT(dev, base, size, name_fmt) \
+    do { \
+        struct rproc_mem_entry *mem = rproc_mem_entry_init( \
+            dev, NULL, (dma_addr_t)(base), (size), (base), \
+            homo_mem_alloc, homo_mem_release, \
+            name_fmt); \
+        if (!mem) { \
+            dev_err(dev, "rproc_mem_entry_init err!\n"); \
+            return -ENOMEM; \
+        } \
+        rproc_add_carveout(rproc, mem); \
+    } while (0)
 
 /* Resource table for the homo remote processors */
 struct homo_resource_table {
@@ -162,7 +186,7 @@ static int homo_rproc_start(struct rproc *rproc)
 	priv->rsc = (struct homo_resource_table *)rproc->table_ptr;
 
 	/* ARMv8 requires to clean D-cache and invalidate I-cache for memory containing new instructions. */
-	flush_icache_range((unsigned long)priv->addr, (unsigned long)(priv->addr + priv->size));
+	flush_icache_range((unsigned long)priv->addr, (unsigned long)(priv->addr + HOMO_IMGLOAD_SIZE));
 
 	arm_smccc_smc(CPU_ON, phys_cpuid, (unsigned long long)priv->phys_addr, 0, 0, 0, 0, 0, &smc_res);
 
@@ -214,15 +238,8 @@ static void homo_rproc_kick(struct rproc *rproc, int vqid)
 	if (rproc->state == RPROC_RUNNING)
 		gicv3_ipi_send_single(priv->irq, cpu_logical_map(priv->cpu));
 
-	return ;
+	return;
 }
-
-static const struct rproc_ops homo_rproc_ops = {
-	.start = homo_rproc_start,
-	.stop = homo_rproc_stop,
-	.kick = homo_rproc_kick,
-	.da_to_va = homo_rproc_da_to_va,
-};
 
 static void __iomem *homo_ioremap_prot(phys_addr_t addr, size_t size, pgprot_t prot)
 {
@@ -290,7 +307,7 @@ static int homo_rproc_dying_cpu(unsigned int cpu)
 	int i;
 	int irq;
 
-	for(i = 0; i < homo_rproc_num; i++) {
+	for (i = 0; i < homo_rproc_num; i++) {
 		irq = g_homo_rproc[i]->mapped_irq;
 		disable_percpu_irq(irq);
 	}
@@ -298,13 +315,84 @@ static int homo_rproc_dying_cpu(unsigned int cpu)
 	return 0;
 }
 
+static int homo_mem_alloc(struct rproc *rproc, struct rproc_mem_entry *mem)
+{
+	struct device *dev = rproc->dev.parent;
+	void *va;
+	struct homo_rproc *priv = rproc->priv;
+	char load_name[32];
+
+	va = homo_ioremap_prot(mem->dma, mem->len, PAGE_KERNEL_EXEC);
+	if (!va) {
+		dev_err(dev, "Unable to map memory region: %pa+%zx\n",
+			&mem->dma, mem->len);
+		return -ENOMEM;
+	}
+
+	snprintf(load_name, sizeof(load_name), "imgload");
+	if (!strcmp(mem->name, load_name)) {
+		priv->addr = va;
+		priv->phys_addr = mem->dma;
+	}
+
+	dev_dbg(dev, "name: %s, ioremap: phys_addr = %016llx, addr = %llx, size = %lx\n",
+			mem->name, mem->dma, (u64)va, mem->len);
+
+	/* Update memory entry va */
+	mem->va = va;
+
+	return 0;
+}
+
+static int homo_mem_release(struct rproc *rproc, struct rproc_mem_entry *mem)
+{
+	vunmap(mem->va);
+
+	return 0;
+}
+
+static int homo_rproc_prepare(struct rproc *rproc)
+{
+	struct device *dev = rproc->dev.parent;
+	struct device_node *np = dev->of_node;
+
+	struct device_node *np_mem;
+	struct resource res;
+	int ret;
+	struct homo_rproc *priv = rproc->priv;
+
+	np_mem = of_parse_phandle(np, "memory-region", 0);
+	ret = of_address_to_resource(np_mem, 0, &res);
+	if (ret) {
+		dev_err(dev, "can't find memory-region for Baremetal\n");
+		return -ENOMEM;
+	}
+
+	priv->rsc = NULL;
+
+	priv->phys_addr = res.start;
+	priv->size = resource_size(&res);
+
+	HOMO_ADD_CARVEOUT(dev, priv->phys_addr + HOMO_IMGLOAD_OFFSET, HOMO_IMGLOAD_SIZE, "imgload");
+	HOMO_ADD_CARVEOUT(dev, priv->phys_addr + HOMO_VDEV_VIRING0_OFFSET, HOMO_VDEV_VIRING0_SIZE, "vdev0vring0");
+	HOMO_ADD_CARVEOUT(dev, priv->phys_addr + HOMO_VDEV_VIRING1_OFFSET, HOMO_VDEV_VIRING1_SIZE, "vdev0vring1");
+	HOMO_ADD_CARVEOUT(dev, priv->phys_addr + HOMO_VDEV_BUFFER_OFFSET, HOMO_VDEV_BUFFER_SIZE, "vdev0buffer");
+
+	return 0;
+}
+
+static const struct rproc_ops homo_rproc_ops = {
+	.prepare = homo_rproc_prepare,
+	.start = homo_rproc_start,
+	.stop = homo_rproc_stop,
+	.kick = homo_rproc_kick,
+	.da_to_va = homo_rproc_da_to_va,
+};
 
 static int homo_core_of_init(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev_of_node(dev), *p;
-	struct device_node *np_mem;
-	struct resource res;
 	struct homo_rproc *priv;
 	unsigned int ipi, cpu;
 	int ret;
@@ -333,53 +421,33 @@ static int homo_core_of_init(struct platform_device *pdev)
 
 	priv = g_homo_rproc[homo_rproc_num] = rproc->priv;
 	priv->rproc = rproc;
+	priv->rsc = NULL;
+	priv->addr = NULL;
 
 	/* The following values can be modified through devicetree 'homo_rproc' node */
 	if (of_property_read_u32(np, "remote-processor", &cpu)) {
 		dev_err(dev, "not found 'remote-processor' property\n");
 		ret = -EINVAL;
-		goto err_add;
+		goto err_free;
 	}
 
 	if (of_property_read_u32(np, "inter-processor-interrupt", &ipi)) {
 		dev_err(dev, "not found 'inter-processor-interrupt' property\n");
 		ret = -EINVAL;
-		goto err_add;
+		goto err_free;
 	}
 
 	/* The gic-v3 driver has registered the 0-7 range of SGI interrupt for system purpose */
 	if (ipi < 8) {
 		dev_err(dev, "'inter-processor-interrupt' is %d, should be between 9~15\n", ipi);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_free;
 	}
 
 	priv->cpu = cpu;
 	priv->irq = ipi;
 
 	dev_info(dev, "remote-processor = %d, inter-processor-interrupt = %d\n", cpu, ipi);
-
-	np_mem = of_parse_phandle(np, "memory-region", 0);
-	ret = of_address_to_resource(np_mem, 0, &res);
-	if (ret) {
-		dev_err(dev, "can't find memory-region for Baremetal\n");
-		goto err_add;
-	}
-
-	priv->rsc = NULL;
-	priv->addr = NULL;
-
-	priv->phys_addr = res.start;
-	priv->size = resource_size(&res);
-
-	/* Map physical memory region reserved for homo remote processor. */
-	priv->addr = homo_ioremap_prot(priv->phys_addr, priv->size, PAGE_KERNEL_EXEC);
-	if (!priv->addr) {
-		dev_err(dev, "ioremap failed\n");
-		ret = -ENOMEM;
-		goto err_add;
-	}
-	dev_info(dev, "ioremap: phys_addr = %016llx, addr = %llx, size = %lld\n",
-			priv->phys_addr, (u64)(priv->addr), priv->size);
 
 	/* Look for the interrupt parent. */
 	p = of_irq_find_parent(np);
@@ -416,10 +484,6 @@ static int homo_core_of_init(struct platform_device *pdev)
 	return 0;
 
 err_free:
-	vunmap((void *)((unsigned long)priv->addr & PAGE_MASK));
-
-err_add:
-	rproc_del(rproc);
 	rproc_free(rproc);
 
 	devres_release_group(dev, homo_core_of_init);
@@ -560,4 +624,5 @@ module_platform_driver(homo_rproc_driver);
 
 MODULE_DESCRIPTION("Homogeneous Remote Processor Control Driver");
 MODULE_AUTHOR("Shaojun Yang <yangshaojun@phytium.com.cn>");
+MODULE_AUTHOR("Yuming Hu <huyuming1672@phytium.com.cn>");
 MODULE_LICENSE("GPL v2");
