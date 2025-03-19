@@ -335,12 +335,14 @@ static int homo_core_of_init(struct platform_device *pdev)
 	/* The following values can be modified through devicetree 'homo_rproc' node */
 	if (of_property_read_u32(np, "remote-processor", &cpu)) {
 		dev_err(dev, "not found 'remote-processor' property\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_add;
 	}
 
 	if (of_property_read_u32(np, "inter-processor-interrupt", &ipi)) {
 		dev_err(dev, "not found 'inter-processor-interrupt' property\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_add;
 	}
 
 	/* The gic-v3 driver has registered the 0-7 range of SGI interrupt for system purpose */
@@ -358,7 +360,7 @@ static int homo_core_of_init(struct platform_device *pdev)
 	ret = of_address_to_resource(np_mem, 0, &res);
 	if (ret) {
 		dev_err(dev, "can't find memory-region for Baremetal\n");
-		return ret;
+		goto err_add;
 	}
 
 	priv->rsc = NULL;
@@ -371,7 +373,8 @@ static int homo_core_of_init(struct platform_device *pdev)
 	priv->addr = homo_ioremap_prot(priv->phys_addr, priv->size, PAGE_KERNEL_EXEC);
 	if (!priv->addr) {
 		dev_err(dev, "ioremap failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err_add;
 	}
 	dev_info(dev, "ioremap: phys_addr = %016llx, addr = %llx, size = %lld\n",
 			priv->phys_addr, (u64)(priv->addr), priv->size);
@@ -413,6 +416,10 @@ static int homo_core_of_init(struct platform_device *pdev)
 err_free:
 	vunmap((void *)((unsigned long)priv->addr & PAGE_MASK));
 
+err_add:
+	rproc_del(rproc);
+	rproc_free(rproc);
+
 err:
 	devres_release_group(dev, homo_core_of_init);
 	return ret;
@@ -424,12 +431,16 @@ err:
 static void homo_core_of_exit(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct rproc *rproc = platform_get_drvdata(pdev);
+
+	rproc_del(rproc);
+	rproc_free(rproc);
 
 	platform_set_drvdata(pdev, NULL);
 	devres_release_group(dev, homo_core_of_init);
 }
 
-static void homo_cluster_of_exit(struct platform_device *pdev)
+static void homo_cluster_of_exit(void)
 {
 	struct rproc *rproc;
 	struct platform_device *cpdev;
@@ -478,7 +489,7 @@ static int homo_cluster_of_init(struct platform_device *pdev)
 	return 0;
 
 fail:
-	homo_cluster_of_exit(pdev);
+	homo_cluster_of_exit();
 	return ret;
 }
 
@@ -522,10 +533,7 @@ static int homo_rproc_probe(struct platform_device *pdev)
 
 static int homo_rproc_remove(struct platform_device *pdev)
 {
-	struct rproc *rproc = platform_get_drvdata(pdev);
-
-	rproc_del(rproc);
-	rproc_free(rproc);
+	homo_cluster_of_exit();
 
 	return 0;
 }
