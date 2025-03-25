@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 ccflags-y += -I$(src)/include/
-ccflags-y += -I$(srctree)/drivers/staging/phytium-npu/
+ccflags-y += -I$(srctree)/drivers/staging/phytium-npu/include/
 
 ifdef CONFIG_NPU_PLATFORM
 	ifeq ($(CONFIG_NPU_PLATFORM),m)
