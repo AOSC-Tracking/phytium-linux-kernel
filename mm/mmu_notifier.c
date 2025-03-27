@@ -621,6 +621,24 @@ void __mmu_notifier_invalidate_range(struct mm_struct *mm,
 	srcu_read_unlock(&srcu, id);
 }
 
+void __mmu_notifier_arch_invalidate_secondary_tlbs(struct mm_struct *mm,
+				unsigned long start, unsigned long end)
+{
+	struct mmu_notifier *subscription;
+	int id;
+
+	id = srcu_read_lock(&srcu);
+	hlist_for_each_entry_rcu(subscription,
+				 &mm->notifier_subscriptions->list, hlist,
+				 srcu_read_lock_held(&srcu)) {
+		if (subscription->ops->arch_invalidate_secondary_tlbs)
+			subscription->ops->arch_invalidate_secondary_tlbs(subscription, mm,
+							start, end);
+	}
+	srcu_read_unlock(&srcu, id);
+}
+
+
 /*
  * Same as mmu_notifier_register but here the caller must hold the mmap_lock in
  * write mode. A NULL mn signals the notifier is being registered for itree
