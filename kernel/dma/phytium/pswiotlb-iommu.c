@@ -94,14 +94,13 @@ struct iommu_dma_cookie {
  */
 static ssize_t __iommu_map_sg_dma(struct device *dev, struct iommu_domain *domain,
 			unsigned long iova, struct scatterlist *sg, unsigned int nents,
-			int prot, unsigned long attrs)
+			int prot, enum dma_data_direction dir, unsigned long attrs)
 {
 	struct scatterlist *s;
 	size_t mapped = 0;
 	unsigned int i, min_pagesz;
 	int ret;
 	int nid = dev->numa_node;
-	enum dma_data_direction dir = prot & (DMA_TO_DEVICE | DMA_FROM_DEVICE | DMA_BIDIRECTIONAL);
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	struct iova_domain *iovad = &cookie->iovad;
 	size_t aligned_size;
@@ -163,9 +162,9 @@ out_err:
 static ssize_t pswiotlb_iommu_map_sg_atomic_dma(struct device *dev,
 			struct iommu_domain *domain, unsigned long iova,
 			struct scatterlist *sg, unsigned int nents, int prot,
-			unsigned long attrs)
+			enum dma_data_direction dir, unsigned long attrs)
 {
-	return __iommu_map_sg_dma(dev, domain, iova, sg, nents, prot, attrs);
+	return __iommu_map_sg_dma(dev, domain, iova, sg, nents, prot, dir, attrs);
 }
 
 static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
@@ -653,7 +652,8 @@ int pswiotlb_iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 	 * implementation - it knows better than we do.
 	 */
 	if (dir != DMA_TO_DEVICE && is_pswiotlb_active(dev))
-		ret = pswiotlb_iommu_map_sg_atomic_dma(dev, domain, iova, sg, nents, prot, attrs);
+		ret = pswiotlb_iommu_map_sg_atomic_dma(dev, domain,
+					iova, sg, nents, prot, dir, attrs);
 	else
 		ret = iommu_map_sg(domain, iova, sg, nents, prot);
 
