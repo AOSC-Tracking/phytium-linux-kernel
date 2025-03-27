@@ -22,6 +22,7 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/sched.h>
+#include <linux/mmu_notifier.h>
 #include <asm/cputype.h>
 #include <asm/mmu.h>
 
@@ -132,6 +133,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 	__tlbi(aside1is, asid);
 	__tlbi_user(aside1is, asid);
 	dsb(ish);
+	mmu_notifier_arch_invalidate_secondary_tlbs(mm, 0, -1UL);
 }
 
 static inline void flush_tlb_page(struct vm_area_struct *vma,
@@ -142,6 +144,8 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 	dsb(ishst);
 	__tlbi(vale1is, addr);
 	__tlbi_user(vale1is, addr);
+	mmu_notifier_arch_invalidate_secondary_tlbs(vma->vm_mm, uaddr & PAGE_MASK,
+			(uaddr & PAGE_MASK) + PAGE_SIZE);
 	dsb(ish);
 }
 
@@ -157,6 +161,10 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 {
 	unsigned long asid = ASID(vma->vm_mm);
 	unsigned long addr;
+	unsigned long ustart, uend;
+
+	ustart = start;
+	uend = end;
 
 	if ((end - start) > MAX_TLB_RANGE) {
 		flush_tlb_mm(vma->vm_mm);
@@ -177,6 +185,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 		}
 	}
 	dsb(ish);
+	mmu_notifier_arch_invalidate_secondary_tlbs(vma->vm_mm, ustart, uend);
 }
 
 static inline void flush_tlb_range(struct vm_area_struct *vma,
