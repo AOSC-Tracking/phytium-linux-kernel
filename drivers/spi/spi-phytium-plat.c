@@ -26,15 +26,19 @@
 
 #define DRIVER_NAME "phytium_spi"
 
+#define SPI_PHYTIUM_DEFAULT_CLK_RATE	50000000
+
 static int phytium_spi_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct phytium_spi *fts;
 	struct resource *mem;
 	int ret;
 	int num_cs;
 	int cs_gpio;
-	int global_cs;
+	int global_cs = 0;
 	int i;
+	u32 clk_rate = SPI_PHYTIUM_DEFAULT_CLK_RATE;
 
 	fts = devm_kzalloc(&pdev->dev, sizeof(struct phytium_spi),
 			GFP_KERNEL);
@@ -71,7 +75,9 @@ static int phytium_spi_probe(struct platform_device *pdev)
 
 		fts->max_freq = clk_get_rate(fts->clk);
 	} else if (has_acpi_companion(&pdev->dev)) {
-		fts->max_freq = 48000000;
+		fts->max_freq = clk_rate;
+		if (!fwnode_property_read_u32(dev->fwnode, "spi-clock", &clk_rate))
+			fts->max_freq = clk_rate;
 	}
 
 	fts->bus_num = pdev->id;
