@@ -202,6 +202,26 @@ struct mmu_notifier_ops {
 				 struct mm_struct *mm,
 				 unsigned long start,
 				 unsigned long end);
+	/*
+	 * arch_invalidate_secondary_tlbs() is used to manage a non-CPU TLB
+	 * which shares page-tables with the CPU. The
+	 * invalidate_range_start()/end() callbacks should not be implemented as
+	 * arch_invalidate_secondary_tlbs() already catches the points in time when
+	 * an external TLB needs to be flushed.
+	 *
+	 * This requires arch_invalidate_secondary_tlbs() to be called while
+	 * holding the ptl spin-lock and therefore this callback is not allowed
+	 * to sleep.
+	 *
+	 * This is called by architecture code whenever invalidating a TLB
+	 * entry. It is assumed that any secondary TLB has the same rules for
+	 * when invalidations are required. If this is not the case architecture
+	 * code will need to call this explicitly when required for secondary
+	 * TLB invalidation.
+	 */
+	void (*arch_invalidate_secondary_tlbs)(struct mmu_notifier *mn, struct mm_struct *mm,
+				unsigned long start, unsigned long end);
+
 
 	/*
 	 * These callbacks are used with the get/put interface to manage the
@@ -394,6 +414,9 @@ extern void __mmu_notifier_invalidate_range_end(struct mmu_notifier_range *r,
 				  bool only_end);
 extern void __mmu_notifier_invalidate_range(struct mm_struct *mm,
 				  unsigned long start, unsigned long end);
+extern void __mmu_notifier_arch_invalidate_secondary_tlbs(struct mm_struct *mm,
+				unsigned long start, unsigned long end);
+
 extern bool
 mmu_notifier_range_update_to_read_only(const struct mmu_notifier_range *range);
 
@@ -492,6 +515,14 @@ static inline void mmu_notifier_invalidate_range(struct mm_struct *mm,
 	if (mm_has_notifiers(mm))
 		__mmu_notifier_invalidate_range(mm, start, end);
 }
+
+static inline void mmu_notifier_arch_invalidate_secondary_tlbs(struct mm_struct *mm,
+				unsigned long start, unsigned long end)
+{
+	if (mm_has_notifiers(mm))
+		__mmu_notifier_arch_invalidate_secondary_tlbs(mm, start, end);
+}
+
 
 static inline void mmu_notifier_subscriptions_init(struct mm_struct *mm)
 {
@@ -715,6 +746,11 @@ mmu_notifier_invalidate_range_only_end(struct mmu_notifier_range *range)
 
 static inline void mmu_notifier_invalidate_range(struct mm_struct *mm,
 				  unsigned long start, unsigned long end)
+{
+}
+
+static inline void mmu_notifier_arch_invalidate_secondary_tlbs(struct mm_struct *mm,
+				unsigned long start, unsigned long end)
 {
 }
 

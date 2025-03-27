@@ -13,6 +13,7 @@
 #include <linux/bitfield.h>
 #include <linux/mm_types.h>
 #include <linux/sched.h>
+#include <linux/mmu_notifier.h>
 #include <asm/cputype.h>
 #include <asm/mmu.h>
 
@@ -252,6 +253,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 	__tlbi(aside1is, asid);
 	__tlbi_user(aside1is, asid);
 	dsb(ish);
+	mmu_notifier_arch_invalidate_secondary_tlbs(mm, 0, -1UL);
 }
 
 static inline void flush_tlb_page_nosync(struct vm_area_struct *vma,
@@ -263,6 +265,8 @@ static inline void flush_tlb_page_nosync(struct vm_area_struct *vma,
 	addr = __TLBI_VADDR(uaddr, ASID(vma->vm_mm));
 	__tlbi(vale1is, addr);
 	__tlbi_user(vale1is, addr);
+	mmu_notifier_arch_invalidate_secondary_tlbs(vma->vm_mm, uaddr & PAGE_MASK,
+			(uaddr & PAGE_MASK) + PAGE_SIZE);
 }
 
 static inline void flush_tlb_page(struct vm_area_struct *vma,
@@ -286,6 +290,10 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 	int num = 0;
 	int scale = 0;
 	unsigned long asid, addr, pages;
+	unsigned long ustart, uend;
+
+	ustart = start;
+	uend = end;
 
 	start = round_down(start, stride);
 	end = round_up(end, stride);
@@ -358,6 +366,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 		scale++;
 	}
 	dsb(ish);
+	mmu_notifier_arch_invalidate_secondary_tlbs(vma->vm_mm, ustart, uend);
 }
 
 static inline void flush_tlb_range(struct vm_area_struct *vma,
