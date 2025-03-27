@@ -25,6 +25,7 @@
 #include "spi-phytium.h"
 
 #define DRIVER_NAME "phytium_spi"
+#define DRIVER_VERSION	"1.0.0"
 
 #define SPI_PHYTIUM_DEFAULT_CLK_RATE	50000000
 
@@ -208,3 +209,4 @@ module_platform_driver(phytium_spi_driver);
 MODULE_AUTHOR("Yiqun Zhang <zhangyiqun@phytium.com.cn>");
 MODULE_DESCRIPTION("Platform Driver for Phytium SPI controller core");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(DRIVER_VERSION);
