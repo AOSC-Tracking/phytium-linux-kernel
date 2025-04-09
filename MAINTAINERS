@@ -17477,6 +17477,7 @@ F:	Documentation/devicetree/bindings/staging/phytium-npu.yaml
 F:	arch/arm64/boot/dts/phytium/*
 F:	arch/arm64/include/asm/ras.h
 F:	arch/arm64/kernel/ras.c
+F:	drivers/bus/phytium_pio.c
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
