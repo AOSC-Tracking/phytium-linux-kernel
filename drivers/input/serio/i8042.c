@@ -536,9 +536,6 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id)
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
-	if (phytium_check_cpu() == true)
-		base_ctrl_write_int_clear(0x0);
-
 	str = i8042_read_status();
 	if (unlikely(~str & I8042_STR_OBF)) {
 		spin_unlock_irqrestore(&i8042_lock, flags);
@@ -1460,7 +1457,7 @@ static int i8042_setup_aux(void)
 	int error;
 	int i;
 
-	if (!phytium_check_cpu() && i8042_check_aux())
+	if (i8042_check_aux())
 		return -ENODEV;
 
 	if (i8042_nomux || i8042_check_mux()) {
@@ -1477,12 +1474,10 @@ static int i8042_setup_aux(void)
 		aux_enable = i8042_enable_mux_ports;
 	}
 
-	if (!phytium_check_cpu()) {
-		error = request_irq(I8042_AUX_IRQ, i8042_interrupt, IRQF_SHARED,
-					"i8042", i8042_platform_device);
-		if (error)
-			goto err_free_ports;
-	}
+	error = request_irq(I8042_AUX_IRQ, i8042_interrupt, IRQF_SHARED,
+			    "i8042", i8042_platform_device);
+	if (error)
+		goto err_free_ports;
 
 	error = aux_enable();
 	if (error)
@@ -1507,17 +1502,8 @@ static int i8042_setup_kbd(void)
 	if (error)
 		return error;
 
-	if (phytium_check_cpu() == true) {
-		error = phytium_base_ctrl_irq();
-		if (error < 0)
-			goto err_free_port;
-
-		error = devm_request_irq(&i8042_platform_device->dev, error,
-				i8042_interrupt, IRQF_SHARED, "i8042", i8042_platform_device);
-	} else {
-		error = request_irq(I8042_KBD_IRQ, i8042_interrupt, IRQF_SHARED,
-					"i8042", i8042_platform_device);
-	}
+	error = request_irq(I8042_KBD_IRQ, i8042_interrupt, IRQF_SHARED,
+			    "i8042", i8042_platform_device);
 	if (error)
 		goto err_free_port;
 
@@ -1634,15 +1620,14 @@ static int __init i8042_init(void)
 
 	dbg_init();
 
-	if (!phytium_check_cpu()) {
-		err = i8042_platform_init();
-		if (err)
-			return (err == -ENODEV) ? 0 : err;
+	err = i8042_platform_init();
+	if (err)
+		return (err == -ENODEV) ? 0 : err;
 
-		err = i8042_controller_check();
-		if (err)
-			goto err_platform_exit;
-	}
+	err = i8042_controller_check();
+	if (err)
+		goto err_platform_exit;
+
 	/* Set this before creating the dev to allow i8042_command to work right away */
 	i8042_present = true;
 
