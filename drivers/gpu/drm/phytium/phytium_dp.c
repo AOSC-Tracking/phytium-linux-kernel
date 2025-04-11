@@ -2425,8 +2425,7 @@ static const struct hdmi_codec_ops phytium_audio_codec_ops = {
 	.hook_plugged_cb = phytium_dp_audio_hook_plugged_cb,
 };
 
-static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp,
-				       const int port)
+static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp)
 {
 	struct device *dev = phytium_dp->dev->dev;
 	struct hdmi_codec_pdata codec_data = {
@@ -2438,8 +2437,11 @@ static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp,
 	};
 
 	phytium_dp->audio_pdev = platform_device_register_data(dev, HDMI_CODEC_DRV_NAME,
-							       codec_id + port,
+							       codec_id,
 							       &codec_data, sizeof(codec_data));
+
+	if (!PTR_ERR_OR_ZERO(phytium_dp->audio_pdev))
+		codec_id += 1;
 
 	return PTR_ERR_OR_ZERO(phytium_dp->audio_pdev);
 }
@@ -2449,6 +2451,7 @@ static void phytium_dp_audio_codec_fini(struct phytium_dp_device *phytium_dp)
 	if (!PTR_ERR_OR_ZERO(phytium_dp->audio_pdev))
 		platform_device_unregister(phytium_dp->audio_pdev);
 	phytium_dp->audio_pdev = NULL;
+	codec_id -= 1;
 }
 
 static long phytium_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
@@ -2643,7 +2646,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 	drm_connector_helper_add(&phytium_dp->connector, &phytium_connector_helper_funcs);
 	drm_connector_attach_encoder(&phytium_dp->connector, &phytium_dp->encoder);
 
-	ret = phytium_dp_audio_codec_init(phytium_dp, port);
+	ret = phytium_dp_audio_codec_init(phytium_dp);
 	if (ret) {
 		DRM_ERROR("failed to initialize audio codec\n");
 		goto failed_connector_init;
