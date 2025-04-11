@@ -182,3 +182,7 @@
 		status = "disabled";
 	};
 };
+
+&i2s_dp1 {
+	dai-name = "phytium-i2s-dp0";
+};
