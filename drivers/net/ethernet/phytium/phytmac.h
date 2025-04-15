@@ -16,7 +16,7 @@
 
 #define PHYTMAC_DRV_NAME		"phytium-mac"
 #define PHYTMAC_DRV_DESC		"PHYTIUM Ethernet Driver"
-#define PHYTMAC_DRIVER_VERSION		"1.0.41"
+#define PHYTMAC_DRIVER_VERSION		"1.0.42"
 #define PHYTMAC_DEFAULT_MSG_ENABLE	  \
 		(NETIF_MSG_DRV		| \
 		NETIF_MSG_PROBE	| \
@@ -569,6 +569,7 @@ struct phytmac_hw_if {
 
 	/* mido ops */
 	int (*enable_mdio_control)(struct phytmac *pdata, int enable);
+	int (*mdio_idle)(struct phytmac *pdata);
 	int (*mdio_read)(struct phytmac *pdata, int mii_id, int regnum, int is_c45);
 	int (*mdio_write)(struct phytmac *pdata, int mii_id,
 			  int regnum, int is_c45, u16 data);
