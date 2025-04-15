@@ -954,8 +954,6 @@ static struct sk_buff *phytmac_rx_xdp_single(struct phytmac_queue *queue,
 	len = hw_if->get_rx_pkt_len(pdata, desc);
 	rx_buffer = phytmac_get_rx_buffer(queue, queue->rx_tail, len);
 
-	hw_if->zero_rx_desc_addr(desc);
-
 	xdp.data = page_address(rx_buffer->page) + rx_buffer->page_offset;
 	xdp.data_meta = xdp.data;
 	xdp.data_hard_start = xdp.data - PHYTMAC_SKB_PAD;
@@ -971,6 +969,7 @@ static struct sk_buff *phytmac_rx_xdp_single(struct phytmac_queue *queue,
 		} else {
 			rx_buffer->pagecnt_bias++;
 		}
+		hw_if->zero_rx_desc_addr(desc);
 		phytmac_put_rx_buffer(queue, rx_buffer);
 		pdata->ndev->stats.rx_bytes += len;
 		queue->stats.rx_bytes += len;
@@ -991,7 +990,6 @@ static struct sk_buff *phytmac_rx_single(struct phytmac_queue *queue, struct phy
 
 	len = hw_if->get_rx_pkt_len(pdata, desc);
 	rx_buffer = phytmac_get_rx_buffer(queue, queue->rx_tail, len);
-	hw_if->zero_rx_desc_addr(desc);
 
 	skb = phytmac_build_skb(rx_buffer, len);
 	if (unlikely(!skb)) {
@@ -1003,6 +1001,7 @@ static struct sk_buff *phytmac_rx_single(struct phytmac_queue *queue, struct phy
 		return NULL;
 	}
 
+	hw_if->zero_rx_desc_addr(desc);
 	phytmac_put_rx_buffer(queue, rx_buffer);
 
 	skb->protocol = eth_type_trans(skb, pdata->ndev);
@@ -1038,7 +1037,6 @@ static struct sk_buff *phytmac_rx_frame(struct phytmac_queue *queue,
 
 	desc = phytmac_get_rx_desc(queue, first_frag);
 	rx_buffer = phytmac_get_rx_buffer(queue, first_frag, frag_len);
-	hw_if->zero_rx_desc_addr(desc);
 
 	skb = phytmac_build_skb(rx_buffer, frag_len);
 	if (unlikely(!skb)) {
@@ -1049,6 +1047,7 @@ static struct sk_buff *phytmac_rx_frame(struct phytmac_queue *queue,
 		return NULL;
 	}
 
+	hw_if->zero_rx_desc_addr(desc);
 	phytmac_put_rx_buffer(queue, rx_buffer);
 
 	for (frag = first_frag + 1; ; frag++) {
