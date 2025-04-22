@@ -2683,6 +2683,16 @@ void phytmac_default_config(struct phytmac *pdata)
 		ndev->max_mtu = ETH_DATA_LEN;
 
 	ndev->features = ndev->hw_features;
+
+	switch (pdata->version) {
+	case VERSION_V3:
+		strscpy(pdata->fw_version, "MAC_FTM300", sizeof(pdata->fw_version));
+		break;
+
+	default:
+		strscpy(pdata->fw_version, "", sizeof(pdata->fw_version));
+		break;
+	}
 }
 
 static void phytmac_ncsi_handler(struct ncsi_dev *nd)
