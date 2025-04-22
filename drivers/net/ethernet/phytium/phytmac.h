@@ -14,9 +14,10 @@
 #include <linux/etherdevice.h>
 #include <net/xdp.h>
 
-#define PHYTMAC_DRV_NAME		"phytium-mac"
+#define PHYTMAC_PCI_DRV_NAME		"phytmac_pci"
+#define PHYTMAC_PLAT_DRV_NAME		"phytmac_platform"
 #define PHYTMAC_DRV_DESC		"PHYTIUM Ethernet Driver"
-#define PHYTMAC_DRIVER_VERSION		"1.0.44"
+#define PHYTMAC_DRIVER_VERSION		"1.0.45"
 #define PHYTMAC_DEFAULT_MSG_ENABLE	  \
 		(NETIF_MSG_DRV		| \
 		NETIF_MSG_PROBE	| \
@@ -508,6 +509,7 @@ struct phytmac {
 	spinlock_t			rx_fs_lock;
 	unsigned int			max_rx_fs;
 	u32						version;
+	char				fw_version[32];
 };
 
 /* phytmac_desc_unused - calculate if we have unused descriptors */
