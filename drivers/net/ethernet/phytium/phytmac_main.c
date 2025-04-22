@@ -2788,8 +2788,8 @@ int phytmac_drv_suspend(struct phytmac *pdata)
 		rtnl_unlock();
 		spin_lock_irqsave(&pdata->lock, flags);
 		hw_if->reset_hw(pdata);
-		hw_if->poweron(pdata, PHYTMAC_POWEROFF);
 		spin_unlock_irqrestore(&pdata->lock, flags);
+		hw_if->poweron(pdata, PHYTMAC_POWEROFF);
 	}
 
 	return 0;
