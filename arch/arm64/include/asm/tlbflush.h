@@ -168,6 +168,9 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 
 	if ((end - start) > MAX_TLB_RANGE) {
 		flush_tlb_mm(vma->vm_mm);
+#ifdef CONFIG_ARCH_PHYTIUM
+		mmu_notifier_arch_invalidate_secondary_tlbs(vma->vm_mm, ustart, uend);
+#endif
 		return;
 	}
 
