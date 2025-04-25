@@ -49,7 +49,6 @@ static struct snd_soc_dai_link phyt_machine_dai[] = {
 		.codec_dai_name = "phytium-hifi-v2",
 		.platform_name = "snd-soc-dummy",
 		.codec_name = "PHYT1002:00",
-		.nonatomic = true
 	},
 };
 
