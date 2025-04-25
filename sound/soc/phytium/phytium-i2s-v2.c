@@ -30,7 +30,7 @@
 #include <sound/jack.h>
 #include "phytium-i2s-v2.h"
 
-#define PHYT_I2S_V2_VERSION "1.0.2"
+#define PHYT_I2S_V2_VERSION "1.0.3"
 
 static struct snd_soc_jack hs_jack;
 
@@ -361,22 +361,24 @@ static snd_pcm_uframes_t phyt_pcm_pointer(struct snd_pcm_substream *substream)
 	return bytes_to_frames(substream->runtime, pos);
 }
 
-int phyt_i2s_msg_set_cmd(struct phytium_i2s *priv, struct phyti2s_cmd *msg)
+int phyt_i2s_msg_set_cmd(struct phytium_i2s *priv, bool is_gpio)
 {
 	struct phyti2s_cmd *ans_msg;
 	int timeout = 40, ret = 0;
 
-	mutex_lock(&priv->sharemem_mutex);
-	memcpy(priv->sharemem_base, msg, sizeof(struct phyti2s_cmd));
-
-	phyt_writel_reg(priv->regfile_base, PHYTIUM_REGFILE_AP2RV_INT_STATE, SEND_INTR);
-
-	ans_msg = priv->sharemem_base;
+	if (is_gpio) {
+		phyt_writel_reg(priv->regfile_base, PHYTIUM_REGFILE_AP2RV_INT_STATE,
+				SEND_GPIO_INTR);
+		ans_msg = priv->sharemem_base + PHYTIUM_GPIO_OFFSET;
+	} else {
+		phyt_writel_reg(priv->regfile_base, PHYTIUM_REGFILE_AP2RV_INT_STATE, SEND_INTR);
+		ans_msg = priv->sharemem_base;
+	}
 
 	while ((ans_msg->complete == PHYTI2S_COMPLETE_NONE
 			|| ans_msg->complete == PHYTI2S_COMPLETE_GOING)
 			&& timeout) {
-		usleep_range(500, 1000);
+		udelay(500);
 		timeout--;
 	}
 
@@ -404,13 +406,13 @@ int phyt_i2s_msg_set_cmd(struct phytium_i2s *priv, struct phyti2s_cmd *msg)
 		dev_err(priv->dev, "cmd params not support!\n");
 		ret = -EINVAL;
 	}
-	mutex_unlock(&priv->sharemem_mutex);
+
 	return ret;
 }
 
 static int phyt_i2s_enable_gpio(struct phytium_i2s *priv)
 {
-	struct phyti2s_cmd *msg = priv->msg;
+	struct phyti2s_cmd *msg = priv->sharemem_base + PHYTIUM_GPIO_OFFSET;
 	struct gpio_i2s_data *data = &msg->cmd_para.gpio_i2s_data;
 	int ret = 0;
 
@@ -419,7 +421,7 @@ static int phyt_i2s_enable_gpio(struct phytium_i2s *priv)
 	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_GPIO;
 	msg->complete = 0;
 	data->enable = 1;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
+	ret = phyt_i2s_msg_set_cmd(priv, true);
 	if (ret)
 		dev_err(priv->dev, "PHYTI2S_MSG_CMD_SET_GPIO enable failed: %d\n", ret);
 
@@ -428,7 +430,7 @@ static int phyt_i2s_enable_gpio(struct phytium_i2s *priv)
 
 static int phyt_i2s_disable_gpioint(struct phytium_i2s *priv)
 {
-	struct phyti2s_cmd *msg = priv->msg;
+	struct phyti2s_cmd *msg = priv->sharemem_base + PHYTIUM_GPIO_OFFSET;
 	struct gpio_i2s_data *data = &msg->cmd_para.gpio_i2s_data;
 	int ret = 0;
 
@@ -437,7 +439,7 @@ static int phyt_i2s_disable_gpioint(struct phytium_i2s *priv)
 	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_GPIO;
 	msg->complete = 0;
 	data->enable = 0;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
+	ret = phyt_i2s_msg_set_cmd(priv, true);
 	if (ret)
 		dev_err(priv->dev, "PHYTIUM_MSG_CMD_SET_GPIO disable failed: %d\n", ret);
 
@@ -452,7 +454,7 @@ static int phyt_pcm_suspend(struct snd_soc_dai *dai)
 static int phyt_pcm_resume(struct snd_soc_dai *dai)
 {
 	struct phytium_i2s *priv = snd_soc_dai_get_drvdata(dai);
-	struct phyti2s_cmd *msg = priv->msg;
+	struct phyti2s_cmd *msg = priv->sharemem_base;
 	struct set_mode_data *data = &msg->cmd_para.set_mode_data;
 	int ret = 0;
 
@@ -467,7 +469,7 @@ static int phyt_pcm_resume(struct snd_soc_dai *dai)
 		msg->cmd_id = PHYTI2S_MSG_CMD_SET;
 		msg->cmd_subid = PHYTI2S_MSG_CMD_SET_MODE;
 		msg->complete = 0;
-		ret = phyt_i2s_msg_set_cmd(priv, msg);
+		ret = phyt_i2s_msg_set_cmd(priv, false);
 		if (ret) {
 			dev_err(priv->dev, "phytium-i2s: resume failed: %d\n", ret);
 			ret = -EINVAL;
@@ -485,7 +487,7 @@ static int phyt_pcm_resume(struct snd_soc_dai *dai)
 		msg->cmd_id = PHYTI2S_MSG_CMD_SET;
 		msg->cmd_subid = PHYTI2S_MSG_CMD_SET_MODE;
 		msg->complete = 0;
-		ret = phyt_i2s_msg_set_cmd(priv, msg);
+		ret = phyt_i2s_msg_set_cmd(priv, false);
 		if (ret) {
 			dev_err(priv->dev, "phytium-i2s: resume failed: %d\n", ret);
 			ret = -EINVAL;
@@ -544,7 +546,7 @@ static int phyt_i2s_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
 {
 	struct phytium_i2s *priv = snd_soc_dai_get_drvdata(dai);
-	struct phyti2s_cmd *msg = priv->msg;
+	struct phyti2s_cmd *msg = priv->sharemem_base;
 	struct set_mode_data *data = &msg->cmd_para.set_mode_data;
 	int ret = 0;
 
@@ -579,7 +581,7 @@ static int phyt_i2s_hw_params(struct snd_pcm_substream *substream,
 	msg->cmd_id = PHYTI2S_MSG_CMD_SET;
 	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_MODE;
 	msg->complete = 0;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
+	ret = phyt_i2s_msg_set_cmd(priv, false);
 	if (ret) {
 		dev_err(priv->dev, "phytium-i2s: PHYTI2S_MSG_CMD_SET_MODE failed: %d\n", ret);
 		ret = -EINVAL;
@@ -589,69 +591,13 @@ error:
 	return ret;
 }
 
-static void i2s_interrupt_playback_stop_work(struct work_struct *work)
-{
-	struct phytium_i2s *priv = container_of(work, struct phytium_i2s,
-			i2s_playback_stop_work.work);
-	struct phyti2s_cmd *msg;
-	struct trigger_i2s_data *data;
-	int ret = 0;
-
-	msg = kmalloc(sizeof(struct phyti2s_cmd), GFP_KERNEL);
-	if (!msg)
-		return;
-	data = &msg->cmd_para.trigger_i2s_data;
-
-	data->direction = DIRECTION_PLAYBACK;
-	data->start = 0;
-	msg->id = PHYTIUM_I2S_LSD_ID;
-	msg->cmd_id = PHYTI2S_MSG_CMD_SET;
-	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_TRIGGER;
-	msg->complete = 0;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
-	if (ret)
-		dev_err(priv->dev, "PHYTI2S_MSG_CMD_SET_MODE stop playback failed: %d\n", ret);
-	kfree(msg);
-}
-
-static void i2s_interrupt_capture_stop_work(struct work_struct *work)
-{
-	struct phytium_i2s *priv = container_of(work, struct phytium_i2s,
-			i2s_capture_stop_work.work);
-	struct phyti2s_cmd *msg;
-	struct trigger_i2s_data *data;
-	int ret = 0;
-
-	msg = kmalloc(sizeof(struct phyti2s_cmd), GFP_KERNEL);
-	if (!msg)
-		return;
-	data = &msg->cmd_para.trigger_i2s_data;
-
-	data->direction = DIRECTION_CAPTURE;
-	data->start = 0;
-	msg->id = PHYTIUM_I2S_LSD_ID;
-	msg->cmd_id = PHYTI2S_MSG_CMD_SET;
-	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_TRIGGER;
-	msg->complete = 0;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
-	if (ret)
-		dev_err(priv->dev, "PHYTI2S_MSG_CMD_SET_MODE stop capture failed: %d\n", ret);
-	kfree(msg);
-}
-
 static int phyt_i2s_trigger(struct snd_pcm_substream *substream,
 		int cmd, struct snd_soc_dai *dai)
 {
 	struct phytium_i2s *priv = snd_soc_dai_get_drvdata(dai);
-	struct phyti2s_cmd *msg = priv->msg;
-	struct trigger_i2s_data *data = &msg->cmd_para.trigger_i2s_data;
-	bool start =  false;
-	int ret = 0;
+	bool start = false;
+	int ret = 0, cfg = 0;
 
-	memset(msg, 0, sizeof(struct phyti2s_cmd));
-
-	data->direction = ((substream->stream ==
-		SNDRV_PCM_STREAM_PLAYBACK) ? DIRECTION_PLAYBACK:DIRECTION_CAPTURE);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -664,18 +610,6 @@ static int phyt_i2s_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		priv->running -= 1;
-		// Use delay work to avoid waiting too long in interrupt.
-		if (priv->interrupt) {
-			if (data->direction == SNDRV_PCM_STREAM_PLAYBACK)
-				queue_delayed_work(system_power_efficient_wq,
-					&priv->i2s_playback_stop_work,
-					usecs_to_jiffies(200));
-			else
-				queue_delayed_work(system_power_efficient_wq,
-					&priv->i2s_capture_stop_work,
-					usecs_to_jiffies(200));
-			return ret;
-		}
 		start = false;
 		break;
 	default:
@@ -686,15 +620,12 @@ static int phyt_i2s_trigger(struct snd_pcm_substream *substream,
 	if (!start && priv->running)
 		goto error;
 
-	data->start = start ? 1:0;
-	msg->id = PHYTIUM_I2S_LSD_ID;
-	msg->cmd_id = PHYTI2S_MSG_CMD_SET;
-	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_TRIGGER;
-	msg->complete = 0;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
-	if (ret) {
-		dev_err(priv->dev, "phytium-i2s: PHYTI2S_MSG_CMD_SET_TRIGGER failed: %d\n", ret);
-		ret = -EINVAL;
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		cfg = start ? TX_EN : TX_DIS;
+		phyt_writel_reg(priv->regfile_base, PHYTIUM_REGFILE_ITER, cfg);
+	} else {
+		cfg = start ? RX_EN : RX_DIS;
+		phyt_writel_reg(priv->regfile_base, PHYTIUM_REGFILE_IRER, cfg);
 	}
 
 error:
@@ -705,14 +636,10 @@ static int phyt_i2s_hw_free(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct phytium_i2s *priv = snd_soc_dai_get_drvdata(dai);
-	struct phyti2s_cmd *msg = priv->msg;
+	struct phyti2s_cmd *msg = priv->sharemem_base;
 	struct set_mode_data *data = &msg->cmd_para.set_mode_data;
 	int ret = 0;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		flush_delayed_work(&priv->i2s_playback_stop_work);
-	else
-		flush_delayed_work(&priv->i2s_capture_stop_work);
 	if (priv->running > 0)
 		return 0;
 
@@ -725,7 +652,7 @@ static int phyt_i2s_hw_free(struct snd_pcm_substream *substream,
 	msg->cmd_id = PHYTI2S_MSG_CMD_SET;
 	msg->cmd_subid = PHYTI2S_MSG_CMD_SET_MODE;
 	msg->complete = 0;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
+	ret = phyt_i2s_msg_set_cmd(priv, false);
 	if (ret) {
 		dev_err(priv->dev, "phytium-i2s: SET_MODE disable failed: %d\n", ret);
 		ret = -EINVAL;
@@ -744,7 +671,7 @@ static void phyt_i2s_gpio_jack_work(struct work_struct *work)
 {
 	struct phytium_i2s *priv = container_of(work, struct phytium_i2s,
 		phyt_i2s_gpio_work.work);
-	struct phyti2s_cmd *msg;
+	struct phyti2s_cmd *msg = priv->sharemem_base + PHYTIUM_GPIO_OFFSET;
 	struct gpio_i2s_data *data;
 	int ret = 0;
 
@@ -758,9 +685,6 @@ static void phyt_i2s_gpio_jack_work(struct work_struct *work)
 		priv->insert = 1;
 	}
 
-	msg = kmalloc(sizeof(struct phyti2s_cmd), GFP_KERNEL);
-	if (!msg)
-		return;
 	data = &msg->cmd_para.gpio_i2s_data;
 
 	msg->id = PHYTIUM_I2S_LSD_ID;
@@ -769,10 +693,9 @@ static void phyt_i2s_gpio_jack_work(struct work_struct *work)
 	msg->complete = 0;
 	data->enable = -1;
 	data->insert = priv->insert;
-	ret = phyt_i2s_msg_set_cmd(priv, msg);
+	ret = phyt_i2s_msg_set_cmd(priv, true);
 	if (ret)
 		dev_err(priv->dev, "PHYTI2S_MSG_CMD_SET_GPIO report jack failed: %d\n", ret);
-	kfree(msg);
 }
 
 static irqreturn_t phyt_i2s_gpio_interrupt(int irq, void *dev_id)
@@ -786,44 +709,25 @@ static irqreturn_t phyt_i2s_gpio_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static void phyt_i2s_playback_elapsed_work(struct work_struct *work)
-{
-	struct phytium_i2s *priv = container_of(work, struct phytium_i2s,
-		i2s_playback_elapsed_work.work);
-
-	snd_pcm_period_elapsed(priv->substream_playback);
-}
-
-static void phyt_i2s_capture_elapsed_work(struct work_struct *work)
-{
-	struct phytium_i2s *priv = container_of(work, struct phytium_i2s,
-		i2s_capture_elapsed_work.work);
-
-	snd_pcm_period_elapsed(priv->substream_capture);
-}
-
 static irqreturn_t phyt_i2s_interrupt(int irq, void *dev_id)
 {
 	struct phytium_i2s *priv = dev_id;
 	uint32_t status;
 	int ret = IRQ_NONE;
 
-	priv->interrupt = 1;
 	status = readl(priv->dma_reg_base + PHYTIUM_DMA_STS);
 
 	if (status & DMA_TX_DONE) {
-		queue_delayed_work(system_wq, &priv->i2s_playback_elapsed_work, 0);
+		snd_pcm_period_elapsed(priv->substream_playback);
 		writel(DMA_TX_DONE, priv->dma_reg_base + PHYTIUM_DMA_STS);
 		ret = IRQ_HANDLED;
 	}
 
 	if (status & DMA_RX_DONE) {
-		queue_delayed_work(system_wq, &priv->i2s_capture_elapsed_work, 0);
+		snd_pcm_period_elapsed(priv->substream_capture);
 		writel(DMA_RX_DONE, priv->dma_reg_base + PHYTIUM_DMA_STS);
 		ret = IRQ_HANDLED;
 	}
-
-	priv->interrupt = 0;
 
 	return ret;
 }
@@ -1051,12 +955,6 @@ static int phyt_i2s_probe(struct platform_device *pdev)
 		goto failed_alloc_phytium_i2s;
 	}
 
-	priv->msg = devm_kzalloc(&pdev->dev, sizeof(struct phyti2s_cmd), GFP_KERNEL);
-	if (!priv->msg) {
-		ret = -ENOMEM;
-		goto failed_alloc_phytium_i2s;
-	}
-
 	dev_set_drvdata(&pdev->dev, priv);
 	priv->dev = &pdev->dev;
 
@@ -1156,12 +1054,6 @@ static int phyt_i2s_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "not able to register dai\n");
 		goto failed_register_com;
 	}
-
-	INIT_DELAYED_WORK(&priv->i2s_playback_stop_work, i2s_interrupt_playback_stop_work);
-	INIT_DELAYED_WORK(&priv->i2s_capture_stop_work, i2s_interrupt_capture_stop_work);
-	INIT_DELAYED_WORK(&priv->i2s_playback_elapsed_work, phyt_i2s_playback_elapsed_work);
-	INIT_DELAYED_WORK(&priv->i2s_capture_elapsed_work, phyt_i2s_capture_elapsed_work);
-	mutex_init(&priv->sharemem_mutex);
 
 	if (sysfs_create_group(&priv->dev->kobj, &phyt_i2s_device_group))
 		dev_warn(&pdev->dev, "failed create sysfs\n");
