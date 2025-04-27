@@ -103,9 +103,9 @@ static const struct ras_error_info pe220x_ras_soc_error[] = {
 	{ 37, UNCORRECTED_ERROR, "nINTERRIRQ_clust1" },
 	{ 38, UNCORRECTED_ERROR, "nEXTERRIRQ_clust2" },
 	{ 39, UNCORRECTED_ERROR, "nINTERRIRQ_clust2" },
-	{ 40, UNCORRECTED_ERROR, "ams_ame0_ras_err" },
-	{ 41, UNCORRECTED_ERROR, "ams_ame1_ras_err" },
-	{ 42, UNCORRECTED_ERROR, "ams_amer_ras_err" },
+	{ 40, UNCORRECTED_ERROR, "ras_err_amu0" },
+	{ 41, UNCORRECTED_ERROR, "ras_err_amu1" },
+	{ 42, UNCORRECTED_ERROR, "ras_err_ame0" },
 	{ 43, UNCORRECTED_ERROR, "ras_err_ame1" },
 };
 
