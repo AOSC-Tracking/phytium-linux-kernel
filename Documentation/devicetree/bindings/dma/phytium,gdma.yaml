@@ -37,7 +37,7 @@ properties:
   max-outstanding:
     minimum: 1
     maximum: 64
-    description: set interrupmax-outstandingts according to the programming manual
+    description: set max-outstanding according to the programming manual
 
 required:
   - compatible
