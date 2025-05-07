@@ -106,8 +106,9 @@ static struct snd_soc_dai_link pmdk_dai0 = {
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp0_init,
-	.playback_only = true,
 	SND_SOC_DAILINK_REG(pmdk_dp0_dai),
+	.nonatomic = true,
+	.playback_only = true,
 };
 
 static struct snd_soc_dai_link pmdk_dai1 = {
@@ -115,8 +116,9 @@ static struct snd_soc_dai_link pmdk_dai1 = {
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp1_init,
-	.playback_only = true,
 	SND_SOC_DAILINK_REG(pmdk_dp1_dai),
+	.nonatomic = true,
+	.playback_only = true,
 };
 
 static struct snd_soc_dai_link pmdk_dai2 = {
@@ -124,8 +126,9 @@ static struct snd_soc_dai_link pmdk_dai2 = {
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp2_init,
-	.playback_only = true,
 	SND_SOC_DAILINK_REG(pmdk_dp2_dai),
+	.nonatomic = true,
+	.playback_only = true,
 };
 
 static struct snd_soc_card pmdk = {
