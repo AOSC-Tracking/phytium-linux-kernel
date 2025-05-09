@@ -66,6 +66,7 @@ static int phytium_gpio_pci_probe(struct pci_dev *pdev, const struct pci_device_
 	gpio->irq_chip.irq_set_type = phytium_gpio_irq_set_type;
 	gpio->irq_chip.irq_enable = phytium_gpio_irq_enable;
 	gpio->irq_chip.irq_disable = phytium_gpio_irq_disable;
+	gpio->irq_chip.irq_set_affinity = phytium_gpio_irq_set_affinity;
 
 	raw_spin_lock_init(&gpio->lock);
 
