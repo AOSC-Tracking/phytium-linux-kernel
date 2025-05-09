@@ -354,6 +354,7 @@
 #define EVTQ_MAX_SZ_SHIFT		(Q_MAX_SZ_SHIFT - EVTQ_ENT_SZ_SHIFT)
 
 #define EVTQ_0_ID			GENMASK_ULL(7, 0)
+#define EVTQ_2_ADDR			GENMASK_ULL(63, 0)
 
 /* PRI queue */
 #define PRIQ_ENT_SZ_SHIFT		4
@@ -378,6 +379,9 @@
 
 #define MSI_IOVA_BASE			0x8000000
 #define MSI_IOVA_LENGTH			0x100000
+
+#define TRANSLATE_INVALID_ADDR		0x0
+#define EVT_ID_TRANSLATION_FAULT	0x10
 
 static bool disable_bypass = 1;
 module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
@@ -1634,7 +1638,17 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
 	do {
 		while (!queue_remove_raw(q, evt)) {
 			u8 id = FIELD_GET(EVTQ_0_ID, evt[0]);
+#ifdef CONFIG_ARCH_PHYTIUM
+			if (read_cpuid_id() == MIDR_PHYTIUM_FTC862 &&
+			    read_sysreg_s(SYS_AIDR_EL1) == PHYTIUM_CPU_SOCID_PS24080) {
+				u8 type = FIELD_GET(EVTQ_0_ID, evt[0]);
+				u64 addr = FIELD_GET(EVTQ_2_ADDR, evt[2]);
 
+				if (type == EVT_ID_TRANSLATION_FAULT &&
+					addr == TRANSLATE_INVALID_ADDR)
+					continue;
+			}
+#endif
 			dev_info(smmu->dev, "event 0x%02x received:\n", id);
 			for (i = 0; i < ARRAY_SIZE(evt); ++i)
 				dev_info(smmu->dev, "\t0x%016llx\n",
