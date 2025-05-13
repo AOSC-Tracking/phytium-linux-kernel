@@ -397,13 +397,12 @@ static int phytium_npu_response_stream(struct phytium_npu_session *sess,
 	} else {
 		size = MAX_NPU_USER_RSP_SIZE;
 	}
+	nustream_rsp = kzalloc(alloc_size, GFP_KERNEL);
+	if (!nustream_rsp)
+		return -ENOMEM;
 
 	if (nustream->estream.stype & NPU_COMPUTEFLAG_NOTIFY) {
 		if (!nstream->rsp) {
-			nustream_rsp = kzalloc(alloc_size, GFP_KERNEL);
-			if (!nustream_rsp)
-				return -ENOMEM;
-
 			nstream->rsp = nustream_rsp;
 			INIT_LIST_HEAD(&nustream_rsp->stream_rsp_list_entry);
 		}
