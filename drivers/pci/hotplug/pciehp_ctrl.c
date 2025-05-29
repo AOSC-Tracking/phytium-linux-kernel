@@ -293,6 +293,10 @@ void pciehp_handle_presence_or_link_change(struct slot *slot, u32 events)
 		if (link_active)
 			ctrl_info(ctrl, "Slot(%s): Link Up\n",
 				  slot_name(slot));
+#ifdef CONFIG_ARCH_PHYTIUM
+		if (present && link_active)
+			phytium_clear_ctrl_prot(ctrl->pcie->port, PHYTIUM_PCIE_HOTPLUG);
+#endif
 		ctrl->request_result = pciehp_enable_slot(slot);
 		break;
 	default:
