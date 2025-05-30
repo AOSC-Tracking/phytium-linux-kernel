@@ -16,7 +16,6 @@
 #include <linux/dma-mapping.h>
 #include "phytium_npu.h"
 #include "phytium_npu_leopard_reg.h"
-#define PHYTIUM_NPU_VERSION "1.0.1"
 
 static irqreturn_t phytium_npu_thread_irq(int irq, void *dev_id)
 {
@@ -165,8 +164,7 @@ static const struct dev_pm_ops phytium_npu_pm_ops = {
 
 static ssize_t info_show(struct device_driver *drv, char *buf)
 {
-#define VERSION "1.0.0"
-	return snprintf(buf, PAGE_SIZE, "NPU platform driver version: %s\n", VERSION);
+	return snprintf(buf, PAGE_SIZE, "NPU platform driver version: %s\n", NPU_FTN300_DRIVER_VERSION);
 }
 
 static DRIVER_ATTR_RO(info);
@@ -196,7 +194,7 @@ static struct platform_driver phytium_npu_plat_driver = {
 	.probe  = phytium_npu_plat_probe,
 	.remove = phytium_npu_remove,
 	.driver = {
-		.name = KBUILD_MODNAME,
+		.name = NPU_FTN300_PLAT_DRV_NAME,
 		.groups = drv_groups,
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(phytium_npu_of_ids),
@@ -210,4 +208,4 @@ module_platform_driver(phytium_npu_plat_driver);
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium NPU driver for IO Mapped controllers");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(PHYTIUM_NPU_VERSION);
+MODULE_VERSION(NPU_FTN300_DRIVER_VERSION);

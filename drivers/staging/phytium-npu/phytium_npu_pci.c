@@ -13,7 +13,6 @@
 #include "phytium_npu.h"
 #include "phytium_npu_reg.h"
 
-#define VERSION "1.0.0"
 #define PHYTIUM_PCI_VENDOR_ID 0x1DB7
 #define PHYTIUM_PCI_DEVICE_ID 0xDC24
 #define PCI_BAR_DEV       0
@@ -181,7 +180,7 @@ static const struct dev_pm_ops phytium_npu_pm_ops = {
 
 static ssize_t info_show(struct device_driver *drv, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "NPU PCI driver version: %s\n", VERSION);
+	return snprintf(buf, PAGE_SIZE, "NPU PCI driver version: %s\n", NPU_FTN300_DRIVER_VERSION);
 }
 
 static DRIVER_ATTR_RO(info);
@@ -192,7 +191,7 @@ static struct attribute *npu_pci_attrs[] = {
 ATTRIBUTE_GROUPS(npu_pci);
 
 static struct pci_driver phytium_npu_pci_drv = {
-	.name = "npu_pci",
+	.name = NPU_FTN300_PCI_DRV_NAME,
 	.id_table = pci_pci_ids,
 	.probe = phytium_npu_pci_probe,
 	.remove = phytium_npu_remove,

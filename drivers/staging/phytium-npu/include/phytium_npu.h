@@ -10,6 +10,10 @@
 #include <linux/iosys-map.h>
 #include "phytium_npu_mmu.h"
 
+#define NPU_FTN300_PCI_DRV_NAME         "NPU_FTN300_pci"
+#define NPU_FTN300_PLAT_DRV_NAME        "NPU_FTN300_platform"
+#define NPU_FTN300_DRIVER_VERSION       "1.0.1"
+
 #define NPU_SUPPORT_SESSION_NUM		128
 #ifndef TRUE
 #define TRUE 1
