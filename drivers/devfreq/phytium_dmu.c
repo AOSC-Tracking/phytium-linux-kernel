@@ -93,6 +93,7 @@ static inline unsigned long dmu_read32(struct phytium_dmufreq *priv, int dmu,
 
 #if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 BLOCKING_NOTIFIER_HEAD(dmu_pmu_notifier_chain);
+EXPORT_SYMBOL(dmu_pmu_notifier_chain);
 
 static int dmu_pmu_notifier_call(struct notifier_block *nb, unsigned long event, void *data)
 {
@@ -354,7 +355,6 @@ static int phytium_dmu_get_dev_status(struct device *dev,
 		stat->busy_time, stat->total_time, single_threshold_value);
 
 	stat->current_frequency	= priv->rate;
-
 	return 0;
 }
 
@@ -481,7 +481,7 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 {
 	struct phytium_dmufreq *priv;
 	struct device *dev = &pdev->dev;
-	const char *gov = DEVFREQ_GOV_SIMPLE_ONDEMAND;
+	const char *gov = DEVFREQ_GOV_PERFORMANCE;
 	int i, ret;
 	unsigned int max_state = get_freq_count(dev);
 	struct acpi_result result;
@@ -566,7 +566,7 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 	}
 
 	priv->devfreq = devm_devfreq_add_device(dev, &priv->profile,
-						gov, &priv->ondemand_data);
+						gov, NULL);
 	if (IS_ERR(priv->devfreq)) {
 		ret = PTR_ERR(priv->devfreq);
 		dev_err(dev, "failed to add devfreq device: %d\n", ret);
@@ -601,6 +601,7 @@ static int phytium_dmufreq_remove(struct platform_device *pdev)
 {
 	struct phytium_dmufreq *priv = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
+
 	for (int i = 0; i < priv->max_count; i++) {
 		dmu_write32(priv, i, AXI_MONITOR_EN, 0x0);
 		dmu_write32(priv, i, TIMER_STOP, 0x1);
@@ -615,6 +616,7 @@ static int phytium_dmufreq_remove(struct platform_device *pdev)
 		return 0;
 	flush_work(&priv->work);
 	del_timer_sync(&priv->sampling);
+
 	dev_pm_opp_remove_all_dynamic(dev);
 
 	kfree(priv);
