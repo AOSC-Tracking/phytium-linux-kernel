@@ -2291,3 +2291,4 @@ int gadget_queue_isoc_tx_prepare(struct phytium_device *pdev, struct gadget_requ
 
 	return gadget_queue_isoc_tx(pdev, preq);
 }
+

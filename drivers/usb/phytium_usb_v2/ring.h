@@ -28,3 +28,4 @@ int gadget_queue_ctrl_tx(struct phytium_device *pdev, struct gadget_request *pre
 int gadget_queue_bulk_tx(struct phytium_device *pdev, struct gadget_request *preq);
 int gadget_queue_isoc_tx_prepare(struct phytium_device *pdev, struct gadget_request *preq);
 #endif
+

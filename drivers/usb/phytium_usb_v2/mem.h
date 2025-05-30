@@ -9,3 +9,4 @@ int gadget_setup_addressable_priv_dev(void *data);
 void gadget_copy_ep0_dequeue_into_input_ctx(void *data);
 
 #endif
+

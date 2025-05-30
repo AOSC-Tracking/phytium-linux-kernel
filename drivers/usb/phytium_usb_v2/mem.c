@@ -1037,3 +1037,4 @@ struct gadget_ring *gadget_dma_to_transfer_ring(struct gadget_ep *pep, u64 addre
 
 	return pep->ring;
 }
+
