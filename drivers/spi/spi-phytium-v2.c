@@ -25,6 +25,10 @@
 #include <linux/mtd/spi-nor.h>
 #include "spi-phytium.h"
 
+#define MCP251x_READ		0x03
+#define MCP251x_READ_RXB0	0x90
+#define MCP251x_READ_RXB1	0x94
+
 static inline void spi_phyt_enable_chip(struct phytium_spi *fts, u8 enable)
 {
 	u8 val = enable ? 1 : 2;
@@ -158,7 +162,7 @@ static int spi_phyt_transfer_one(struct spi_master *master,
 			chip->tmode = TMOD_TO;
 	}
 
-	if (fts->tx) {
+	if (fts->tx && fts->len == 1) {
 		if ((*(u8 *)fts->tx == SPINOR_OP_WREN) && fts->spi_write_flag == 0) {
 			spi_phytium_write_pre(fts, spi->chip_select,
 					transfer->bits_per_word, spi->mode,
@@ -258,8 +262,14 @@ static int spi_phyt_transfer_one(struct spi_master *master,
 			}
 			fts->flash_erase = 0;
 		} else {
+			fts->flags = 1;
+			if (fts->spi_write_flag == 0 && *(u8 *)(fts->tx) != MCP251x_READ
+					&& *(u8 *)(fts->tx) != MCP251x_READ_RXB0
+					&& *(u8 *)(fts->tx) != MCP251x_READ_RXB1)
+				fts->flags = 3;
+
 			ret = spi_phytium_write(fts, spi->chip_select, transfer->bits_per_word,
-					spi->mode, chip->tmode, 1, fts->spi_write_flag);
+					spi->mode, chip->tmode, fts->flags, fts->spi_write_flag);
 			if (ret) {
 				dev_err(&master->dev, "write command failed\n");
 				return ret;
@@ -403,9 +413,50 @@ static void spi_phyt_timer_handle(struct timer_list *t)
 	mod_timer(&fts->timer, jiffies + msecs_to_jiffies(10));
 }
 
+void spi_handle_debug_err(struct phytium_spi *fts)
+{
+	struct device *dev = &fts->master->dev;
+	u32 reg, len, i;
+
+	reg = phytium_read_regfile(fts, SPI_REGFILE_DEBUG);
+
+	if (reg & SPI_REGFILE_HAVE_LOG) {
+		len = strnlen(fts->log, fts->log_size);
+		dev_info(dev, "log len :%d,addr: 0x%llx,size:%d\n",
+				len, (u64)fts->log, fts->log_size);
+		if (len > SPI_LOG_LINE_MAX_LEN) {
+			for (i = 0; i + SPI_LOG_LINE_MAX_LEN < len; i += SPI_LOG_LINE_MAX_LEN)
+				dev_info(dev, "(log)%.*s\n", SPI_LOG_LINE_MAX_LEN, &fts->log[i]);
+		} else {
+			dev_info(dev, "(log)%.*s\n", SPI_LOG_LINE_MAX_LEN, &fts->log[0]);
+		}
+
+		for (i = 0; i < fts->log_size; i++)
+			fts->log[i] = 0;
+	}
+
+	reg &= ~SPI_REGFILE_HAVE_LOG;
+	phytium_write_regfile(fts, SPI_REGFILE_DEBUG, reg);
+}
+
 static void spi_phyt_hw_init(struct device *dev, struct phytium_spi *fts)
 {
+	u32 reg, i;
+
 	spi_phytium_default(fts);
+
+	reg = phytium_read_regfile(fts, SPI_REGFILE_DEBUG);
+	fts->ddr_paddr = ((reg & SPI_REGFILE_ADDR_MASK) >> 8) << SPI_DDR_ADDR_HIGH;
+	fts->log_size = ((reg & SPI_REGFILE_SIZE_MASK) >> 4) * SPI_DEBUG_LOG_SIZE;
+	fts->log = devm_ioremap(dev, fts->ddr_paddr, fts->log_size);
+
+	if (IS_ERR(fts->log)) {
+		dev_err(dev, "log_addr is err\n");
+		return;
+	}
+
+	for (i = 0; i < fts->log_size; i++)
+		fts->log[i] = 0;
 }
 
 int spi_phyt_add_host(struct device *dev, struct phytium_spi *fts)
@@ -442,6 +493,7 @@ int spi_phyt_add_host(struct device *dev, struct phytium_spi *fts)
 	master->dev.of_node = dev->of_node;
 	master->dev.fwnode = dev->fwnode;
 	master->flags = SPI_CONTROLLER_GPIO_SS;
+	master->flags |= SPI_CONTROLLER_HALF_DUPLEX;
 
 	spi_master_set_devdata(master, fts);
 
@@ -452,6 +504,7 @@ int spi_phyt_add_host(struct device *dev, struct phytium_spi *fts)
 	fts->alive_enabled = false;
 
 	fts->watchdog = spi_watchdog;
+	fts->handle_debug_err = spi_handle_debug_err;
 
 	fts->timer.expires = jiffies + msecs_to_jiffies(50);
 	timer_setup(&fts->timer, spi_phyt_timer_handle, 0);
