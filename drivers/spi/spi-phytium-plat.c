@@ -126,8 +126,12 @@ static int phytium_spi_probe(struct platform_device *pdev)
 				goto out;
 			}
 
-			cs_gpio = desc_to_gpio(gpiod);
-			cs[i] = cs_gpio;
+			if (gpiod) {
+				cs_gpio = desc_to_gpio(gpiod);
+				cs[i] = cs_gpio;
+			} else {
+				cs[i] = -ENOENT;
+			}
 		}
 	}
 
