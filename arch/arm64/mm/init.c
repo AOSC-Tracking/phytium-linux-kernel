@@ -42,6 +42,9 @@
 #include <linux/sizes.h>
 #include <asm/tlb.h>
 #include <asm/alternative.h>
+#ifdef CONFIG_PSWIOTLB
+#include <linux/pswiotlb.h>
+#endif
 
 /*
  * We need to be able to catch inadvertent references to memstart_addr
@@ -583,6 +586,13 @@ void __init mem_init(void)
 		swiotlb_force = SWIOTLB_NO_FORCE;
 
 	set_max_mapnr(max_pfn - PHYS_PFN_OFFSET);
+
+#ifdef CONFIG_PSWIOTLB
+	/* enable pswiotlb default */
+	if ((pswiotlb_force_disable != true) &&
+		is_phytium_ps_socs())
+		pswiotlb_init(1, PSWIOTLB_VERBOSE);
+#endif
 
 #ifndef CONFIG_SPARSEMEM_VMEMMAP
 	free_unused_memmap();

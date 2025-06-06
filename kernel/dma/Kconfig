@@ -225,3 +225,5 @@ config DMA_API_DEBUG_SG
 	  is technically out-of-spec.
 
 	  If unsure, say N.
+
+source "kernel/dma/phytium/Kconfig"
