@@ -436,6 +436,8 @@ struct dev_links_info {
  * @dma_pools:	Dma pools (if dma'ble device).
  * @dma_mem:	Internal for coherent mem override.
  * @cma_area:	Contiguous memory area for dma allocations
+ * @dma_p_io_tlb_mem: Phytium Software IO TLB allocator.  Not for driver use.
+ * @dma_uses_p_io_tlb: %true if device has used the Phytium software IO TLB.
  * @archdata:	For arch-specific additions.
  * @of_node:	Associated device tree node.
  * @fwnode:	Associated device node supplied by platform firmware.
@@ -552,6 +554,7 @@ struct device {
 #ifdef CONFIG_NUMA
 	int		numa_node;	/* NUMA node this device is close to */
 #endif
+
 	dev_t			devt;	/* dev_t, creates the sysfs "dev" */
 	u32			id;	/* device instance */
 
@@ -578,6 +581,17 @@ struct device {
 #endif
 #ifdef CONFIG_DMA_OPS_BYPASS
 	bool			dma_ops_bypass : 1;
+#endif
+#ifdef CONFIG_PSWIOTLB
+	struct p_io_tlb_mem *dma_p_io_tlb_mem;
+	const struct dma_map_ops *orig_dma_ops;
+	struct {
+#ifdef CONFIG_NUMA
+			int local_node;
+#endif
+			bool dma_uses_p_io_tlb;
+			bool can_use_pswiotlb;
+		};
 #endif
 };
 
