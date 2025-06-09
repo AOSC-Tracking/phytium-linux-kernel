@@ -380,13 +380,14 @@ static int phytium_kcs_probe(struct platform_device *pdev)
 	if (rc)
 		return rc;
 
+	phytium_kcs_enable_channel(kcs_bmc, false);
+	phytium_kcs_irq_mask_update(kcs_bmc, (KCS_BMC_EVENT_TYPE_IBF | KCS_BMC_EVENT_TYPE_OBE), 0);
+
 	rc = phytium_kcs_config_irq(kcs_bmc, pdev);
 	if (rc)
 		return rc;
 
 	platform_set_drvdata(pdev, priv);
-
-	phytium_kcs_irq_mask_update(kcs_bmc, (KCS_BMC_EVENT_TYPE_IBF | KCS_BMC_EVENT_TYPE_OBE), 0);
 
 	phytium_kcs_enable_channel(kcs_bmc, true);
 
