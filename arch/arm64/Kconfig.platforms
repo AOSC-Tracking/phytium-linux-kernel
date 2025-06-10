@@ -142,6 +142,7 @@ config ARCH_MVEBU
 
 config ARCH_PHYTIUM
 	bool "Phytium SoC Family"
+	select ARCH_MIGHT_HAVE_PC_SERIO
 	help
 	  This enables support for Phytium ARMv8 SoC family.
 
