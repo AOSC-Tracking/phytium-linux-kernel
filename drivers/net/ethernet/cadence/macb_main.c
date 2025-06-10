@@ -640,7 +640,7 @@ static int macb_usx_pcs_config(struct phylink_pcs *pcs,
 	struct macb *bp = container_of(pcs, struct macb, phylink_usx_pcs);
 
 	gem_writel(bp, USX_CONTROL, gem_readl(bp, USX_CONTROL) |
-		   GEM_BIT(SIGNAL_OK));
+		   GEM_BIT(SIGNAL_OK) | GEM_BIT(TX_EN));
 
 	return 0;
 }
@@ -3250,9 +3250,6 @@ static void macb_init_hw(struct macb *bp)
 		if (bp->caps & MACB_CAPS_SEL_CLK)
 			bp->sel_clk_hw(bp, bp->speed);
 		phytium_mac_config(bp);
-		if (bp->link)
-			macb_usx_pcs_link_up(&bp->phylink_usx_pcs, 0,
-					     bp->phy_interface, bp->speed, bp->duplex);
 	} else {
 		bp->speed = SPEED_10;
 		bp->duplex = DUPLEX_HALF;
