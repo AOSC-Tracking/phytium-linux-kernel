@@ -17540,6 +17540,7 @@ F:	drivers/spi/spi-phytium-qspi.c
 F:	drivers/spi/spi-phytium-v2.c
 F:	drivers/tty/serial/phytium-uart-v2.c
 F:	drivers/tty/serial/phytium-uart.c
+F:	drivers/usb/gadget/*
 F:	drivers/usb/phytium/*
 F:	drivers/usb/phytium/phytium_usb_v2*
 F:	drivers/usb/typec/role-switch-phytium.c
