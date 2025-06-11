@@ -5,6 +5,7 @@
  * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
+#include "drm/drm_aperture.h"
 #include <linux/of_device.h>
 #include <linux/of_address.h>
 #include <linux/acpi.h>
@@ -265,6 +266,8 @@ static int phytium_platform_probe(struct platform_device *pdev)
 				phytium_display_drm_driver.name = "pe220x";
 		}
 	}
+
+	drm_aperture_remove_framebuffers(&phytium_display_drm_driver);
 
 	dev = drm_dev_alloc(&phytium_display_drm_driver, &pdev->dev);
 	if (IS_ERR(dev)) {
