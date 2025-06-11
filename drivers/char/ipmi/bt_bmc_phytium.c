@@ -427,6 +427,10 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 	if (!bt_bmc->irq)
 		return -ENODEV;
 
+	rc = regmap_update_bits(bt_bmc->map,  BT_CSR1,
+							BT_CSR1_IRQ_H2B | BT_CSR1_IRQ_HWRST,
+							0);
+
 	rc = devm_request_irq(dev, bt_bmc->irq, bt_bmc_irq, IRQF_SHARED,
 			      DEVICE_NAME, bt_bmc);
 	if (rc < 0) {
@@ -480,6 +484,10 @@ static int bt_bmc_probe(struct platform_device *pdev)
 		dev_err(dev, "Unable to register misc device\n");
 		return rc;
 	}
+
+	regmap_update_bits(bt_bmc->map,  LPC_HICR0, LPC_HICR0_LPC3E, 0);
+	regmap_update_bits(bt_bmc->map,  LPC_HICR4, LPC_BTENABLE, 0);
+	regmap_update_bits(bt_bmc->map,  LPC_HICR2, LPC_HICR2_IBFIF3, 0);
 
 	bt_bmc_config_irq(bt_bmc, pdev);
 
