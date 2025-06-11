@@ -5159,6 +5159,10 @@ static const struct pci_dev_acs_enabled {
 	{ PCI_VENDOR_ID_ZHAOXIN, PCI_ANY_ID, pci_quirk_zhaoxin_pcie_ports_acs },
 	/* Wangxun nics */
 	{ PCI_VENDOR_ID_WANGXUN, PCI_ANY_ID, pci_quirk_wangxun_nic_acs },
+	/* Phytium Technology */
+	{ 0x10b5, PCI_ANY_ID, pci_quirk_xgene_acs },
+	{ 0x17cd, PCI_ANY_ID, pci_quirk_xgene_acs },
+	{ 0x1db7, PCI_ANY_ID, pci_quirk_xgene_acs },
 	{ 0 }
 };
 
