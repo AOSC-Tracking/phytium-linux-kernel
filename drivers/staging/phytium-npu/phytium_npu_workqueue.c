@@ -9,11 +9,7 @@
 #include <linux/wait.h>
 #include "phytium_npu.h"
 #include "phytium_npu_uapi.h"
-#ifdef PHYTIUM_NPU_PLATFORM
-#include "phytium_npu_leopard_reg.h"
-#else
-#include "phytium_npu_reg.h"
-#endif
+#include "phytium_npu_pd2408_reg.h"
 
 static void wake(struct phytium_npu_dev *npu)
 {

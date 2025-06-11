@@ -12,8 +12,8 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
-#include "include/phytium_npu.h"
-#include "include/phytium_npu_uapi.h"
+#include "phytium_npu.h"
+#include "phytium_npu_uapi.h"
 
 static int phytium_npu_open(struct inode *inode, struct file *file)
 {

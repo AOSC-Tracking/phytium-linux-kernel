@@ -6,11 +6,7 @@
 #include "phytium_npu_mmu.h"
 #include "phytium_npu.h"
 #include <linux/kernel.h>
-#ifdef PHYTIUM_NPU_PLATFORM
-#include "phytium_npu_leopard_reg.h"
-#else
-#include "phytium_npu_reg.h"
-#endif
+#include "phytium_npu_pd2408_reg.h"
 
 int pg_size[6] = {4096, 16384, 65536, 262144, 1048576, 2097152};
 

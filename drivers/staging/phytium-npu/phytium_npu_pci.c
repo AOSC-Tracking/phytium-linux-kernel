@@ -11,7 +11,7 @@
 #include <linux/version.h>
 #include <linux/pci.h>
 #include "phytium_npu.h"
-#include "phytium_npu_reg.h"
+#include "phytium_npu_px210_reg.h"
 
 #define PHYTIUM_PCI_VENDOR_ID 0x1DB7
 #define PHYTIUM_PCI_DEVICE_ID 0xDC24

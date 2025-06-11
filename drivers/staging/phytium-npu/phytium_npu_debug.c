@@ -9,11 +9,7 @@
 #include "phytium_npu.h"
 #include "phytium_npu_mmu.h"
 #include "linux/phytium_npu_dma_buf_heap.h"
-#ifdef PHYTIUM_NPU_PLATFORM
-#include "phytium_npu_leopard_reg.h"
-#else
-#include "phytium_npu_reg.h"
-#endif
+#include "phytium_npu_pd2408_reg.h"
 
 #define DEBUG_BAND_COUNT_RESET	0x3fffffff
 #define DEBUG_BAND_EN	0x1

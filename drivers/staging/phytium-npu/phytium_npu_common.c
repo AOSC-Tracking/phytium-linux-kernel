@@ -18,11 +18,7 @@
 #include <acpi/acpi_bus.h>
 #include <linux/pm_runtime.h>
 #include <linux/workqueue.h>
-#ifdef PHYTIUM_NPU_PLATFORM
-#include "phytium_npu_leopard_reg.h"
-#else
-#include "phytium_npu_reg.h"
-#endif
+#include "phytium_npu_pd2408_reg.h"
 
 struct phytium_npu_dev *gnpu_dev;
 #define AP_CPPC2_STAT		0x0
