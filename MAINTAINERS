@@ -17490,6 +17490,7 @@ F:	drivers/bus/phytium_pio.c
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
+F:	drivers/char/tcm_usb_phytium.c
 F:	drivers/cpufreq/phytium_pstate.c
 F:	drivers/devfreq/phytium_dmu.c
 F:	drivers/devfreq/phytium_noc.c
