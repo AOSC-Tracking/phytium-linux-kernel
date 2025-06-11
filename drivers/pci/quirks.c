@@ -4803,6 +4803,10 @@ static const struct pci_dev_acs_enabled {
 	{ PCI_VENDOR_ID_BROADCOM, 0x16D7, pci_quirk_mf_endpoint_acs },
 	{ PCI_VENDOR_ID_BROADCOM, 0xD714, pci_quirk_brcm_acs },
 	{ PCI_VENDOR_ID_PHYTIUM,  0xDC01, pci_quirk_xgene_acs},
+	/* Phytium Technology */
+	{ 0x10b5, PCI_ANY_ID, pci_quirk_xgene_acs },
+	{ 0x17cd, PCI_ANY_ID, pci_quirk_xgene_acs },
+	{ 0x1db7, PCI_ANY_ID, pci_quirk_xgene_acs },
 	{ 0 }
 };
 
