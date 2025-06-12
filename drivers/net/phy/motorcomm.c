@@ -3001,6 +3001,9 @@ static int yt8821_init(struct phy_device *phydev)
 	return ret;
 }
 
+#define YT8821_CHIP_MODE_AUTO_BX2500_SGMII 	(1)
+#define YT8821_CHIP_MODE_FORCE_BX2500 	    (0)
+#define YT8821_CHIP_MODE_UTP_TO_FIBER_FORCE (0)
 static int yt8821_config_init(struct phy_device *phydev)
 {
 	int ret, val;
@@ -3008,29 +3011,29 @@ static int yt8821_config_init(struct phy_device *phydev)
 	phydev->irq = PHY_POLL;
 
 	val = ytphy_read_ext(phydev, 0xa001);
-	if (phydev->interface == PHY_INTERFACE_MODE_SGMII) {
-		val &= ~(BIT(0));
-		val &= ~(BIT(1));
-		val &= ~(BIT(2));
-		ret = ytphy_write_ext(phydev, 0xa001, val);
-		if (ret < 0)
-			return ret;
 
-		ret = ytphy_write_ext(phydev, 0xa000, 2);
-		if (ret < 0)
-			return ret;
+#if YT8821_CHIP_MODE_AUTO_BX2500_SGMII
+	val &= ~(BIT(0));
+	val &= ~(BIT(1));
+	val &= ~(BIT(2));
+	ret = ytphy_write_ext(phydev, 0xa001, val);
+	if (ret < 0)
+		return ret;
 
-		val = phy_read(phydev, MII_BMCR);
-		val |= BIT(YTXXXX_AUTO_NEGOTIATION_BIT);
-		phy_write(phydev, MII_BMCR, val);
+	ret = ytphy_write_ext(phydev, 0xa000, 2);
+	if (ret < 0)
+		return ret;
 
-		ret = ytphy_write_ext(phydev, 0xa000, 0x0);
-		if (ret < 0)
-			return ret;
-	}
-#if (KERNEL_VERSION(4, 10, 17) < LINUX_VERSION_CODE)
-	else if (phydev->interface == PHY_INTERFACE_MODE_2500BASEX) 
-	{
+	val = phy_read(phydev, MII_BMCR);
+	val |= BIT(YTXXXX_AUTO_NEGOTIATION_BIT);
+	phy_write(phydev, MII_BMCR, val);
+
+	ret = ytphy_write_ext(phydev, 0xa000, 0x0);
+	if (ret < 0)
+		return ret;
+
+#elif YT8821_CHIP_MODE_FORCE_BX2500
+	#if KERNEL_VERSION(4, 10, 17) < LINUX_VERSION_CODE
 		val |= BIT(0);
 		val &= ~(BIT(1));
 		val &= ~(BIT(2));
@@ -3063,17 +3066,17 @@ static int yt8821_config_init(struct phy_device *phydev)
 		ret = ytphy_write_ext(phydev, 0xa000, 0x0);
 		if (ret < 0)
 			return ret;
-	}
-#endif    
-	else 
-	{  
-		val |= BIT(0);
-		val &= ~(BIT(1));
-		val |= BIT(2);
-		ret = ytphy_write_ext(phydev, 0xa001, val);
-		if (ret < 0)
-			return ret;
-	}
+	#endif /* KERNEL_VERSION(4, 10, 17) < LINUX_VERSION_CODE */
+
+#elif YT8821_CHIP_MODE_UTP_TO_FIBER_FORCE
+	val |= BIT(0);
+	val &= ~(BIT(1));
+	val |= BIT(2);
+	ret = ytphy_write_ext(phydev, 0xa001, val);
+	if (ret < 0)
+		return ret;
+
+#endif /* Mode selection */
 
 	ret = yt8821_init(phydev);
 	if (ret < 0)
