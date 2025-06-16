@@ -21,7 +21,7 @@
 #include <linux/spi/spi-mem.h>
 #include <linux/mtd/spi-nor.h>
 
-#define DRIVER_VERSION	"1.0.2"
+#define DRIVER_VERSION	"1.0.3"
 
 #define PHYTIUM_CPU_PART_FTC862		0x862
 
@@ -267,28 +267,28 @@ static int phytium_qspi_flash_capacity_encode_new(u32 size,
 
 	switch (size) {
 	case SZ_4M:
-		*cap |= (0x0 >> (4 * i));
+		*cap |= (0x0 << (4 * i));
 		break;
 	case SZ_8M:
-		*cap |= (0x1 >> (4 * i));
+		*cap |= (0x1 << (4 * i));
 		break;
 	case SZ_16M:
-		*cap |= (0x2 >> (4 * i));
+		*cap |= (0x2 << (4 * i));
 		break;
 	case SZ_32M:
-		*cap |= (0x3 >> (4 * i));
+		*cap |= (0x3 << (4 * i));
 		break;
 	case SZ_64M:
-		*cap |= (0x4 >> (4 * i));
+		*cap |= (0x4 << (4 * i));
 		break;
 	case SZ_128M:
-		*cap |= (0x5 >> (4 * i));
+		*cap |= (0x5 << (4 * i));
 		break;
 	case SZ_256M:
-		*cap |= (0x6 >> (4 * i));
+		*cap |= (0x6 << (4 * i));
 		break;
 	case SZ_512M:
-		*cap |= (0x7 >> (4 * i));
+		*cap |= (0x7 << (4 * i));
 		break;
 	default:
 		ret = -EINVAL;
@@ -447,8 +447,8 @@ static int phytium_qspi_exec_op(struct spi_mem *mem,
 
 	if (op->dummy.nbytes) {
 		cmd |= QSPI_CMD_PORT_LATENCY_MASK;
-		cmd |= ((op->dummy.nbytes * 8) / op->dummy.buswidth) <<
-			QSPI_CMD_PORT_LATENCY_SHIFT;
+		cmd |= ((op->dummy.nbytes * 8 - 1) / op->dummy.buswidth) <<
+			QSPI_CMD_PORT_DUMMY_SHIFT;
 	}
 
 	if (op->data.nbytes) {
@@ -690,7 +690,7 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 	qspi = spi_controller_get_devdata(ctrl);
 	qspi->ctrl = ctrl;
 
-	reg_name_array = kcalloc(4, sizeof(*reg_name_array), GFP_KERNEL);
+	reg_name_array = devm_kcalloc(dev, 4, sizeof(*reg_name_array), GFP_KERNEL);
 	if (dev->of_node)
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "qspi");
 	else if (has_acpi_companion(dev)) {
@@ -773,7 +773,7 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 		goto probe_setup_failed;
 	}
 
-	if (!qspi->nodirmap) {
+	if (!qspi->nodirmap && qspi->fnum != 0) {
 		/*
 		 * The controller supports direct mapping access only if all
 		 * flashes are of same size.

@@ -642,6 +642,8 @@ struct phy_device {
 
 	u32 phy_id;
 
+	u32 force_mode;
+
 	struct phy_c45_device_ids c45_ids;
 	unsigned is_c45:1;
 	unsigned is_internal:1;

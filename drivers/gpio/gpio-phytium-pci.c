@@ -21,6 +21,8 @@ static const struct irq_chip phytium_gpio_irq_chip = {
 	.irq_print_chip		= phytium_gpio_irq_print_chip,
 	.irq_enable		= phytium_gpio_irq_enable,
 	.irq_disable		= phytium_gpio_irq_disable,
+	.irq_set_affinity	= phytium_gpio_irq_set_affinity,
+	.irq_set_wake		= phytium_gpio_irq_set_wake,
 	.flags			= IRQCHIP_IMMUTABLE,
 	GPIOCHIP_IRQ_RESOURCE_HELPERS,
 };
@@ -70,6 +72,9 @@ static int phytium_gpio_pci_probe(struct pci_dev *pdev, const struct pci_device_
 
 	/* irq_chip support */
 	raw_spin_lock_init(&gpio->lock);
+
+	writel(0, gpio->regs + GPIO_INTEN);
+	writel(0xffffffff, gpio->regs + GPIO_PORTA_EOI);
 
 	gpio->gc.base = -1;
 	gpio->gc.get_direction = phytium_gpio_get_direction;
@@ -139,7 +144,8 @@ static int phytium_gpio_pci_suspend(struct device *dev)
 	gpio->ctx.int_polarity = readl(gpio->regs + GPIO_INT_POLARITY);
 	gpio->ctx.debounce = readl(gpio->regs + GPIO_DEBOUNCE);
 
-	writel(0, gpio->regs + GPIO_INTEN);
+	writel(~gpio->ctx.wake_en, gpio->regs + GPIO_INTMASK);
+	writel(gpio->ctx.wake_en, gpio->regs + GPIO_INTEN);
 	raw_spin_unlock_irqrestore(&gpio->lock, flags);
 
 	return 0;
@@ -194,3 +200,4 @@ module_pci_driver(phytium_gpio_pci_driver);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium GPIO PCI Driver");
+MODULE_VERSION(PHYTIUM_GPIO_DRIVER_VERSION);

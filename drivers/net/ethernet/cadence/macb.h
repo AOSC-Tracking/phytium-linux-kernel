@@ -1337,10 +1337,11 @@ struct macb {
 	struct phylink_config	phylink_config;
 	struct phylink_pcs	phylink_usx_pcs;
 	struct phylink_pcs	phylink_sgmii_pcs;
-	int			link;
 	int			speed;
 	int			duplex;
 	int			use_ncsi;
+
+	int             	force_phy_mode;
 
 	u32			caps;
 	unsigned int		dma_burst_length;

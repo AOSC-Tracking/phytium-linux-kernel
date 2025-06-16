@@ -76,3 +76,15 @@ bool fixup_exception(struct pt_regs *regs)
 
 	BUG();
 }
+
+int fixup_exception_mc(struct pt_regs *regs)
+{
+	const struct exception_table_entry *fixup;
+
+	fixup = search_mc_exception_tables(instruction_pointer(regs));
+	if (!fixup)
+		return 0;
+
+	regs->pc = (unsigned long)&fixup->fixup + fixup->fixup;
+	return 1;
+}

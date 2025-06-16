@@ -6152,9 +6152,11 @@ S:	Maintained
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 F:	Documentation/driver-api/dma-buf.rst
 F:	drivers/dma-buf/
+F:	drivers/dma-buf/heaps/phytium_npu_heap.c
 F:	include/linux/*fence.h
 F:	include/linux/dma-buf.h
 F:	include/linux/dma-resv.h
+F:	include/linux/phytium_npu_dma_buf_heap.h
 K:	\bdma_(?:buf|fence|resv)\b
 
 DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
@@ -17437,6 +17439,7 @@ F:	Documentation/devicetree/bindings/gpu/phytium,dc.yaml
 F:	drivers/hwmon/tacho-phytium.c
 F:	Documentation/devicetree/bindings/hwlock/phytium,hwspinlock.yaml
 F:	Documentation/devicetree/bindings/hwmon/phytium,tacho.yaml
+F:	Documentation/devicetree/bindings/i2c/phytium,i2c-2.0.yaml
 F:	Documentation/devicetree/bindings/i2c/phytium,i2c.yaml
 F:	Documentation/devicetree/bindings/i3c/phytium,i3c-master.yaml
 F:	Documentation/devicetree/bindings/media/phytium,jpeg.yaml
@@ -17449,19 +17452,29 @@ F:	Documentation/devicetree/bindings/leds/phytnet_led.yaml
 F:	Documentation/devicetree/bindings/mailbox/phytium,mbox.yaml
 F:	Documentation/devicetree/bindings/misc/phytium,snoop-ctrl.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,mci.yaml
+F:	Documentation/devicetree/bindings/mmc/phytium,mci_v2.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
+F:	Documentation/devicetree/bindings/mtd/phytium,localbus.yaml
 F:	Documentation/devicetree/bindings/mtd/phytium,nfc.yaml
 F:	Documentation/devicetree/bindings/net/can/phytium,can.yaml
 F:	Documentation/devicetree/bindings/net/phytmac.yaml
 F:	Documentation/devicetree/bindings/pci/phytium,pd2008-pcie-ep.yaml
 F:	Documentation/devicetree/bindings/pwm/phytium,pwm.yaml
+F:	Documentation/devicetree/bindings/reset/phytium,reset.yaml
 F:	Documentation/devicetree/bindings/rng/phytium,rng.yaml
+F:	Documentation/devicetree/bindings/serial/phytium,uart-2.0.yaml
+F:	Documentation/devicetree/bindings/sound/phytium,codec-2.0.yaml
 F:	Documentation/devicetree/bindings/sound/phytium,hda.yaml
+F:	Documentation/devicetree/bindings/sound/phytium,i2s-2.0.yaml
 F:	Documentation/devicetree/bindings/sound/phytium,i2s.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,qspi-nor.yaml
+F:	Documentation/devicetree/bindings/spi/phytium,spi-v2.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
+F:	Documentation/devicetree/bindings/usb/phytium,usb2-2.0.yaml
 F:	Documentation/devicetree/bindings/usb/phytium,usb2.yaml
+F:	Documentation/devicetree/bindings/usb/phytium.role-sw.yaml
 F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
+F:	Documentation/devicetree/bindings/staging/phytium-npu.yaml
 F:	arch/arm64/boot/dts/phytium/*
 F:	arch/arm64/include/asm/ras.h
 F:	arch/arm64/kernel/ras.c
@@ -17479,6 +17492,7 @@ F:	drivers/gpio/gpio-phytium-sgpio.c
 F:	drivers/gpu/drm/phytium/*
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
+F:	drivers/i2c/busses/phytium_i2c_v2/i2c-phyt-*
 F:	drivers/i3c/master/i3c-master-acpi.c
 F:	drivers/i3c/master/i3c-master-acpi.h
 F:	drivers/i3c/master/i3c-master-phytium.c
@@ -17492,7 +17506,10 @@ F:	drivers/mfd/phytium_px210_i2s_lsd.c
 F:	drivers/mfd/phytium_px210_i2s_mmd.c
 F:	drivers/misc/phytium-snoop-ctrl.c
 F:	drivers/mmc/host/phytium-mci*
+F:	drivers/mmc/host/phytium-mci-plat-v2.c
+F:	drivers/mmc/host/phytium-mci-v2*
 F:	drivers/mmc/host/phytium-sdci.*
+F:	drivers/mtd/maps/phytium_lbc.c
 F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/mtd/parsers/acpipart_core.c
 F:	drivers/net/can/phytium/*
@@ -17502,16 +17519,37 @@ F:	drivers/net/ethernet/phytium/*
 F:	drivers/net/ethernet/stmicro/stmmac/dwmac-phytium.c
 F:	drivers/pci/controller/pcie-phytium*
 F:	drivers/perf/phytium/*
+F:	drivers/perf/phytium/phytium_dmu_pmu_pd2408.c
 F:	drivers/perf/phytium/phytium_pcie_pmu.c
 F:	drivers/pwm/pwm-phytium.c
+F:	drivers/reset/reset-phytium.c
 F:	drivers/spi/spi-phytium*
+F:	drivers/spi/spi-phytium-common.c
 F:	drivers/spi/spi-phytium-dma.c
+F:	drivers/spi/spi-phytium-plat-v2.c
 F:	drivers/spi/spi-phytium-qspi.c
+F:	drivers/spi/spi-phytium-v2.c
+F:	drivers/tty/serial/phytium-uart-v2.c
 F:	drivers/tty/serial/phytium-uart.c
 F:	drivers/usb/phytium/*
+F:	drivers/usb/phytium/phytium_usb_v2*
+F:	drivers/usb/typec/role-switch-phytium.c
 F:	drivers/w1/masters/phytium_w1.c
+F:	drivers/staging/phytium-npu/*
 F:	sound/pci/hda/hda_phytium.*
+F:	sound/soc/codecs/phytium-codec-v2.*
 F:	sound/soc/phytium/*
+F:	include/linux/pswiotlb.h
+F:	include/trace/events/pswiotlb.h
+F:	kernel/dma/Kconfig
+F:	kernel/dma/Makefile
+F:	kernel/dma/phytium/Kconfig
+F:	kernel/dma/phytium/Makefile
+F:	kernel/dma/phytium/pswiotlb-direct.c
+F:	kernel/dma/phytium/pswiotlb-dma.h
+F:	kernel/dma/phytium/pswiotlb-iommu.c
+F:	kernel/dma/phytium/pswiotlb-mapping.c
+F:	kernel/dma/phytium/pswiotlb.c
 
 QAT DRIVER
 M:	Giovanni Cabiddu <giovanni.cabiddu@intel.com>

@@ -32,6 +32,8 @@
 #include <linux/percpu.h>
 #include <asm/module.h>
 
+#include <linux/kabi.h>
+
 #define MODULE_NAME_LEN MAX_PARAM_PREFIX_LEN
 
 struct modversion_info {
@@ -457,6 +459,11 @@ struct module {
 	/* Startup function. */
 	int (*init)(void);
 
+#ifdef CONFIG_ARCH_HAS_MC_EXTABLE
+	/* there is 8-byte hole on all platforms */
+	KABI_FILL_HOLE(unsigned int num_mc_exentries)
+#endif
+
 	struct module_memory mem[MOD_MEM_NUM_TYPES] __module_memory_align;
 
 	/* Arch-specific module values */
@@ -579,6 +586,9 @@ struct module {
 #ifdef CONFIG_FUNCTION_ERROR_INJECTION
 	struct error_injection_entry *ei_funcs;
 	unsigned int num_ei_funcs;
+#endif
+#ifdef CONFIG_ARCH_HAS_MC_EXTABLE
+	KABI_USE(1, struct exception_table_entry *mc_extable)
 #endif
 #ifdef CONFIG_DYNAMIC_DEBUG_CORE
 	struct _ddebug_info dyndbg_info;

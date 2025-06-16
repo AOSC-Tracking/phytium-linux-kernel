@@ -2,6 +2,9 @@
 /*
  * Phytium GMAC PCI wrapper.
  *
+ * Copyright(c) 2022 - 2025 Phytium Technology Co., Ltd.
+ *
+ * Author: Wenting Song <songwenting@phytium.com>
  */
 
 #include <linux/pci.h>
@@ -21,7 +24,6 @@
 struct phytmac_data {
 	struct phytmac_hw_if	*hw_if;
 	u32			caps;
-	u32			tsu_rate;
 	u16			queue_num;
 	int			speed;
 	bool			duplex;
@@ -72,7 +74,7 @@ static int phytmac_pci_probe(struct pci_dev *pdev, const struct pci_device_id *i
 
 	/* Obtain the mmio areas for the device */
 	bar_mask = pci_select_bars(pdev, IORESOURCE_MEM);
-	ret = pcim_iomap_regions(pdev, bar_mask, PHYTMAC_DRV_NAME);
+	ret = pcim_iomap_regions(pdev, bar_mask, PHYTMAC_PCI_DRV_NAME);
 	if (ret) {
 		dev_err(dev, "pcim_iomap_regions failed\n");
 		goto err_pci_enable;
@@ -303,7 +305,7 @@ static const struct dev_pm_ops phytmac_pci_pm_ops = {
 };
 
 static struct pci_driver phytmac_driver = {
-	.name = PHYTMAC_DRV_NAME,
+	.name = PHYTMAC_PCI_DRV_NAME,
 	.id_table = phytmac_pci_table,
 	.probe = phytmac_pci_probe,
 	.remove = phytmac_pci_remove,

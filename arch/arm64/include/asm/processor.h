@@ -91,6 +91,8 @@
 #define STACK_TOP		STACK_TOP_MAX
 #endif /* CONFIG_COMPAT */
 
+extern int sysctl_machine_check_safe;
+
 #ifndef CONFIG_ARM64_FORCE_52BIT
 #define arch_get_mmap_end(addr, len, flags) \
 		(((addr) > DEFAULT_MAP_WINDOW) ? TASK_SIZE : DEFAULT_MAP_WINDOW)

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
+/* Copyright(c) 2022 - 2025 Phytium Technology Co., Ltd. */
 
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -14,6 +15,7 @@
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
 #include <linux/ptp_clock_kernel.h>
+#include <linux/acpi.h>
 #include "phytmac.h"
 #include "phytmac_v1.h"
 
@@ -211,6 +213,11 @@ static int phytmac_mac_linkup(struct phytmac *pdata, phy_interface_t interface,
 	else
 		PHYTMAC_WRITE(pdata, PHYTMAC_HCONFIG, PHYTMAC_SPEED_100M);
 
+	if (interface == PHY_INTERFACE_MODE_SGMII) {
+		if (speed == SPEED_2500)
+			phytmac_enable_autoneg(pdata, 0);
+	}
+
 	return 0;
 }
 
@@ -289,7 +296,6 @@ static int phytmac_set_mac_addr(struct phytmac *pdata, const u8 *addr)
 
 static void phytmac_reset_hw(struct phytmac *pdata)
 {
-	struct phytmac_queue *queue;
 	unsigned int q;
 	u32 ctrl;
 
@@ -300,7 +306,7 @@ static void phytmac_reset_hw(struct phytmac *pdata)
 	PHYTMAC_WRITE(pdata, PHYTMAC_NCTRL, ctrl);
 
 	/* Disable and clear all interrupts and disable queues */
-	for (q = 0, queue = pdata->queues; q < pdata->queues_max_num; ++q, ++queue) {
+	for (q = 0; q < pdata->queues_max_num; ++q) {
 		if (q == 0) {
 			PHYTMAC_WRITE(pdata, PHYTMAC_ID, -1);
 			PHYTMAC_WRITE(pdata, PHYTMAC_IS, -1);
@@ -317,7 +323,10 @@ static void phytmac_reset_hw(struct phytmac *pdata)
 		PHYTMAC_WRITE(pdata, PHYTMAC_RXPTRH(q), 0);
 
 		if (pdata->capacities & PHYTMAC_CAPS_TAILPTR)
-			PHYTMAC_WRITE(pdata, PHYTMAC_TAILPTR(q), 0);
+			PHYTMAC_WRITE(pdata, PHYTMAC_TX_TAILPTR(q), 0);
+
+		if (pdata->capacities & PHYTMAC_CAPS_RXPTR)
+			PHYTMAC_WRITE(pdata, PHYTMAC_RX_TAILPTR(q), 0);
 	}
 }
 
@@ -352,6 +361,7 @@ static int phytmac_init_hw(struct phytmac *pdata)
 	u32 config = PHYTMAC_READ(pdata, PHYTMAC_NCONFIG);
 	u32 dmaconfig;
 	u32 nctrlconfig;
+	u32 ptrconfig = 0;
 
 	nctrlconfig = PHYTMAC_READ(pdata, PHYTMAC_NCTRL);
 	nctrlconfig |= PHYTMAC_BIT(MPE);
@@ -414,7 +424,14 @@ static int phytmac_init_hw(struct phytmac *pdata)
 	PHYTMAC_WRITE(pdata, PHYTMAC_DCONFIG, dmaconfig);
 
 	if (pdata->capacities & PHYTMAC_CAPS_TAILPTR)
-		PHYTMAC_WRITE(pdata, PHYTMAC_TAIL_ENABLE, PHYTMAC_BIT(TXTAIL_ENABLE));
+		ptrconfig |= PHYTMAC_BIT(TXPTR_EN);
+	if (pdata->capacities & PHYTMAC_CAPS_RXPTR)
+		ptrconfig |= PHYTMAC_BIT(RXPTR_EN);
+
+	PHYTMAC_WRITE(pdata, PHYTMAC_TAIL_ENABLE, ptrconfig);
+
+	if (pdata->capacities & PHYTMAC_CAPS_START)
+		PHYTMAC_WRITE(pdata, PHYTMAC_TXSTARTSEL, PHYTMAC_BIT(TSTARTSEL_ENABLE));
 
 	if (phy_interface_mode_is_8023z(pdata->phy_interface))
 		phytmac_pcs_software_reset(pdata, 1);
@@ -426,8 +443,46 @@ static int phytmac_powerup_hw(struct phytmac *pdata, int on)
 {
 	u32 status, data0, data1, rdata1;
 	int ret;
+	acpi_handle handle;
+	union acpi_object args[3];
+	struct acpi_object_list arg_list = {
+		.pointer = args,
+		.count = ARRAY_SIZE(args),
+	};
+	acpi_status acpi_sts;
+	unsigned long long rv;
 
-	if (pdata->capacities & PHYTMAC_CAPS_LPI) {
+	if (!(pdata->capacities & PHYTMAC_CAPS_PWCTRL)) {
+		pdata->power_state = on;
+		return 0;
+	}
+
+	if (has_acpi_companion(pdata->dev)) {
+		handle = ACPI_HANDLE(pdata->dev);
+
+		netdev_info(pdata->ndev, "set gmac power %s\n",
+			    on == PHYTMAC_POWERON ? "on" : "off");
+		args[0].type = ACPI_TYPE_INTEGER;
+		args[0].integer.value = PHYTMAC_PWCTL_GMAC_ID;
+		args[1].type = ACPI_TYPE_INTEGER;
+		args[1].integer.value = PHYTMAC_PWCTL_DEFAULT_VAL;
+		args[2].type = ACPI_TYPE_INTEGER;
+		args[2].integer.value = PHYTMAC_PWCTL_DEFAULT_VAL;
+
+		if (on == PHYTMAC_POWERON) {
+			acpi_sts = acpi_evaluate_integer(handle, "PPWO", &arg_list, &rv);
+			if (ACPI_FAILURE(acpi_sts))
+				netdev_err(pdata->ndev, "NO PPWO Method\n");
+			if (rv)
+				netdev_err(pdata->ndev, "Failed to power on\n");
+		} else {
+			acpi_sts = acpi_evaluate_integer(handle, "PPWD", &arg_list, &rv);
+			if (ACPI_FAILURE(acpi_sts))
+				netdev_err(pdata->ndev, "NO PPWD Method\n");
+			if (rv)
+				netdev_err(pdata->ndev, "Failed to power off\n");
+		}
+	} else {
 		ret = readx_poll_timeout(PHYTMAC_READ_STAT, pdata, status, !status,
 					 1, PHYTMAC_TIMEOUT);
 		if (ret)
@@ -460,16 +515,17 @@ static int phytmac_powerup_hw(struct phytmac *pdata, int on)
 					 data0 & PHYTMAC_BIT(DATA0_FREE),
 					 1, PHYTMAC_TIMEOUT);
 		if (ret)
-			netdev_err(pdata->ndev, "mnh data0 is busy");
+			netdev_err(pdata->ndev, "mnh data0 is busy\n");
 
 		rdata1 = PHYTMAC_MHU_READ(pdata, PHYTMAC_MHU_CPP_DATA1);
 		if (rdata1 == data1)
 			netdev_err(pdata->ndev, "gmac power %s success, data1 = %x, rdata1=%x\n",
-				   on ? "up" : "down", data1, rdata1);
+				   on == PHYTMAC_POWERON ? "up" : "down", data1, rdata1);
 		else
 			netdev_err(pdata->ndev, "gmac power %s failed, data1 = %x, rdata1=%x\n",
-				   on ? "up" : "down", data1, rdata1);
+				   on == PHYTMAC_POWERON ? "up" : "down", data1, rdata1);
 	}
+
 	pdata->power_state = on;
 
 	return 0;
@@ -502,16 +558,18 @@ static int phytmac_set_wake(struct phytmac *pdata, int wake)
 	return 0;
 }
 
-static void phytmac_mdio_idle(struct phytmac *pdata)
+static int phytmac_mdio_idle(struct phytmac *pdata)
 {
 	u32 val;
+	int ret;
 
 	/* wait for end of transfer */
-	val = PHYTMAC_READ(pdata, PHYTMAC_NSTATUS);
-	while (!(val & PHYTMAC_BIT(MDIO_IDLE))) {
-		cpu_relax();
-		val = PHYTMAC_READ(pdata, PHYTMAC_NSTATUS);
-	}
+	ret = readx_poll_timeout(PHYTMAC_READ_NSTATUS, pdata, val, val & PHYTMAC_BIT(MDIO_IDLE),
+				 1, PHYTMAC_MDIO_TIMEOUT);
+	if (ret)
+		netdev_err(pdata->ndev, "mdio wait for idle time out!");
+
+	return ret;
 }
 
 static int phytmac_mdio_data_read_c22(struct phytmac *pdata, int mii_id, int regnum)
@@ -625,6 +683,9 @@ static int phytmac_get_feature_all(struct phytmac *pdata)
 
 	/* max rx fs */
 	pdata->max_rx_fs = PHYTMAC_READ_BITS(pdata, PHYTMAC_DEFAULT3, SCR2CMP);
+
+	if (pdata->version == VERSION_V3)
+		pdata->capacities |= PHYTMAC_CAPS_RXPTR;
 
 	if (netif_msg_hw(pdata))
 		netdev_info(pdata->ndev, "get feature queue_num=%d, daw=%d, dbw=%d, rx_fs=%d, rx_bd=%d, tx_bd=%d\n",
@@ -756,7 +817,7 @@ static int phytmac_init_ring_hw(struct phytmac *pdata)
 		PHYTMAC_WRITE(pdata, PHYTMAC_RXPTRH(q), upper_32_bits(queue->rx_ring_addr));
 
 		if (pdata->capacities & PHYTMAC_CAPS_TAILPTR)
-			PHYTMAC_WRITE(pdata, PHYTMAC_TAILPTR(q), queue->tx_tail);
+			PHYTMAC_WRITE(pdata, PHYTMAC_TX_TAILPTR(q), queue->tx_tail);
 	}
 
 	return 0;
@@ -928,7 +989,8 @@ static unsigned int phytmac_rx_map_desc(struct phytmac_queue *queue,
 		desc->desc1 = 0;
 		desc->desc2 = upper_32_bits(addr);
 		/* Make newly descriptor to hardware */
-		dma_wmb();
+		if (!(pdata->capacities & PHYTMAC_CAPS_RXPTR))
+			dma_wmb();
 		desc->desc0 = lower_32_bits(addr);
 	} else {
 		desc->desc1 = 0;
@@ -943,7 +1005,16 @@ static unsigned int phytmac_rx_map_desc(struct phytmac_queue *queue,
 static unsigned int phytmac_zero_rx_desc_addr(struct phytmac_dma_desc *desc)
 {
 	desc->desc2 = 0;
-	desc->desc0 = PHYTMAC_BIT(RX_USED);
+	desc->desc0 = (desc->desc0 & PHYTMAC_BIT(RX_TS_VALID)) | PHYTMAC_BIT(RX_USED);
+
+	return 0;
+}
+
+static unsigned int phytmac_zero_tx_desc(struct phytmac_dma_desc *desc)
+{
+	desc->desc2 = 0;
+	desc->desc0 = 0;
+	desc->desc1 &= ~PHYTMAC_BIT(TX_USED);
 
 	return 0;
 }
@@ -953,27 +1024,19 @@ static void phytmac_tx_start(struct phytmac_queue *queue)
 	struct phytmac *pdata = queue->pdata;
 
 	if (pdata->capacities & PHYTMAC_CAPS_TAILPTR)
-		PHYTMAC_WRITE(pdata, PHYTMAC_TAILPTR(queue->index),
+		PHYTMAC_WRITE(pdata, PHYTMAC_TX_TAILPTR(queue->index),
 			      PHYTMAC_BIT(TXTAIL_UPDATE) | queue->tx_tail);
 
-	if (pdata->capacities & PHYTMAC_CAPS_START)
-		PHYTMAC_WRITE(pdata, PHYTMAC_NCTRL,
-			      PHYTMAC_READ(pdata, PHYTMAC_NCTRL) | PHYTMAC_BIT(TSTART));
+	if (likely(pdata->capacities & PHYTMAC_CAPS_START))
+		PHYTMAC_WRITE(pdata, PHYTMAC_TXSTART, PHYTMAC_BIT(TSTART));
 }
 
-static void phytmac_restart(struct phytmac *pdata)
+static void phytmac_update_rx_tail(struct phytmac_queue *queue)
 {
-	int q;
-	struct phytmac_queue *queue;
+	struct phytmac *pdata = queue->pdata;
 
-	for (q = 0; q < pdata->queues_num; q++) {
-		queue = &pdata->queues[q];
-		if (queue->tx_head != queue->tx_tail) {
-			PHYTMAC_WRITE(pdata, PHYTMAC_NCTRL,
-				      PHYTMAC_READ(pdata, PHYTMAC_NCTRL) | PHYTMAC_BIT(TSTART));
-			break;
-		}
-	}
+	if (pdata->capacities & PHYTMAC_CAPS_RXPTR)
+		PHYTMAC_WRITE(pdata, PHYTMAC_RX_TAILPTR(queue->index), queue->rx_head);
 }
 
 static int phytmac_tx_complete(const struct phytmac_dma_desc *desc)
@@ -1116,7 +1179,7 @@ static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mod
 
 	/* Disable AN for SGMII fixed link or speed equal to 2.5G, enable otherwise.*/
 	if (state->interface == PHY_INTERFACE_MODE_SGMII) {
-		if (state->speed == SPEED_2500 || mode == MLO_AN_FIXED)
+		if (mode == MLO_AN_FIXED)
 			phytmac_enable_autoneg(pdata, 0);
 		else
 			phytmac_enable_autoneg(pdata, 1);
@@ -1158,20 +1221,20 @@ static void phytmac_clear_tx_desc(struct phytmac_queue *queue)
 	desc->desc1 |= PHYTMAC_BIT(TX_WRAP);
 
 	if (pdata->capacities & PHYTMAC_CAPS_TAILPTR)
-		PHYTMAC_WRITE(pdata, PHYTMAC_TAILPTR(queue->index), queue->tx_tail);
+		PHYTMAC_WRITE(pdata, PHYTMAC_TX_TAILPTR(queue->index), queue->tx_tail);
 }
 
 static void phytmac_get_hw_stats(struct phytmac *pdata)
 {
-	u32 stats[45];
+	u32 stats[PHYTMAC_STATIS_REG_NUM];
 	int i, j;
 	u64 val;
 	u64 *p = &pdata->stats.tx_octets;
 
-	for (i = 0 ; i < 45; i++)
+	for (i = 0 ; i < PHYTMAC_STATIS_REG_NUM; i++)
 		stats[i] = PHYTMAC_READ(pdata, PHYTMAC_OCTTX + i * 4);
 
-	for (i = 0, j = 0; i < 45; i++) {
+	for (i = 0, j = 0; i < PHYTMAC_STATIS_REG_NUM; i++) {
 		if (i == 0 || i == 20) {
 			val = (u64)stats[i + 1] << 32 | stats[i];
 			*p += val;
@@ -1355,6 +1418,7 @@ struct phytmac_hw_if phytmac_1p0_hw = {
 	.get_stats = phytmac_get_hw_stats,
 	.set_mac_address = phytmac_set_mac_addr,
 	.get_mac_address = phytmac_get_mac_addr,
+	.mdio_idle = phytmac_mdio_idle,
 	.mdio_read = phytmac_mdio_data_read_c22,
 	.mdio_write = phytmac_mdio_data_write_c22,
 	.mdio_read_c45 = phytmac_mdio_data_read_c45,
@@ -1388,7 +1452,7 @@ struct phytmac_hw_if phytmac_1p0_hw = {
 	/* tx and rx */
 	.tx_map = phytmac_tx_map_desc,
 	.transmit = phytmac_tx_start,
-	.restart = phytmac_restart,
+	.update_rx_tail = phytmac_update_rx_tail,
 	.tx_complete = phytmac_tx_complete,
 	.rx_complete = phytmac_rx_complete,
 	.get_rx_pkt_len = phytmac_rx_pkt_len,
@@ -1401,6 +1465,7 @@ struct phytmac_hw_if phytmac_1p0_hw = {
 	.clear_rx_desc = phytmac_clear_rx_desc,
 	.clear_tx_desc = phytmac_clear_tx_desc,
 	.zero_rx_desc_addr = phytmac_zero_rx_desc_addr,
+	.zero_tx_desc = phytmac_zero_tx_desc,
 	/* ptp */
 	.init_ts_hw = phytmac_ptp_init_hw,
 	.set_time = phytmac_set_time,

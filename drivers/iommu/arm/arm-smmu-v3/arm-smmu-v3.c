@@ -4120,7 +4120,7 @@ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
 
 #ifdef CONFIG_PM_SLEEP
 static const struct dev_pm_ops arm_smmu_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(arm_smmu_suspend,
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(arm_smmu_suspend,
 	arm_smmu_resume)
 };
 #define ARM_SMMU_PM_OPS                (&arm_smmu_pm_ops)

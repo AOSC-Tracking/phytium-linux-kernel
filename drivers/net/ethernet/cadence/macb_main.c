@@ -640,7 +640,7 @@ static int macb_usx_pcs_config(struct phylink_pcs *pcs,
 	struct macb *bp = container_of(pcs, struct macb, phylink_usx_pcs);
 
 	gem_writel(bp, USX_CONTROL, gem_readl(bp, USX_CONTROL) |
-		   GEM_BIT(SIGNAL_OK));
+		   GEM_BIT(SIGNAL_OK) | GEM_BIT(TX_EN));
 
 	return 0;
 }
@@ -1103,6 +1103,7 @@ static int macb_phylink_connect(struct macb *bp)
 			netdev_err(dev, "no PHY found\n");
 			return -ENXIO;
 		}
+		phydev->force_mode = bp->force_phy_mode;
 
 		/* attach the mac to the phy */
 		if (phylink_expects_phy(bp->phylink))
@@ -2018,7 +2019,8 @@ static void macb_tx_restart(struct macb_queue *queue)
 	if (queue->tx_head == queue->tx_tail)
 		goto out_tx_ptr_unlock;
 
-	tbqp = queue_readl(queue, TBQP) / macb_dma_desc_get_size(bp);
+	tbqp = queue_readl(queue, TBQP) - lower_32_bits(queue->tx_ring_dma);
+	tbqp = tbqp / macb_dma_desc_get_size(bp);
 	tbqp = macb_adj_dma_desc_idx(bp, macb_tx_ring_wrap(bp, tbqp));
 	head_idx = macb_adj_dma_desc_idx(bp, macb_tx_ring_wrap(bp, queue->tx_head));
 
@@ -3248,9 +3250,6 @@ static void macb_init_hw(struct macb *bp)
 		if (bp->caps & MACB_CAPS_SEL_CLK)
 			bp->sel_clk_hw(bp, bp->speed);
 		phytium_mac_config(bp);
-		if (bp->link)
-			macb_usx_pcs_link_up(&bp->phylink_usx_pcs, 0,
-					     bp->phy_interface, bp->speed, bp->duplex);
 	} else {
 		bp->speed = SPEED_10;
 		bp->duplex = DUPLEX_HALF;
@@ -5799,6 +5798,10 @@ static int macb_probe(struct platform_device *pdev)
 	if (err)
 		goto err_out_free_netdev;
 
+	if (device_property_read_bool(&pdev->dev, "force-phy-mode")) {
+		bp->force_phy_mode = 1;
+	}
+
 	err = macb_mii_init(bp);
 	if (err)
 		goto err_out_phy_exit;
@@ -5837,8 +5840,10 @@ static int macb_probe(struct platform_device *pdev)
 	return 0;
 
 err_out_unregister_mdio:
-	mdiobus_unregister(bp->mii_bus);
-	mdiobus_free(bp->mii_bus);
+	if (bp->mii_bus) {
+		mdiobus_unregister(bp->mii_bus);
+		mdiobus_free(bp->mii_bus);
+	}
 
 err_out_phy_exit:
 	phy_exit(bp->sgmii_phy);
@@ -5866,8 +5871,11 @@ static int macb_remove(struct platform_device *pdev)
 		bp = netdev_priv(dev);
 		unregister_netdev(dev);
 		phy_exit(bp->sgmii_phy);
-		mdiobus_unregister(bp->mii_bus);
-		mdiobus_free(bp->mii_bus);
+
+		if (bp->mii_bus) {
+			mdiobus_unregister(bp->mii_bus);
+			mdiobus_free(bp->mii_bus);
+		}
 
 		tasklet_kill(&bp->hresp_err_tasklet);
 		pm_runtime_disable(&pdev->dev);

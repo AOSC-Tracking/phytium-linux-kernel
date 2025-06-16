@@ -1,11 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
+/* Copyright(c) 2022 - 2025 Phytium Technology Co., Ltd. */
+
 #ifndef _PHYTMAC_V2_H
 #define _PHYTMAC_V2_H
 
 extern struct phytmac_hw_if phytmac_2p0_hw;
 
+#define PHYTMAC_CMD_PRC_SUCCESS	0x1
 #define PHYTMAC_MSG_SRAM_SIZE	4096
-#define MSG_HDR_LEN		8
+#define PHYTMAC_MSG_HDR_LEN				8
+#define PHYTMAC_MSG_PARA_LEN			56
+#define PHYTMAC_READ_REG_NUM_MAX		(PHYTMAC_MSG_PARA_LEN / sizeof(u32))
 
 #define PHYTMAC_TX_MSG_HEAD				0x000
 #define PHYTMAC_TX_MSG_TAIL				0x004
@@ -13,6 +18,7 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 #define PHYTMAC_RX_MSG_TAIL				0x00c
 #define PHYTMAC_MSG_IMR					0x020
 #define PHYTMAC_MSG_ISR					0x02c
+#define PHYTMAC_TAILPTR_ENABLE				0x038
 
 #define PHYTMAC_SIZE					0x0048
 #define PHYTMAC_NETWORK_STATUS				0x0240
@@ -25,7 +31,8 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 #define PHYTMAC_TIMER_SEC				0x0258
 #define PHYTMAC_TIMER_NSEC				0x025c
 #define PHYTMAC_TIMER_ADJUST				0x0260
-#define PHYTMAC_MSG(i)					(((i) - 1) * 0x48)
+#define PHYTMAC_MSG(i)					((i) * sizeof(struct phytmac_msg_info))
+#define PHYTMAC_OCT_TX					0x400
 
 #define PHYTMAC_MODULE_ID_GMAC				0x60
 #define PHYTMAC_FLAGS_MSG_COMP				0x1
@@ -38,6 +45,12 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 /* Bitfields in PHYTMAC_MSG_ISR */
 #define PHYTMAC_MSG_COMPLETE_INDEX			0
 #define PHYTMAC_MSG_COMPLETE_WIDTH			1
+
+/* Bitfields in PHYTMAC_TAILPTR_ENABLE */
+#define PHYTMAC_TXTAIL_EN_INDEX		0	/* Enable tx tail */
+#define PHYTMAC_TXTAIL_EN_WIDTH		1
+#define PHYTMAC_RXTAIL_EN_INDEX		16	/* Enable rx tail */
+#define PHYTMAC_RXTAIL_EN_WIDTH		1
 
 /* Bitfields in PHYTMAC_SIZE */
 #define PHYTMAC_MEM_SIZE_INDEX				0
@@ -83,7 +96,8 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 #define TIMER_SEC_MAX_VAL (((u64)1 << PHYTMAC_TIMER_SEC_WIDTH) - 1)
 #define TIMER_NSEC_MAX_VAL ((1 << PHYTMAC_TIMER_NSEC_WIDTH) - 1)
 
-#define PHYTMAC_TAIL_PTR(i)				(0x0100 + ((i) * 4))
+#define PHYTMAC_TX_PTR(i)				(0x0100 + ((i) * 4))
+#define PHYTMAC_RX_PTR(i)				(0x0030 + ((i) * 4))
 #define PHYTMAC_INT_ER(i)				(0x0140 + ((i) * 4))
 #define PHYTMAC_INT_DR(i)				(0x0180 + ((i) * 4))
 #define PHYTMAC_INT_MR(i)				(0x01c0 + ((i) * 4))
@@ -200,14 +214,41 @@ extern struct phytmac_hw_if phytmac_2p0_hw;
 #define PHYTMAC_TS_SEC_MASK			0x3f
 #define PHYTMAC_TS_SEC_TOP			0x40
 
+/* WOL register */
+#define PHYTMAC_ARP_IP_INDEX		0
+#define PHYTMAC_ARP_IP_WIDTH		16
+#define PHYTMAC_MAGIC_INDEX			16
+#define PHYTMAC_MAGIC_WIDTH			1
+#define PHYTMAC_ARP_INDEX			17
+#define PHYTMAC_ARP_WIDTH			1
+#define PHYTMAC_UCAST_INDEX			18
+#define PHYTMAC_UCAST_WIDTH			1
+#define PHYTMAC_MCAST_INDEX			19
+#define PHYTMAC_MCAST_WIDTH			1
+
 #define HW_DMA_CAP_64B		0x1
 #define HW_DMA_CAP_CSUM		0x2
 #define HW_DMA_CAP_PTP		0x4
-#define HW_DMA_CAP_DDW64	0x8
-#define HW_DMA_CAP_DDW128	0x10
+#define HW_DMA_CAP_DDW32	0x8
+#define HW_DMA_CAP_DDW64	0x10
+#define HW_DMA_CAP_DDW128	0x20
 
+#define PHYTMAC_DBW32				1
 #define PHYTMAC_DBW64				2
 #define PHYTMAC_DBW128				4
+
+#define PHYTMAC_CLK_DIV8	0
+#define PHYTMAC_CLK_DIV16	1
+#define PHYTMAC_CLK_DIV32	2
+#define PHYTMAC_CLK_DIV48	3
+#define PHYTMAC_CLK_DIV64	4
+#define PHYTMAC_CLK_DIV96	5
+#define PHYTMAC_CLK_DIV128	6
+#define PHYTMAC_CLK_DIV224	7
+
+#define PHYTMAC_RETRY_TIMES	50000
+
+#define PHYTMAC_READ_NSR(pdata)	PHYTMAC_READ(pdata, PHYTMAC_NETWORK_STATUS)
 
 enum phytmac_msg_cmd_id {
 	PHYTMAC_MSG_CMD_DEFAULT = 0,
@@ -218,7 +259,7 @@ enum phytmac_msg_cmd_id {
 };
 
 enum phytmac_default_subid {
-	PHYTMAC_MSG_CMD_DEFAULT_RESET_HW = 0,
+	PHYTMAC_MSG_CMD_DEFAULT_RESET_HW = 1,
 	PHYTMAC_MSG_CMD_DEFAULT_RESET_TX_QUEUE,
 	PHYTMAC_MSG_CMD_DEFAULT_RESET_RX_QUEUE,
 };
@@ -228,7 +269,7 @@ enum phytmac_set_subid {
 	PHYTMAC_MSG_CMD_SET_INIT_RING = 1,
 	PHYTMAC_MSG_CMD_SET_INIT_TX_RING = 2,
 	PHYTMAC_MSG_CMD_SET_INIT_RX_RING = 3,
-	PHYTMAC_MSG_CMD_SET_MAC_CONFIG = 4,
+	PHYTMAC_MSG_CMD_SET_INIT_MAC_CONFIG = 4,
 	PHYTMAC_MSG_CMD_SET_ADDR = 5,
 	PHYTMAC_MSG_CMD_SET_DMA_RX_BUFSIZE = 6,
 	PHYTMAC_MSG_CMD_SET_DMA = 7,
@@ -269,6 +310,13 @@ enum phytmac_set_subid {
 	PHYTMAC_MSG_CMD_SET_DISABLE_AUTONEG = 42,
 	PHYTMAC_MSG_CMD_SET_RX_DATA_OFFSET = 43,
 	PHYTMAC_MSG_CMD_SET_WOL = 44,
+	PHYTMAC_MSG_CMD_SET_ENABLE_RSC = 45,
+	PHYTMAC_MSG_CMD_SET_DISABLE_RSC = 46,
+	PHYTMAC_MSG_CMD_SET_ENABLE_TX_START = 47,
+	PHYTMAC_MSG_CMD_SET_ENABLE_PCS_RESET = 48,
+	PHYTMAC_MSG_CMD_SET_DISABLE_PCS_RESET = 49,
+	PHYTMAC_MSG_CMD_SET_MDC = 50,
+	PHYTMAC_MSG_CMD_SET_OUTSTANDING = 51,
 };
 
 enum phytmac_get_subid {
@@ -278,6 +326,8 @@ enum phytmac_get_subid {
 	PHYTMAC_MSG_CMD_GET_BD_PREFETCH,
 	PHYTMAC_MSG_CMD_GET_STATS,
 	PHYTMAC_MSG_CMD_GET_REG_READ,
+	PHYTMAC_MSG_CMD_GET_RX_FLOW,
+	PHYTMAC_MSG_CMD_GET_REGS_FOR_ETHTOOL,
 };
 
 struct phytmac_interface_info {
@@ -290,6 +340,11 @@ struct phytmac_interface_info {
 struct phytmac_mc_info {
 	u32 mc_bottom;
 	u32 mc_top;
+} __packed;
+
+struct phytmac_reg_info {
+	u32 offset;
+	u16 regnum;
 } __packed;
 
 struct phytmac_fdir_info {
@@ -351,12 +406,36 @@ struct phytmac_feature {
 	u8 max_rx_fs;
 } __packed;
 
-struct phytmac_msg_info {
-	u16 module_id;
-	u16 cmd_id;
-	u16 cmd_subid;
-	u16 flags;
-	u8 para[64];
+struct phytmac_wol {
+	u32 wol_type;
+	u8 wake;
 } __packed;
+
+struct phytmac_msg_info {
+	u8 reserved;
+	u8 seq;
+	u8 cmd_type;
+	u8 cmd_subid;
+	u16 len;
+	u8 status1;
+	u8 status0;
+	u8 para[PHYTMAC_MSG_PARA_LEN];
+} __packed;
+
+struct phytmac_ots_config {
+	u32 axi_rd;
+	u32 axi_wr;
+	u8 queuenum;
+} __packed;
+
+struct phytmac_ethtool_reg {
+	u8 interface;
+	u8 cnt;
+} __packed;
+
+static inline unsigned int phytmac_v2_tx_ring_wrap(struct phytmac *pdata, unsigned int index)
+{
+	return index & (pdata->msg_ring.tx_msg_ring_size - 1);
+}
 
 #endif

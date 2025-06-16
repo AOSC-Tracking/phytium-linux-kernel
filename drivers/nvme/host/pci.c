@@ -3000,6 +3000,12 @@ static struct nvme_dev *nvme_pci_alloc_dev(struct pci_dev *pdev,
 			 "platform quirk: setting simple suspend\n");
 		quirks |= NVME_QUIRK_SIMPLE_SUSPEND;
 	}
+
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (read_cpuid_implementor() == ARM_CPU_IMP_PHYTIUM)
+		quirks |= NVME_QUIRK_SIMPLE_SUSPEND;
+#endif
+
 	ret = nvme_init_ctrl(&dev->ctrl, &pdev->dev, &nvme_pci_ctrl_ops,
 			     quirks);
 	if (ret)

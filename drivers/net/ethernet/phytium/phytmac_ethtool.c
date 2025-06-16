@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
+/* Copyright(c) 2022 - 2025 Phytium Technology Co., Ltd. */
 
 #include <linux/ethtool.h>
 #include <linux/phy.h>
@@ -69,7 +70,7 @@ static void phytmac_get_ethtool_strings(struct net_device *ndev, u32 sset, u8 *p
 
 static inline int phytmac_get_regs_len(struct net_device *ndev)
 {
-	return PHYTMAC_GREGS_LEN;
+	return PHYTMAC_ETHTOOLD_REGS_LEN;
 }
 
 static void phytmac_get_regs(struct net_device *ndev,
@@ -80,7 +81,7 @@ static void phytmac_get_regs(struct net_device *ndev,
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	u32 *regs_buff = p;
 
-	memset(p, 0, PHYTMAC_GREGS_LEN * sizeof(u32));
+	memset(p, 0, PHYTMAC_ETHTOOLD_REGS_LEN);
 
 	hw_if->get_regs(pdata, regs_buff);
 }
@@ -95,18 +96,14 @@ static void phytmac_get_wol(struct net_device *ndev, struct ethtool_wolinfo *wol
 	wol->supported = WAKE_MAGIC | WAKE_ARP |
 			 WAKE_UCAST | WAKE_MCAST;
 
-	if (pdata->wol & PHYTMAC_WAKE_MAGIC) {
+	if (pdata->wol & PHYTMAC_WAKE_MAGIC)
 		wol->wolopts |= WAKE_MAGIC;
-	}
-	if (pdata->wol & PHYTMAC_WAKE_ARP) {
+	if (pdata->wol & PHYTMAC_WAKE_ARP)
 		wol->wolopts |= WAKE_ARP;
-	}
-	if (pdata->wol & PHYTMAC_WAKE_UCAST) {
+	if (pdata->wol & PHYTMAC_WAKE_UCAST)
 		wol->wolopts |= WAKE_UCAST;
-	}
-	if (pdata->wol & PHYTMAC_WAKE_MCAST) {
+	if (pdata->wol & PHYTMAC_WAKE_MCAST)
 		wol->wolopts |= WAKE_MCAST;
-	}
 }
 
 static int phytmac_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
@@ -510,13 +507,16 @@ static void phytmac_get_drvinfo(struct net_device *ndev, struct ethtool_drvinfo 
 {
 	struct phytmac *pdata = netdev_priv(ndev);
 
-	strscpy(drvinfo->driver, PHYTMAC_DRV_NAME, sizeof(drvinfo->driver));
 	strscpy(drvinfo->version, PHYTMAC_DRIVER_VERSION, sizeof(drvinfo->version));
+	strscpy(drvinfo->fw_version, pdata->fw_version, sizeof(drvinfo->fw_version));
 
-	if (pdata->platdev)
+	if (pdata->platdev) {
+		strscpy(drvinfo->driver, PHYTMAC_PLAT_DRV_NAME, sizeof(drvinfo->driver));
 		strscpy(drvinfo->bus_info, pdata->platdev->name, sizeof(drvinfo->bus_info));
-	else if (pdata->pcidev)
+	} else if (pdata->pcidev) {
+		strscpy(drvinfo->driver, PHYTMAC_PCI_DRV_NAME, sizeof(drvinfo->driver));
 		strscpy(drvinfo->bus_info, pci_name(pdata->pcidev), sizeof(drvinfo->bus_info));
+	}
 }
 
 static const struct ethtool_ops phytmac_ethtool_ops = {
