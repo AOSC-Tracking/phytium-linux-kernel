@@ -1080,24 +1080,17 @@ static const struct phylink_mac_ops macb_phylink_ops = {
 	.mac_link_up = macb_mac_link_up,
 };
 
-static bool macb_phy_handle_exists(struct device_node *dn)
-{
-	dn = of_parse_phandle(dn, "phy-handle", 0);
-	of_node_put(dn);
-	return dn != NULL;
-}
-
 static int macb_phylink_connect(struct macb *bp)
 {
-	struct device_node *dn = bp->pdev->dev.of_node;
+	struct fwnode_handle *fwnode = dev_fwnode(&bp->pdev->dev);
 	struct net_device *dev = bp->dev;
 	struct phy_device *phydev;
 	int ret = 0;
 
-	if (dn)
-		ret = phylink_of_phy_connect(bp->phylink, dn, 0);
+	if (fwnode)
+		ret = phylink_fwnode_phy_connect(bp->phylink, fwnode, 0);
 
-	if (!dn || (ret && !macb_phy_handle_exists(dn))) {
+	if (!fwnode || ret) {
 		phydev = phy_find_first(bp->mii_bus);
 		if (!phydev) {
 			netdev_err(dev, "no PHY found\n");
@@ -1106,8 +1099,7 @@ static int macb_phylink_connect(struct macb *bp)
 		phydev->force_mode = bp->force_phy_mode;
 
 		/* attach the mac to the phy */
-		if (phylink_expects_phy(bp->phylink))
-			ret = phylink_connect_phy(bp->phylink, phydev);
+		ret = phylink_connect_phy(bp->phylink, phydev);
 	}
 
 	if (ret) {
