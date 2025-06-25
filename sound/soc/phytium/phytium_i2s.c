@@ -1455,6 +1455,7 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 	int err, ret;
 	int card_num = 1;
 	bool schedule_probe;
+	struct fwnode_handle *np;
 
 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
 	if (!i2s)
@@ -1512,23 +1513,28 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 		i2s->pdev = pdata->dev;
 		i2s->clk_base = pdata->clk_base;
 		i2s->pcie = 1;
-	} else {
-		device_property_read_string(&pdev->dev, "dai-name", &dai_drv->name);
+	} else if (pdev->dev.of_node) {
+		ret = device_property_read_string(&pdev->dev, "dai-name", &dai_drv->name);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "missing dai-name property from device tree\n");
+			goto failed_get_dai_name;
+		}
+		i2s->pdev = &pdev->dev;
+		clk = devm_clk_get(&pdev->dev, NULL);
+		i2s->clk_base = clk_get_rate(clk);
+	} else if (has_acpi_companion(&pdev->dev)) {
+		np = dev_fwnode(&(pdev->dev));
+		ret = fwnode_property_read_string(np, "dai-name", &dai_drv->name);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "missing dai-name property\n");
 			goto failed_get_dai_name;
 		}
 		i2s->pdev = &pdev->dev;
-		if ((&pdev->dev)->of_node) {
-			clk = devm_clk_get(&pdev->dev, NULL);
-			i2s->clk_base = clk_get_rate(clk);
-		}
-		else if (has_acpi_companion(&pdev->dev)) {
-			ret = device_property_read_u32(&pdev->dev, "i2s_clk", &i2s->clk_base);
-			if (ret < 0) {
-				dev_info(&pdev->dev, "missing i2s_clk property from acpi, use default value\n");
-				i2s->clk_base = 600000000;
-			}
+		ret = fwnode_property_read_u32(np, "i2s_clk", &i2s->clk_base);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "missing i2s_clk property from acpi\n");
+
+			goto failed_get_dai_name;
 		}
 	}
 	ret = devm_snd_soc_register_component(&pdev->dev, &phytium_i2s_component,
