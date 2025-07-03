@@ -520,8 +520,7 @@ static struct snd_soc_dai_driver phytium_i2s_dai = {
 		.formats = SNDRV_PCM_FMTBIT_S8 |
 			   SNDRV_PCM_FMTBIT_S16_LE |
 			   SNDRV_PCM_FMTBIT_S20_LE |
-			   SNDRV_PCM_FMTBIT_S24_LE |
-			   SNDRV_PCM_FMTBIT_S32_LE,
+			   SNDRV_PCM_FMTBIT_S24_LE,
 	},
 	.capture = {
 		.stream_name = "i2s-Capture",
@@ -538,7 +537,7 @@ static struct snd_soc_dai_driver phytium_i2s_dai = {
 	.symmetric_rate = 1,
 };
 
-static const struct snd_pcm_hardware phytium_pcm_hardware = {
+static struct snd_pcm_hardware phytium_pcm_hardware = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED |
 		SNDRV_PCM_INFO_MMAP |
 		SNDRV_PCM_INFO_MMAP_VALID |
@@ -552,8 +551,7 @@ static const struct snd_pcm_hardware phytium_pcm_hardware = {
 	.formats = (SNDRV_PCM_FMTBIT_S8 |
 		SNDRV_PCM_FMTBIT_S16_LE |
 		SNDRV_PCM_FMTBIT_S20_LE |
-		SNDRV_PCM_FMTBIT_S24_LE |
-		SNDRV_PCM_FMTBIT_S32_LE),
+		SNDRV_PCM_FMTBIT_S24_LE ),
 	.channels_min = 2,
 	.channels_max = 2,
 	.buffer_bytes_max = 4096*16,
@@ -626,6 +624,9 @@ static int phytium_pcm_open(struct snd_soc_component *component,
 	azx_dev = azx_assign_device(chip, substream);
 	if (azx_dev == NULL)
 		return -EBUSY;
+
+	if (!dev->i2s_dp)
+		phytium_pcm_hardware.formats |= SNDRV_PCM_FMTBIT_S32_LE;
 
 	snd_soc_set_runtime_hwparams(substream, &phytium_pcm_hardware);
 	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
@@ -1524,6 +1525,14 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 			goto failed_get_dai_name;
 		}
 	}
+
+	if (strstr(dai_drv->name, "dp"))
+		i2s->i2s_dp = 1;
+	else
+		i2s->i2s_dp = 0;
+
+	if (!i2s->i2s_dp)
+		dai_drv->playback.formats |= SNDRV_PCM_FMTBIT_S32_LE;
 
 	ret = devm_snd_soc_register_component(&pdev->dev, &phytium_i2s_component,
 					      dai_drv, 1);
