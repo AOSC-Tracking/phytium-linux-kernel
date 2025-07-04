@@ -91,6 +91,7 @@
 		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&sysclk_600mhz>;
 		clock-names = "i2s_clk";
+		dai-name = "phytium-i2s-lsd";
 		status = "disabled";
 	};
 
