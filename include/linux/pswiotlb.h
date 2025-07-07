@@ -108,7 +108,8 @@ void pswiotlb_dma_iommu_unmap_page_attrs_distribute(struct device *dev,
 			dma_addr_t addr, size_t size, enum dma_data_direction dir,
 			unsigned long attrs);
 int pswiotlb_dma_iommu_map_sg_attrs_distribute(struct device *dev,
-			struct scatterlist *sg, int nents, int prot, unsigned long attrs);
+			struct scatterlist *sgl, int nelems,
+			enum dma_data_direction dir, unsigned long attrs);
 void pswiotlb_dma_iommu_unmap_sg_attrs_distribute(struct device *dev,
 			struct scatterlist *sg, int nents, enum dma_data_direction dir,
 			unsigned long attrs);
@@ -120,6 +121,8 @@ void pswiotlb_dma_iommu_sync_sg_for_cpu_distribute(struct device *dev,
 			struct scatterlist *sg, int nelems, enum dma_data_direction dir);
 void pswiotlb_dma_iommu_sync_sg_for_device_distribute(struct device *dev,
 			struct scatterlist *sg, int nelems, enum dma_data_direction dir);
+void pswiotlb_setup_dma_ops(struct device *dev, u64 dma_base,
+			u64 size, const struct iommu_ops *iommu_ops);
 
 #ifdef CONFIG_PSWIOTLB
 struct pswiotlb_passthroughlist {
@@ -251,7 +254,7 @@ extern struct p_io_tlb_mem p_io_tlb_default_mem[MAX_NUMNODES];
 
 struct p_io_tlb_pool *pswiotlb_find_pool(struct device *dev, int nid, phys_addr_t paddr);
 
-static bool is_ps_socs;
+static bool __read_mostly is_ps_socs;
 static inline bool is_phytium_ps_socs(void)
 {
 	unsigned int soc_id;

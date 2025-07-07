@@ -224,12 +224,14 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
 }
 #endif
 
+#ifdef CONFIG_PSWIOTLB
 static inline unsigned int dma_get_min_align_mask(struct device *dev)
 {
-	if (dev->dma_parms)
-		return dev->dma_parms->min_align_mask;
+	if (dev->dma_para_pswiotlb)
+		return dev->dma_para_pswiotlb->min_align_mask;
 	return 0;
 }
+#endif
 
 static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 					      size_t size,

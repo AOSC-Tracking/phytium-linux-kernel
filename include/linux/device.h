@@ -750,9 +750,15 @@ struct device_dma_parameters {
 	 * sg limitations.
 	 */
 	unsigned int max_segment_size;
-	unsigned int min_align_mask;
 	unsigned long segment_boundary_mask;
 };
+
+#ifdef CONFIG_PSWIOTLB
+struct device_dma_parameters_pswiotlb {
+	struct device_dma_parameters dev_dma_para;
+	unsigned int min_align_mask;
+};
+#endif
 
 /**
  * struct device_connection - Device Connection Descriptor
@@ -1007,9 +1013,6 @@ struct device {
 
 #ifdef CONFIG_NUMA
 	int		numa_node;	/* NUMA node this device is close to */
-#ifdef CONFIG_PSWIOTLB
-	int     local_node; /* NUMA node this device is really belong to */
-#endif
 #endif
 	const struct dma_map_ops *dma_ops;
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
@@ -1032,9 +1035,16 @@ struct device {
 					   allocations */
 #endif
 #ifdef CONFIG_PSWIOTLB
+	struct device_dma_parameters_pswiotlb *dma_para_pswiotlb;
 	struct p_io_tlb_mem *dma_p_io_tlb_mem;
-	bool dma_uses_p_io_tlb;
-	bool can_use_pswiotlb;
+	const struct dma_map_ops *orig_dma_ops;
+	struct {
+#ifdef CONFIG_NUMA
+		int local_node;
+#endif
+		bool dma_uses_p_io_tlb;
+		bool can_use_pswiotlb;
+	};
 #endif
 	/* arch specific additions */
 	struct dev_archdata	archdata;
