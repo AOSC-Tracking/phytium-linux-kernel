@@ -29,7 +29,9 @@
 #include <linux/vmalloc.h>
 #include <linux/swiotlb.h>
 #include <linux/pci.h>
+#ifdef CONFIG_PSWIOTLB
 #include <linux/pswiotlb.h>
+#endif
 
 #include <asm/cacheflush.h>
 
@@ -174,14 +176,6 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
 {
 	dma_addr_t dev_addr;
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev) &&
-				!pswiotlb_bypass_is_needed(dev, 0, dir)) {
-		dev_addr = pswiotlb_dma_direct_map_page_distribute(dev,
-					page, offset, size, dir, attrs);
-		return dev_addr;
-	}
-#endif
 	dev_addr = swiotlb_map_page(dev, page, offset, size, dir, attrs);
 	if (!is_device_dma_coherent(dev) &&
 	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
@@ -198,12 +192,6 @@ static void __swiotlb_unmap_page(struct device *dev, dma_addr_t dev_addr,
 	if (!is_device_dma_coherent(dev) &&
 	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
 		__dma_unmap_area(phys_to_virt(dma_to_phys(dev, dev_addr)), size, dir);
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_direct_unmap_page_attrs_distribute(dev, dev_addr, size, dir, attrs);
-		return;
-	}
-#endif
 
 	swiotlb_unmap_page(dev, dev_addr, size, dir, attrs);
 }
@@ -215,13 +203,6 @@ static int __swiotlb_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
 	struct scatterlist *sg;
 	int i, ret;
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev) &&
-				!pswiotlb_bypass_is_needed(dev, nelems, dir)) {
-		ret = pswiotlb_dma_direct_map_sg_attrs_distribute(dev, sgl, nelems, dir, attrs);
-		return ret;
-	}
-#endif
 	ret = swiotlb_map_sg_attrs(dev, sgl, nelems, dir, attrs);
 	if (!is_device_dma_coherent(dev) &&
 	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
@@ -245,12 +226,6 @@ static void __swiotlb_unmap_sg_attrs(struct device *dev,
 		for_each_sg(sgl, sg, nelems, i)
 			__dma_unmap_area(phys_to_virt(dma_to_phys(dev, sg->dma_address)),
 					 sg->length, dir);
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_direct_unmap_sg_attrs_distribute(dev, sgl, nelems, dir, attrs);
-		return;
-	}
-#endif
 	swiotlb_unmap_sg_attrs(dev, sgl, nelems, dir, attrs);
 }
 
@@ -260,12 +235,6 @@ static void __swiotlb_sync_single_for_cpu(struct device *dev,
 {
 	if (!is_device_dma_coherent(dev))
 		__dma_unmap_area(phys_to_virt(dma_to_phys(dev, dev_addr)), size, dir);
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_direct_sync_single_for_cpu_distribute(dev, dev_addr, size, dir);
-		return;
-	}
-#endif
 
 	swiotlb_sync_single_for_cpu(dev, dev_addr, size, dir);
 }
@@ -274,12 +243,6 @@ static void __swiotlb_sync_single_for_device(struct device *dev,
 					     dma_addr_t dev_addr, size_t size,
 					     enum dma_data_direction dir)
 {
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_direct_sync_single_for_device_distribute(dev, dev_addr, size, dir);
-		return;
-	}
-#endif
 	swiotlb_sync_single_for_device(dev, dev_addr, size, dir);
 	if (!is_device_dma_coherent(dev))
 		__dma_map_area(phys_to_virt(dma_to_phys(dev, dev_addr)), size, dir);
@@ -296,12 +259,6 @@ static void __swiotlb_sync_sg_for_cpu(struct device *dev,
 		for_each_sg(sgl, sg, nelems, i)
 			__dma_unmap_area(phys_to_virt(dma_to_phys(dev, sg->dma_address)),
 					 sg->length, dir);
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_direct_sync_sg_for_cpu_distribute(dev, sgl, nelems, dir);
-		return;
-	}
-#endif
 	swiotlb_sync_sg_for_cpu(dev, sgl, nelems, dir);
 }
 
@@ -312,12 +269,6 @@ static void __swiotlb_sync_sg_for_device(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_direct_sync_sg_for_device_distribute(dev, sgl, nelems, dir);
-		return;
-	}
-#endif
 	swiotlb_sync_sg_for_device(dev, sgl, nelems, dir);
 	if (!is_device_dma_coherent(dev))
 		for_each_sg(sgl, sg, nelems, i)
@@ -602,9 +553,6 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
 	if (WARN(!dev, "cannot create IOMMU mapping for unknown device\n"))
 		return NULL;
 
-#ifdef CONFIG_PSWIOTLB
-	check_if_pswiotlb_is_applicable(dev);
-#endif
 	size = PAGE_ALIGN(size);
 
 	/*
@@ -788,17 +736,6 @@ static void __iommu_sync_single_for_cpu(struct device *dev,
 {
 	phys_addr_t phys;
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		if (!is_device_dma_coherent(dev)) {
-			phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
-			__dma_unmap_area(phys_to_virt(phys), size, dir);
-		}
-		pswiotlb_dma_iommu_sync_single_for_cpu_distribute(dev, dev_addr, size, dir);
-
-		return;
-	}
-#endif
 	if (is_device_dma_coherent(dev))
 		return;
 
@@ -812,17 +749,6 @@ static void __iommu_sync_single_for_device(struct device *dev,
 {
 	phys_addr_t phys;
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_iommu_sync_single_for_device_distribute(dev, dev_addr, size, dir);
-		if (!is_device_dma_coherent(dev)) {
-			phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
-			__dma_map_area(phys_to_virt(phys), size, dir);
-		}
-
-		return;
-	}
-#endif
 	if (is_device_dma_coherent(dev))
 		return;
 
@@ -837,20 +763,8 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
 {
 	bool coherent = is_device_dma_coherent(dev);
 	int prot = dma_info_to_prot(dir, coherent, attrs);
-#ifdef CONFIG_PSWIOTLB
-	dma_addr_t dev_addr;
 
-	if (check_if_pswiotlb_is_applicable(dev) &&
-				!pswiotlb_bypass_is_needed(dev, 0, dir)) {
-		dev_addr =
-			pswiotlb_dma_iommu_map_page_distribute(dev, page, offset, size, dir, attrs);
-
-		return dev_addr;
-	}
-	dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
-#else
 	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
-#endif
 	if (!iommu_dma_mapping_error(dev, dev_addr) &&
 	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
 		__iommu_sync_single_for_device(dev, dev_addr, size, dir);
@@ -862,13 +776,6 @@ static void __iommu_unmap_page(struct device *dev, dma_addr_t dev_addr,
 			       size_t size, enum dma_data_direction dir,
 			       unsigned long attrs)
 {
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_iommu_unmap_page_attrs_distribute(dev, dev_addr, size, dir, attrs);
-		return;
-	}
-#endif
-
 	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
 		__iommu_sync_single_for_cpu(dev, dev_addr, size, dir);
 
@@ -881,13 +788,6 @@ static void __iommu_sync_sg_for_cpu(struct device *dev,
 {
 	struct scatterlist *sg;
 	int i;
-
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_iommu_sync_sg_for_cpu_distribute(dev, sgl, nelems, dir);
-		return;
-	}
-#endif
 
 	if (is_device_dma_coherent(dev))
 		return;
@@ -903,12 +803,6 @@ static void __iommu_sync_sg_for_device(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		pswiotlb_dma_iommu_sync_sg_for_device_distribute(dev, sgl, nelems, dir);
-		return;
-	}
-#endif
 	if (is_device_dma_coherent(dev))
 		return;
 
@@ -922,16 +816,6 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
 {
 	bool coherent = is_device_dma_coherent(dev);
 
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev) &&
-				!pswiotlb_bypass_is_needed(dev, nelems, dir)) {
-		if ((dir == DMA_TO_DEVICE) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
-			pswiotlb_dma_iommu_sync_sg_for_device_distribute(dev, sgl, nelems, dir);
-
-		return pswiotlb_dma_iommu_map_sg_attrs_distribute(dev, sgl, nelems,
-					dma_info_to_prot(dir, coherent, attrs), attrs);
-	}
-#endif
 	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
 		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
 
@@ -944,15 +828,6 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
 				   enum dma_data_direction dir,
 				   unsigned long attrs)
 {
-#ifdef CONFIG_PSWIOTLB
-	if (check_if_pswiotlb_is_applicable(dev)) {
-		if ((dir == DMA_TO_DEVICE) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
-			pswiotlb_dma_iommu_sync_sg_for_cpu_distribute(dev, sgl, nelems, dir);
-
-		pswiotlb_dma_iommu_unmap_sg_attrs_distribute(dev, sgl, nelems, dir, attrs);
-		return;
-	}
-#endif
 	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
 		__iommu_sync_sg_for_cpu(dev, sgl, nelems, dir);
 
@@ -1035,6 +910,10 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 
 	dev->archdata.dma_coherent = coherent;
 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+
+#ifdef CONFIG_PSWIOTLB
+	pswiotlb_setup_dma_ops(dev, dma_base, size, iommu);
+#endif
 
 #ifdef CONFIG_XEN
 	if (xen_initial_domain()) {

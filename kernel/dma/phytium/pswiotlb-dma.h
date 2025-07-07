@@ -13,6 +13,65 @@
 #include <linux/swiotlb.h>
 #include <linux/pswiotlb.h>
 
+struct pswiotlb_dma_map_ops {
+	void* (*alloc)(struct device *dev, size_t size,
+				dma_addr_t *dma_handle, gfp_t gfp,
+				unsigned long attrs);
+	void (*free)(struct device *dev, size_t size,
+			      void *vaddr, dma_addr_t dma_handle,
+			      unsigned long attrs);
+	int (*mmap)(struct device *dev, struct vm_area_struct *vma,
+			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
+			  unsigned long attrs);
+
+	int (*get_sgtable)(struct device *dev, struct sg_table *sgt, void *cpu_addr,
+			   dma_addr_t handle, size_t size, unsigned long attrs);
+
+	dma_addr_t (*map_page)(struct device *dev, struct page *page,
+			       unsigned long offset, size_t size,
+			       enum dma_data_direction dir,
+			       unsigned long attrs);
+	void (*unmap_page)(struct device *dev, dma_addr_t dma_handle,
+			   size_t size, enum dma_data_direction dir,
+			   unsigned long attrs);
+	/*
+	 * map_sg returns 0 on error and a value > 0 on success.
+	 * It should never return a value < 0.
+	 */
+	int (*map_sg)(struct device *dev, struct scatterlist *sg,
+		      int nents, enum dma_data_direction dir,
+		      unsigned long attrs);
+	void (*unmap_sg)(struct device *dev,
+			 struct scatterlist *sg, int nents,
+			 enum dma_data_direction dir,
+			 unsigned long attrs);
+	dma_addr_t (*map_resource)(struct device *dev, phys_addr_t phys_addr,
+			       size_t size, enum dma_data_direction dir,
+			       unsigned long attrs);
+	void (*unmap_resource)(struct device *dev, dma_addr_t dma_handle,
+			   size_t size, enum dma_data_direction dir,
+			   unsigned long attrs);
+	void (*sync_single_for_cpu)(struct device *dev,
+				    dma_addr_t dma_handle, size_t size,
+				    enum dma_data_direction dir);
+	void (*sync_single_for_device)(struct device *dev,
+				       dma_addr_t dma_handle, size_t size,
+				       enum dma_data_direction dir);
+	void (*sync_sg_for_cpu)(struct device *dev,
+				struct scatterlist *sg, int nents,
+				enum dma_data_direction dir);
+	void (*sync_sg_for_device)(struct device *dev,
+				   struct scatterlist *sg, int nents,
+				   enum dma_data_direction dir);
+	void (*cache_sync)(struct device *dev, void *vaddr, size_t size,
+			enum dma_data_direction direction);
+	int (*mapping_error)(struct device *dev, dma_addr_t dma_addr);
+	int (*dma_supported)(struct device *dev, u64 mask);
+#ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
+	u64 (*get_required_mask)(struct device *dev);
+#endif
+};
+
 #if defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_DEVICE) || \
 	defined(CONFIG_PSWIOTLB)
 void pswiotlb_dma_direct_sync_sg_for_device(struct device *dev, struct scatterlist *sgl,
