@@ -31,9 +31,6 @@
 #include <linux/vmalloc.h>
 #include <asm/dma.h>
 #include <linux/aer.h>
-#ifdef CONFIG_PSWIOTLB
-#include <linux/pswiotlb.h>
-#endif
 #include "pci.h"
 #ifdef CONFIG_ARCH_PHYTIUM
 #include <asm/phytium_cputype.h>
@@ -4305,15 +4302,6 @@ void __weak pcibios_set_master(struct pci_dev *dev)
  */
 void pci_set_master(struct pci_dev *dev)
 {
-#ifdef CONFIG_PSWIOTLB
-	if ((pswiotlb_force_disable != true) &&
-			is_phytium_ps_socs()) {
-		dev->dev.can_use_pswiotlb = pswiotlb_is_dev_in_passthroughlist(dev);
-		dev_info(&dev->dev, "The device %s use pswiotlb because vendor 0x%04x %s in pswiotlb passthroughlist\n",
-				dev->dev.can_use_pswiotlb ? "would" : "would NOT",
-				dev->vendor, dev->dev.can_use_pswiotlb ? "is NOT" : "is");
-	}
-#endif
 	__pci_set_master(dev, true);
 	pcibios_set_master(dev);
 }
