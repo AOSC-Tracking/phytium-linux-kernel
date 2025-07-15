@@ -33,6 +33,9 @@
 #include <linux/switchtec.h>
 #include <linux/crash_dump.h>
 #include "pci.h"
+#ifdef CONFIG_PSWIOTLB
+#include <linux/pswiotlb.h>
+#endif
 
 /*
  * Retrain the link of a downstream PCIe port by hand if necessary.
@@ -6351,3 +6354,14 @@ static void pci_fixup_d3cold_delay_1sec(struct pci_dev *pdev)
 	pdev->d3cold_delay = 1000;
 }
 DECLARE_PCI_FIXUP_FINAL(0x5555, 0x0004, pci_fixup_d3cold_delay_1sec);
+
+void pci_configure_pswiotlb(struct pci_dev *dev, struct pci_bus *bus)
+{
+#ifdef CONFIG_PSWIOTLB
+	if ((pswiotlb_force_disable != true) &&
+		is_phytium_ps_socs()) {
+		pswiotlb_store_local_node(dev, bus);
+		dma_set_seg_boundary(&dev->dev, 0xffffffffffff);
+	}
+#endif
+}
