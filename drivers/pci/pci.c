@@ -33,9 +33,6 @@
 #include <linux/aer.h>
 #include <linux/bitfield.h>
 #include "pci.h"
-#ifdef CONFIG_PSWIOTLB
-#include <linux/pswiotlb.h>
-#endif
 #ifdef CONFIG_ARCH_PHYTIUM
 #include <asm/phytium_cputype.h>
 #endif
