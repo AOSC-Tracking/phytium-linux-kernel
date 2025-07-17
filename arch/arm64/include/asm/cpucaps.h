@@ -57,6 +57,8 @@
 #define ARM64_SPECTRE_BHB			36
 #define ARM64_HAS_CRC32				37
 
-#define ARM64_NCAPS				38
+#define ARM64_WORKAROUND_PHYTIUM_FT3386		38
+
+#define ARM64_NCAPS				80
 
 #endif /* __ASM_CPUCAPS_H */
