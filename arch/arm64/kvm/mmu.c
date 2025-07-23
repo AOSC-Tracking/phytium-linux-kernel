@@ -2154,8 +2154,20 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
 	 * If switching it off, need to clean the caches.
 	 * Clean + invalidate does the trick always.
 	 */
-	if (now_enabled != was_enabled)
-		stage2_flush_vm(vcpu->kvm);
+	if (now_enabled != was_enabled) {
+		/*
+		 * Due to Phytium CPU's cache consistency support,
+		 * just flush dcache on one vcpu not all vcpus in the VM.
+		 * This can reduce the number of flush dcaches and
+		 * improve the efficiency of SMP multi-core startup,
+		 * especially for the large VM with hugepages.
+		 */
+		if (read_cpuid_implementor() == ARM_CPU_IMP_PHYTIUM) {
+			if (vcpu->vcpu_id == 0)
+				stage2_flush_vm(vcpu->kvm);
+		} else
+			stage2_flush_vm(vcpu->kvm);
+	}
 
 	/* Caches are now on, stop trapping VM ops (until a S/W op) */
 	if (now_enabled)
