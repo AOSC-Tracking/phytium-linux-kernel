@@ -17429,6 +17429,7 @@ ARM/PHYTIUM SOC SUPPORT
 M:	Wang Yinfeng <wangyinfeng@phytium.com.cn>
 S:	Maintained
 W:	https://www.phytium.com.cn
+F:	arch/arm64/include/asm/pvsched-abi.h
 F:	Documentation/arch/arm64/cpu-hotplug.rst
 F:	Documentation/devicetree/bindings/dma/phytium,ddma.yaml
 F:	Documentation/devicetree/bindings/dma/phytium,gdma.yaml
