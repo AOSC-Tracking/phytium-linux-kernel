@@ -17475,6 +17475,7 @@ F:	Documentation/devicetree/bindings/usb/phytium,usb2.yaml
 F:	Documentation/devicetree/bindings/usb/phytium.role-sw.yaml
 F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
 F:	Documentation/devicetree/bindings/staging/phytium-npu.yaml
+F:	Documentation/virt/kvm/arm/pvsched.rst
 F:	arch/arm64/boot/dts/phytium/*
 F:	arch/arm64/include/asm/phytium_cputype.h
 F:	arch/arm64/include/asm/phyt.h
