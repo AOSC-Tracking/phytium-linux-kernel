@@ -389,6 +389,7 @@ struct task_group {
 	/* runqueue "owned" by this group on each CPU */
 	struct cfs_rq		**cfs_rq;
 	unsigned long		shares;
+	u64			slice;
 
 	/* A positive value indicates that this is a SCHED_IDLE group. */
 	int			idle;
@@ -502,6 +503,8 @@ extern void sched_move_task(struct task_struct *tsk);
 extern int sched_group_set_shares(struct task_group *tg, unsigned long shares);
 
 extern int sched_group_set_idle(struct task_group *tg, long idle);
+
+extern int sched_group_set_slice(struct task_group *tg, u64 slice_us);
 
 #ifdef CONFIG_SMP
 extern void set_task_rq_fair(struct sched_entity *se,

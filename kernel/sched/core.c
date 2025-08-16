@@ -11207,6 +11207,23 @@ static int cpu_idle_write_s64(struct cgroup_subsys_state *css,
 }
 #endif
 
+#ifdef CONFIG_FAIR_GROUP_SCHED
+static u64 cpu_slice_read_u64(struct cgroup_subsys_state *css,
+				   struct cftype *cft)
+{
+	u64 slice_us = css_tg(css)->slice;
+	do_div(slice_us, NSEC_PER_USEC);
+
+	return slice_us;
+}
+
+static int cpu_slice_write_u64(struct cgroup_subsys_state *css,
+				    struct cftype *cftype, u64 slice_us)
+{
+	return sched_group_set_slice(css_tg(css), slice_us);
+}
+#endif
+
 static struct cftype cpu_legacy_files[] = {
 #ifdef CONFIG_GROUP_SCHED_WEIGHT
 	{
@@ -11451,6 +11468,12 @@ static struct cftype cpu_files[] = {
 		.read_s64 = cpu_idle_read_s64,
 		.write_s64 = cpu_idle_write_s64,
 	},
+	{
+		.name = "slice_us",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.read_u64 = cpu_slice_read_u64,
+		.write_u64 = cpu_slice_write_u64,
+	},
 #endif
 #ifdef CONFIG_CFS_BANDWIDTH
 	{
@@ -11478,6 +11501,12 @@ static struct cftype cpu_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = cpu_uclamp_max_show,
 		.write = cpu_uclamp_max_write,
+	},
+	{
+		.name = "slice",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.read_u64 = cpu_slice_read_u64,
+		.write_u64 = cpu_slice_write_u64,
 	},
 #endif
 	{ }	/* terminate */

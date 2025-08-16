@@ -819,6 +819,18 @@ static inline u64 cfs_rq_min_slice(struct cfs_rq *cfs_rq)
 	return min_slice;
 }
 
+#ifdef CONFIG_FAIR_GROUP_SCHED
+static inline u64 cfs_rq_slice(struct cfs_rq *cfs_rq)
+{
+	return cfs_rq->tg->slice ? : cfs_rq_min_slice(cfs_rq);
+}
+#else
+static inline u64 cfs_rq_slice(struct cfs_rq *cfs_rq)
+{
+	return cfs_rq_min_slice(cfs_rq);
+}
+#endif
+
 static inline bool __entity_less(struct rb_node *a, const struct rb_node *b)
 {
 	return entity_before(__node_2_se(a), __node_2_se(b));
@@ -7008,7 +7020,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 			se->custom_slice = 1;
 		}
 		enqueue_entity(cfs_rq, se, flags);
-		slice = cfs_rq_min_slice(cfs_rq);
+		slice = cfs_rq_slice(cfs_rq);
 
 		cfs_rq->h_nr_runnable += h_nr_runnable;
 		cfs_rq->h_nr_queued++;
@@ -7034,7 +7046,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		se->slice = slice;
 		if (se != cfs_rq->curr)
 			min_vruntime_cb_propagate(&se->run_node, NULL);
-		slice = cfs_rq_min_slice(cfs_rq);
+		slice = cfs_rq_slice(cfs_rq);
 
 		cfs_rq->h_nr_runnable += h_nr_runnable;
 		cfs_rq->h_nr_queued++;
@@ -7105,7 +7117,7 @@ static int dequeue_entities(struct rq *rq, struct sched_entity *se, int flags)
 			h_nr_runnable = 1;
 	} else {
 		cfs_rq = group_cfs_rq(se);
-		slice = cfs_rq_min_slice(cfs_rq);
+		slice = cfs_rq_slice(cfs_rq);
 	}
 
 	for_each_sched_entity(se) {
@@ -7131,7 +7143,7 @@ static int dequeue_entities(struct rq *rq, struct sched_entity *se, int flags)
 
 		/* Don't dequeue parent if it has other entities besides us */
 		if (cfs_rq->load.weight) {
-			slice = cfs_rq_min_slice(cfs_rq);
+			slice = cfs_rq_slice(cfs_rq);
 
 			/* Avoid re-evaluating load for this entity: */
 			se = parent_entity(se);
@@ -7157,7 +7169,7 @@ static int dequeue_entities(struct rq *rq, struct sched_entity *se, int flags)
 		se->slice = slice;
 		if (se != cfs_rq->curr)
 			min_vruntime_cb_propagate(&se->run_node, NULL);
-		slice = cfs_rq_min_slice(cfs_rq);
+		slice = cfs_rq_slice(cfs_rq);
 
 		cfs_rq->h_nr_runnable -= h_nr_runnable;
 		cfs_rq->h_nr_queued -= h_nr_queued;
@@ -13501,6 +13513,45 @@ next_cpu:
 		__sched_group_set_shares(tg, NICE_0_LOAD);
 
 	mutex_unlock(&shares_mutex);
+	return 0;
+}
+
+int sched_group_set_slice(struct task_group *tg, u64 slice_us)
+{
+	u64 slice = 0;
+	int i;
+
+	if (slice_us > U64_MAX / NSEC_PER_USEC)
+		return -EINVAL;
+
+	if (slice_us) {
+		slice = clamp_t(u64, slice_us * NSEC_PER_USEC,
+				NSEC_PER_MSEC / 10,	/* HZ = 1000 * 10 */
+				NSEC_PER_MSEC * 100);	/* HZ = 100 / 10 */
+	}
+
+	if (slice == tg->slice)
+		return 0;
+
+	tg->slice = slice;
+
+	for_each_possible_cpu(i) {
+		struct sched_entity *se = tg->se[i];
+		struct rq *rq = cpu_rq(i);
+
+		guard(rq_lock_irqsave)(rq);
+		for_each_sched_entity(se) {
+			se->custom_slice = 1;
+			se->slice = cfs_rq_slice(group_cfs_rq(se));
+
+			if (!se->on_rq)
+				break;
+
+			if (se != cfs_rq_of(se)->curr)
+				min_vruntime_cb_propagate(&se->run_node, NULL);
+		}
+	}
+
 	return 0;
 }
 
