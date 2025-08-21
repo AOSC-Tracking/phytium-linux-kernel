@@ -28,27 +28,27 @@
 #include <asm/memory.h>
 #include "spi-phytium.h"
 
-#ifdef CONFIG_SPI_V2_SHOW_MSG
+#define SPI_SHOW_MSG_DEBUG 0
+
 void spi_phytium_show_msg(struct msg *info)
 {
-	pr_err("module:0x%4x, cmd:0x%04x, sub:0x%04x\n",
-			info->seq, info->cmd_id, info->cmd_subid);
+	if (SPI_SHOW_MSG_DEBUG) {
+		pr_err("module:0x%4x, cmd:0x%04x, sub:0x%04x\n",
+				info->seq, info->cmd_id, info->cmd_subid);
 
-	pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[0],
-			info->data[1], info->data[2], info->data[3]);
+		pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[0],
+				info->data[1], info->data[2], info->data[3]);
 
-	pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[4],
-			info->data[5], info->data[6], info->data[7]);
+		pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[4],
+				info->data[5], info->data[6], info->data[7]);
 
-	pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[8],
-			info->data[9], info->data[10], info->data[11]);
+		pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[8],
+				info->data[9], info->data[10], info->data[11]);
 
-	pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[12],
-			info->data[13], info->data[14], info->data[15]);
+		pr_err("0x%02x 0x%02x 0x%02x 0x%02x", info->data[12],
+				info->data[13], info->data[14], info->data[15]);
+	}
 }
-#else
-void spi_phytium_show_msg(struct msg *info) { }
-#endif
 
 void *memcpy_byte(void *_dest, const void *_src, size_t sz)
 {
@@ -101,6 +101,9 @@ int spi_phytium_print_status(struct phytium_spi *fts, u8 status0,
 		pr_err("status=0x%x,Unknown error\n", status1);
 		break;
 	}
+
+	if (fts->debug_enabled)
+		fts->handle_debug_err(fts);
 
 	return -1;
 }
