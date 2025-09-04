@@ -690,12 +690,6 @@ static void phyt_i2s_gpio_jack_work(struct work_struct *work)
 	int ret = 0;
 	u32 unplug = phyt_readl_reg(priv->regfile_base, PHYTIUM_REGFILE_HPDET);
 
-	if (IS_ERR_OR_NULL(hs_jack.card->snd_card)) {
-		dev_warn(priv->dev, "sound card %s not binded", 
-			 hs_jack.card->name);
-		return;
-	}
-
 	if (unplug & 0x1) {
 		if (hs_jack.jack) {
 			snd_soc_jack_report(&hs_jack, HEADPHONE_DISABLE, SND_JACK_HEADSET);
