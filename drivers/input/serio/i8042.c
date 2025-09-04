@@ -1488,8 +1488,7 @@ static int i8042_setup_aux(void)
 	if (error)
 		goto err_free_irq;
 
-	if (!phytium_check_cpu())
-		i8042_aux_irq_registered = true;
+	i8042_aux_irq_registered = true;
 	return 0;
 
  err_free_irq:
