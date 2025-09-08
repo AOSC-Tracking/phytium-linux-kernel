@@ -36,6 +36,7 @@
 #include <media/videobuf2-dma-contig.h>
 
 #define PHYTIUM_JPEG_NAME       "phytium-jpeg"
+#define JPEG_DRIVER_VERSION     "1.0.0"
 #define MAX_FRAME_RATE          60
 #define MAX_HEIGHT              1080
 #define MAX_WIDTH               1920
@@ -45,13 +46,17 @@
 #define MAX_PIXEL_CLOCK         (1920 * 1080 * 60)   /* 1920 x 1080 x 60Hz */
 
 #define SOURCE_RESOLUTION_DETECT_TIMEOUT    msecs_to_jiffies(500)
-#define RESOLUTION_CHANGE_DELAY             msecs_to_jiffies(0)
+#define RESOLUTION_CHANGE_DELAY             msecs_to_jiffies(250)
 #define INVALID_RESOLUTION_DELAY            msecs_to_jiffies(250)
 #define STOP_TIMEOUT                        msecs_to_jiffies(1000)
 
 #define INVALID_RESOLUTION_RETRIES   2
 #define CAPTURE_BUF_NUMBER           3  /* using how many buffers */
 #define VB_BUF_NO                    0  /* there are 16 buffer, use which one */
+#define VB_BUF_LAST                  15 /* Use the last one to identify no signal */
+#define HAVE_SIGNAL                  0xCDDCDCCD   /* VGA output signal */
+#define HOST_POWER_ON                0x0          /* Host is poweron */
+#define HOST_POWER_OFF               0xDEADBEEF   /* Host is poweroff */
 
 /* The below macros are defined for the JPEG header of the phytium JPEG Engine */
 #define PHYTIUM_JPEG_HEADER_LEN		(256 * 3)
@@ -122,12 +127,14 @@ struct phytium_jpeg_dev {
 	unsigned int sequence;
 	unsigned int max_compressed_size;
 	struct phytium_jpeg_addr src_addrs[OCM_BUF_NUM];
-	struct phytium_jpeg_addr dst_addrs[16];
+	struct phytium_jpeg_addr dst_addrs[VB_BUF_LAST + 1];
 
 	bool yuv420;
 	unsigned int frame_rate;
 	void __iomem *timer30_addr;
 	void __iomem *timer31_addr;
+	struct v4l2_ctrl_handler ctrl_handler;
+	bool once_poweroff;
 };
 
 struct phytium_jpeg_config {
