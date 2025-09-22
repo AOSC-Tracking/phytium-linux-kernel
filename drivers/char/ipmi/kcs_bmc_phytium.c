@@ -287,10 +287,11 @@ static int phytium_kcs_probe(struct platform_device *pdev)
 	dev_set_drvdata(dev, kcs_bmc);
 
 	phytium_kcs_set_address(kcs_bmc, addr);
-	phytium_kcs_enable_channel(kcs_bmc, true);
 	rc = phytium_kcs_config_irq(kcs_bmc, pdev);
 	if (rc)
 		return rc;
+	/* First register the interrupt handler, then enable the interrupt. */
+	phytium_kcs_enable_channel(kcs_bmc, true);
 
 	rc = misc_register(&kcs_bmc->miscdev);
 	if (rc) {
@@ -313,6 +314,17 @@ static int phytium_kcs_remove(struct platform_device *pdev)
 	return 0;
 }
 
+/* Disable kcs IRQs on reboot. */
+static void phytium_kcs_shutdown(struct platform_device *pdev)
+{
+	struct kcs_bmc *kcs_bmc = dev_get_drvdata(&pdev->dev);
+
+	if (!kcs_bmc)
+		return;
+
+	phytium_kcs_enable_channel(kcs_bmc, false);
+}
+
 static const struct of_device_id phytium_kcs_bmc_match[] = {
 	{ .compatible = "phytium,kcs-bmc" },
 	{ }
@@ -326,6 +338,7 @@ static struct platform_driver phytium_kcs_bmc_driver = {
 	},
 	.probe  = phytium_kcs_probe,
 	.remove = phytium_kcs_remove,
+	.shutdown = phytium_kcs_shutdown,
 };
 module_platform_driver(phytium_kcs_bmc_driver);
 
