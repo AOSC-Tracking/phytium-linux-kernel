@@ -251,7 +251,7 @@ static const struct snd_kcontrol_new input_right_mixer[] = {
 	SOC_DAPM_SINGLE("DMIC Right Input", MA1026_PWRCTRL1, 6, 1, 1),
 };
 
-static DECLARE_TLV_DB_SCALE(hpd_tlv, -10200, 50, 0);
+//static DECLARE_TLV_DB_SCALE(hpd_tlv, -10200, 50, 0);
 static DECLARE_TLV_DB_SCALE(hpa_tlv, -5400, 200, 0);
 
 static const unsigned int limiter_tlv[] = {
@@ -953,11 +953,10 @@ static struct snd_soc_dai_driver ma1026_dai = {
 		.formats = MA1026_FORMATS,
 	},
 	.ops = &ma1026_ops,
-	.symmetric_rates = 1,
+	.symmetric_rate = 1,
 };
 
-static int ma1026_i2c_probe(struct i2c_client *i2c_client,
-			     const struct i2c_device_id *id)
+static int ma1026_i2c_probe(struct i2c_client *i2c_client)
 {
 	struct ma1026_priv *ma1026;
 	int ret;
@@ -1003,10 +1002,9 @@ static int ma1026_i2c_probe(struct i2c_client *i2c_client,
 	return 0;
 }
 
-static int ma1026_i2c_remove(struct i2c_client *client)
+static void ma1026_i2c_remove(struct i2c_client *client)
 {
 	snd_soc_unregister_component(&client->dev);
-	return 0;
 }
 
 static void ma1026_i2c_shutdown(struct i2c_client *client)
