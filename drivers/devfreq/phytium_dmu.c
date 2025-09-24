@@ -41,7 +41,7 @@
 #define DDR_PMU_NOTICE_START  0x0
 #define DDR_PMU_NOTICE_STOP   0x1
 
-#define DMUFREQ_DRIVER_VERSION "1.0.0"
+#define DMUFREQ_DRIVER_VERSION "1.0.1"
 
 struct phytium_dmufreq {
 	struct device *dev;
@@ -91,7 +91,6 @@ static inline unsigned long dmu_read32(struct phytium_dmufreq *priv, int dmu,
 	return readl_relaxed(priv->base[dmu] + offest);
 }
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 BLOCKING_NOTIFIER_HEAD(dmu_pmu_notifier_chain);
 EXPORT_SYMBOL(dmu_pmu_notifier_chain);
 
@@ -116,7 +115,6 @@ static int dmu_pmu_notifier_call(struct notifier_block *nb, unsigned long event,
 
 	return NOTIFY_OK;
 }
-#endif
 
 static ktime_t stop;
 
@@ -262,7 +260,7 @@ struct acpi_result phytium_read_threshold_value(struct device *dev)
 
 	status = acpi_evaluate_integer(handle, "BAND", NULL, &single_threshold_value);
 	if (ACPI_FAILURE(status)) {
-		dev_err(dev, "Failed to evaluate BAND method: ACPI status 0x%x\n", status);
+		WARN_ONCE(1, "Failed to evaluate BAND method: ACPI status 0x%x\n", status);
 		result.status = -EIO;
 		result.value = 0;
 		return result;
@@ -345,7 +343,7 @@ static int phytium_dmu_get_dev_status(struct device *dev,
 
 	result = phytium_read_threshold_value(dev);
 	if (result.status) {
-		dev_err(dev, "Failed to get threshold value\n");
+		WARN_ONCE(1, "Failed to get threshold value\n");
 		return -EINVAL;
 	}
 	single_threshold_value = result.value;
@@ -523,7 +521,6 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 	}
 	platform_set_drvdata(pdev, priv);
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 	/* Register the notifier */
 	priv->nb.notifier_call = dmu_pmu_notifier_call;
 	ret = blocking_notifier_chain_register(&dmu_pmu_notifier_chain, &priv->nb);
@@ -531,14 +528,17 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register notifier\n");
 		return ret;
 	}
-#endif
 
 	/* Get the base address of the DMU PMU */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	for (i = 0; i < priv->max_count; i++) {
-		priv->base[i] = ioremap(res->start + i * DMU_PMU_STRIDE, resource_size(res));
-		if (!priv->base[i])
-			return -ENOMEM;
+		resource_size_t offset = res->start + i * DMU_PMU_STRIDE;
+
+		priv->base[i] = devm_ioremap(&pdev->dev, offset, resource_size(res));
+		if (IS_ERR(priv->base[i])) {
+			dev_err(dev, "Ioremap failed for dmu base resource\n");
+			return PTR_ERR(priv->base);
+		}
 	}
 
 	ret = phytium_dmu_get_freq_info(dev);
@@ -606,23 +606,19 @@ static int phytium_dmufreq_remove(struct platform_device *pdev)
 	int i;
 
 	for (i = 0; i < priv->max_count; i++) {
-		dmu_write32(priv, i, AXI_MONITOR_EN, 0x0);
 		dmu_write32(priv, i, TIMER_STOP, 0x1);
+		dmu_write32(priv, i, AXI_MONITOR_EN, 0x0);
 	}
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 	/*Unregister the notifier*/
 	blocking_notifier_chain_unregister(&dmu_pmu_notifier_chain, &priv->nb);
-#endif
 
 	if (!priv->devfreq)
 		return 0;
 
-	flush_work(&priv->work);
 	del_timer_sync(&priv->sampling);
 
+	cancel_work_sync(&priv->work);
 	dev_pm_opp_of_remove_table(dev);
-
-	kfree(priv);
 
 	return 0;
 }
@@ -638,11 +634,9 @@ MODULE_DEVICE_TABLE(acpi, phytium_dmufreq_acpi_ids);
 #define phytium_dmu_acpi_ids NULL
 #endif
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 struct notifier_block nb = {
 	.notifier_call = dmu_pmu_notifier_call,
 };
-#endif
 
 static struct platform_driver phytium_dmufreq_driver = {
 	.probe		= phytium_dmufreq_probe,
@@ -658,5 +652,6 @@ module_platform_driver(phytium_dmufreq_driver);
 
 MODULE_DESCRIPTION("Phytium DDR Memory Unit frequency driver");
 MODULE_AUTHOR("Li Jiayi <lijiayi@phytium.com.cn>");
+MODULE_AUTHOR("Li Mingzhe <limingzhe@phytium.com.cn>");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DMUFREQ_DRIVER_VERSION);
