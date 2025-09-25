@@ -632,7 +632,8 @@ static bool mdiobus_prevent_c45_scan(struct mii_bus *bus)
 			continue;
 		oui = phydev->phy_id >> 10;
 
-		if (oui == MICREL_OUI)
+		/* skip c45 scan when linkyum phy */
+		if (oui == MICREL_OUI || oui == 0x2B6D01)
 			return true;
 	}
 	return false;
