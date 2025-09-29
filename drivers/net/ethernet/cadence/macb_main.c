@@ -1074,6 +1074,9 @@ static void macb_mac_link_up(struct phylink_config *config,
 		}
 	}
 
+	bp->speed = speed;
+	bp->duplex = duplex;
+
 	netif_tx_wake_all_queues(ndev);
 }
 
