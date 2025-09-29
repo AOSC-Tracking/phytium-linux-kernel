@@ -989,6 +989,9 @@ static void macb_mac_link_up(struct phylink_config *config,
 
 		macb_set_tx_clk(bp, speed);
 
+		bp->speed = speed;
+		bp->duplex = duplex;
+
 		/* Initialize rings & buffers as clearing MACB_BIT(TE) in link down
 		 * cleared the pipeline and control registers.
 		 */
@@ -3775,8 +3778,13 @@ static int macb_get_link_ksettings(struct net_device *netdev,
 							supported);
 		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.advertising,
 							advertising);
-		kset->base.speed = bp->speed;
-		kset->base.duplex = bp->duplex;
+		if (netif_carrier_ok(netdev)) {
+			kset->base.speed = bp->speed;
+			kset->base.duplex = bp->duplex;
+		} else {
+			kset->base.speed = SPEED_UNKNOWN;
+			kset->base.duplex = DUPLEX_UNKNOWN;
+		}
 	} else {
 		phylink_ethtool_ksettings_get(bp->phylink, kset);
 	}
