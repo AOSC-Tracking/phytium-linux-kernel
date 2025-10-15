@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/gpu/phytium,dc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Phytium Display Controller
+
+maintainers:
+  - Yu Da <yuda2152@phytium.com.cn>
+
+properties:
+  compatible:
+    enum:
+      - phytium,dc
+
+  reg:
+    items:
+      - description: DC registers
+
+  interrupts:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - pipe_mask
+  - edp_mask
+
+examples:
+  - |
+    dc@32000000 {
+        compatible = "phytium,dc";
+        reg = <0x0 0x32000000 0x0 0x8000>;
+        interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+        pipe_mask = 0x3;
+        edp_mask = 0x0;
+    };
