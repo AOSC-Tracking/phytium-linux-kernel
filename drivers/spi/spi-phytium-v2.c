@@ -534,6 +534,7 @@ int spi_phyt_suspend_host(struct phytium_spi *fts)
 {
 	int ret;
 
+	del_timer(&fts->timer);
 	ret = spi_controller_suspend(fts->master);
 	if (ret)
 		return ret;
@@ -547,6 +548,7 @@ int spi_phyt_resume_host(struct phytium_spi *fts)
 {
 	int ret;
 
+	mod_timer(&fts->timer, jiffies + msecs_to_jiffies(10));
 	spi_phyt_hw_init(&fts->master->dev, fts);
 
 	spi_phyt_enable_chip(fts, 0);
