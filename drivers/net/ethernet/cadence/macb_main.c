@@ -776,6 +776,7 @@ static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
 	struct macb_tx_skb *tx_skb;
 	struct macb_queue *queue;
 	struct macb_dma_desc *tx_desc = NULL;
+	unsigned long flags;
 	unsigned int q;
 	u32 ctrl;
 	int i;
@@ -793,7 +794,7 @@ static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
 	macb_writel(bp, NCR, ctrl);
 
 	/* Tx clean */
-	spin_lock(&bp->lock);
+	spin_lock_irqsave(&bp->lock, flags);
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
 		for (i = 0; i < bp->tx_ring_size; i++) {
 			tx_skb = macb_tx_skb(queue, i);
@@ -806,7 +807,7 @@ static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
 			tx_desc->ctrl &= ~MACB_BIT(TX_USED);
 		}
 	}
-	spin_unlock(&bp->lock);
+	spin_unlock_irqrestore(&bp->lock, flags);
 
 	netif_tx_stop_all_queues(ndev);
 }
