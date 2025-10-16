@@ -2261,9 +2261,12 @@ static void macb_free_consistent(struct macb *bp)
 	struct macb_dma_desc *rx_ring_base = NULL;
 	dma_addr_t tx_ring_base_addr;
 	dma_addr_t rx_ring_base_addr;
+	struct macb_tx_skb *tx_skb;
+	struct macb_dma_desc *tx_desc = NULL;
 	struct macb_queue *queue;
 	unsigned int q;
 	int size;
+	int i;
 
 	bp->macbgem_ops.mog_free_rx_buffers(bp);
 
@@ -2278,8 +2281,22 @@ static void macb_free_consistent(struct macb *bp)
 	}
 
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
-		kfree(queue->tx_skb);
-		queue->tx_skb = NULL;
+		/* Tx clean */
+		if (queue->tx_skb) {
+			for (i = 0; i < bp->tx_ring_size; i++) {
+				tx_skb = macb_tx_skb(queue, i);
+				/* free unsent skb buffers */
+				if (tx_skb)
+					macb_tx_unmap(bp, tx_skb);
+
+				tx_desc = macb_tx_desc(queue, i);
+				macb_set_addr(bp, tx_desc, 0);
+				tx_desc->ctrl &= ~MACB_BIT(TX_USED);
+			}
+			kfree(queue->tx_skb);
+			queue->tx_skb = NULL;
+		}
+
 		if (queue->tx_ring)
 			queue->tx_ring = NULL;
 		if (queue->rx_ring)
