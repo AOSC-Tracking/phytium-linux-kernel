@@ -190,7 +190,7 @@ static const struct ras_error_info pd2208_ras_sram_err[] = {
 	{30, CORRECTED_ERROR, "gmactx2_corrected_err"},
 	{31, UNCORRECTED_ERROR, "gmactx2_uncorrected_err"},
 	{32, CORRECTED_ERROR, "gmactx3_corrected_err"},
-	{33, UNCORRECTED_ERROR, "gmactx3_uncorrected_err"},	
+	{33, UNCORRECTED_ERROR, "gmactx3_uncorrected_err"},
 };
 
 static const struct ras_error_info pd2208_ras_peu_sram0_err[] = {
@@ -501,6 +501,11 @@ static void phytium_edac_error_report(struct phytium_edac *edac,
 {
 	const struct ras_error_info *err_info =
 		edac->error_info[error_group];
+
+	/* ignore pe220x soc_err id 40~43 */
+	if ((err_info == pe220x_ras_soc_error) &&
+	    (error_id >= 40) && (error_id <= 43))
+		return;
 
 	if (err_info[error_id].error_type == UNCORRECTED_ERROR) {
 		edac_printk(KERN_CRIT, EDAC_MOD_STR, "uncorrected error: %s\n",
