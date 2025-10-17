@@ -78,7 +78,7 @@
 #define GEM_MAX_TX_LEN		(unsigned int)(0x3FC0)
 
 #define GEM_MTU_MIN_SIZE	ETH_MIN_MTU
-#define MACB_NETIF_LSO		NETIF_F_TSO
+#define MACB_NETIF_LSO		(NETIF_F_TSO | NETIF_F_TSO6)
 
 #define HS_SPEED_100M		0
 #define HS_SPEED_1000M		1
