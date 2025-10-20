@@ -15,7 +15,7 @@
 #include <linux/version.h>
 #include <linux/dma-mapping.h>
 #include "phytium_npu.h"
-#include "phytium_npu_leopard_reg.h"
+#include "phytium_npu_pd2408_reg.h"
 
 static irqreturn_t phytium_npu_thread_irq(int irq, void *dev_id)
 {

@@ -695,15 +695,29 @@ void kvm_tlb_flush_vmid_range(struct kvm_s2_mmu *mmu,
 static int stage2_set_prot_attr(struct kvm_pgtable *pgt, enum kvm_pgtable_prot prot,
 				kvm_pte_t *ptep)
 {
-	bool device = prot & KVM_PGTABLE_PROT_DEVICE;
-	kvm_pte_t attr = device ? KVM_S2_MEMATTR(pgt, DEVICE_nGnRE) :
-			    KVM_S2_MEMATTR(pgt, NORMAL);
+	kvm_pte_t attr;
 	u32 sh = KVM_PTE_LEAF_ATTR_LO_S2_SH_IS;
+
+	switch (prot & (KVM_PGTABLE_PROT_DEVICE |
+			KVM_PGTABLE_PROT_NORMAL_NC)) {
+	case KVM_PGTABLE_PROT_DEVICE | KVM_PGTABLE_PROT_NORMAL_NC:
+		return -EINVAL;
+	case KVM_PGTABLE_PROT_DEVICE:
+		if (prot & KVM_PGTABLE_PROT_X)
+			return -EINVAL;
+		attr = KVM_S2_MEMATTR(pgt, DEVICE_nGnRE);
+		break;
+	case KVM_PGTABLE_PROT_NORMAL_NC:
+		if (prot & KVM_PGTABLE_PROT_X)
+			return -EINVAL;
+		attr = KVM_S2_MEMATTR(pgt, NORMAL_NC);
+		break;
+	default:
+		attr = KVM_S2_MEMATTR(pgt, NORMAL);
+	}
 
 	if (!(prot & KVM_PGTABLE_PROT_X))
 		attr |= KVM_PTE_LEAF_ATTR_HI_S2_XN;
-	else if (device)
-		return -EINVAL;
 
 	if (prot & KVM_PGTABLE_PROT_R)
 		attr |= KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R;
@@ -1161,6 +1175,20 @@ struct stage2_attr_data {
 	u32				level;
 };
 
+static inline bool post_migration_huge(kvm_pte_t pte, kvm_pte_t old_pte,
+				       u32 level)
+{
+	/*
+	 * Based on pagesize and PTE permissions(read, write and execute),
+	 * determine whether it is a huge pagesize VM live migration.
+	 */
+	return (kvm_granule_size(level) > PAGE_SIZE
+		&& (pte & KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R)
+		&& (pte & KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W)
+		&& stage2_pte_executable(pte)
+		&& !stage2_pte_executable(old_pte));
+}
+
 static int stage2_attr_walker(const struct kvm_pgtable_visit_ctx *ctx,
 			      enum kvm_pgtable_walk_flags visit)
 {
@@ -1183,6 +1211,16 @@ static int stage2_attr_walker(const struct kvm_pgtable_visit_ctx *ctx,
 	 */
 	if (data->pte != pte) {
 		/*
+		 * if it's a huge page VM after live migration, other
+		 * vCPUs do not need to refresh icache because of the
+		 * CMO mechanism.
+		 */
+		if (read_cpuid_implementor() == ARM_CPU_IMP_PHYTIUM) {
+			if (post_migration_huge(pte, ctx->old, ctx->level))
+				goto set_pte;
+		}
+
+		/*
 		 * Invalidate instruction cache before updating the guest
 		 * stage-2 PTE if we are going to add executable permission.
 		 */
@@ -1191,6 +1229,7 @@ static int stage2_attr_walker(const struct kvm_pgtable_visit_ctx *ctx,
 			mm_ops->icache_inval_pou(kvm_pte_follow(pte, mm_ops),
 						  kvm_granule_size(ctx->level));
 
+set_pte:
 		if (!stage2_try_set_pte(ctx, pte))
 			return -EAGAIN;
 	}

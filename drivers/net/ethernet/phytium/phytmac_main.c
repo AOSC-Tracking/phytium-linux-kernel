@@ -739,7 +739,8 @@ static bool phytmac_alloc_mapped_page(struct phytmac *pdata,
 	bi->addr = dma;
 	bi->page = page;
 	bi->page_offset = PHYTMAC_SKB_PAD;
-	bi->pagecnt_bias = 1;
+	page_ref_add(page, USHRT_MAX - 1);
+	bi->pagecnt_bias = USHRT_MAX;
 
 	return true;
 }
@@ -769,8 +770,8 @@ static bool phytmac_can_reuse_rx_page(struct phytmac_rx_buffer *rx_buffer)
 	 * the pagecnt_bias and page count so that we fully restock the
 	 * number of references the driver holds.
 	 */
-	if (unlikely(!pagecnt_bias)) {
-		page_ref_add(page, USHRT_MAX);
+	if (unlikely(pagecnt_bias == 1)) {
+		page_ref_add(page, USHRT_MAX - 1);
 		rx_buffer->pagecnt_bias = USHRT_MAX;
 	}
 
@@ -2364,7 +2365,7 @@ static netdev_features_t phytmac_features_check(struct sk_buff *skb,
 	hdrlen = skb_transport_offset(skb);
 
 	if (!IS_ALIGNED(skb_headlen(skb) - hdrlen, PHYTMAC_TX_LEN_ALIGN))
-		return features & ~NETIF_F_TSO;
+		return features & ~(NETIF_F_TSO | NETIF_F_TSO6);
 
 	nr_frags = skb_shinfo(skb)->nr_frags;
 	/* No need to check last fragment */
@@ -2373,7 +2374,7 @@ static netdev_features_t phytmac_features_check(struct sk_buff *skb,
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[f];
 
 		if (!IS_ALIGNED(skb_frag_size(frag), PHYTMAC_TX_LEN_ALIGN))
-			return features & ~NETIF_F_TSO;
+			return features & ~(NETIF_F_TSO | NETIF_F_TSO6);
 	}
 	return features;
 }
@@ -2663,7 +2664,7 @@ void phytmac_default_config(struct phytmac *pdata)
 	ndev->hw_features = NETIF_F_SG;
 
 	if (pdata->capacities & PHYTMAC_CAPS_LSO)
-		ndev->hw_features |= NETIF_F_TSO;
+		ndev->hw_features |= NETIF_F_TSO | NETIF_F_TSO6;
 
 	if (pdata->use_ncsi) {
 		ndev->hw_features &= ~(NETIF_F_HW_CSUM | NETIF_F_RXCSUM);

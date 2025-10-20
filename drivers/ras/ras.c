@@ -70,6 +70,16 @@ void log_arm_hw_error(struct cper_sec_proc_arm *err, const u8 sev)
 			ven_err_data, vsei_len, sev, cpu);
 }
 
+void log_phyt_err_event(struct cper_sec_phyt_err *err, const u8 sev)
+{
+	u32 phyt_len;
+	u8 *phyt;
+
+	phyt_len = sizeof(struct cper_sec_phyt_err);
+	phyt = (u8 *)err;
+	trace_phyt_err_event(phyt_len, phyt, sev);
+}
+
 static int __init ras_init(void)
 {
 	int rc = 0;
@@ -87,6 +97,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
 EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
 EXPORT_TRACEPOINT_SYMBOL_GPL(non_standard_event);
 EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
+EXPORT_TRACEPOINT_SYMBOL_GPL(phyt_err_event);
 
 static int __init parse_ras_param(char *str)
 {

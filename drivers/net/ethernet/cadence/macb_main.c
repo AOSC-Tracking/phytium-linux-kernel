@@ -88,7 +88,7 @@ struct sifive_fu540_macb_mgmt {
 #define GEM_MAX_TX_LEN		(unsigned int)(0x3FC0)
 
 #define GEM_MTU_MIN_SIZE	ETH_MIN_MTU
-#define MACB_NETIF_LSO		NETIF_F_TSO
+#define MACB_NETIF_LSO		(NETIF_F_TSO | NETIF_F_TSO6)
 
 #define MACB_WOL_HAS_MAGIC_PACKET	(0x1 << 0)
 #define MACB_WOL_ENABLED		(0x1 << 1)
@@ -988,6 +988,9 @@ static void macb_mac_link_up(struct phylink_config *config,
 			ctrl |= MACB_BIT(PAE);
 
 		macb_set_tx_clk(bp, speed);
+
+		bp->speed = speed;
+		bp->duplex = duplex;
 
 		/* Initialize rings & buffers as clearing MACB_BIT(TE) in link down
 		 * cleared the pipeline and control registers.
@@ -3775,8 +3778,13 @@ static int macb_get_link_ksettings(struct net_device *netdev,
 							supported);
 		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.advertising,
 							advertising);
-		kset->base.speed = bp->speed;
-		kset->base.duplex = bp->duplex;
+		if (netif_carrier_ok(netdev)) {
+			kset->base.speed = bp->speed;
+			kset->base.duplex = bp->duplex;
+		} else {
+			kset->base.speed = SPEED_UNKNOWN;
+			kset->base.duplex = DUPLEX_UNKNOWN;
+		}
 	} else {
 		phylink_ethtool_ksettings_get(bp->phylink, kset);
 	}
@@ -4809,7 +4817,6 @@ static const struct macb_usrio_config macb_default_usrio = {
 	.refclk = MACB_BIT(CLKEN),
 };
 
-#if defined(CONFIG_OF)
 /* 1518 rounded up */
 #define AT91ETHER_MAX_RBUFF_SZ	0x600
 /* max number of receive buffers */
@@ -5526,6 +5533,7 @@ static const struct macb_config phytium_gem2p0_config = {
 	.usrio = &macb_default_usrio,
 };
 
+#if defined(CONFIG_OF)
 static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,at91sam9260-macb", .data = &at91sam9260_config },
 	{ .compatible = "cdns,macb" },

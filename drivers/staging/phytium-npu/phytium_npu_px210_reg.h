@@ -2,8 +2,8 @@
 /*
  * Copyright (C) 2023 Phytium Technology Co., Ltd.
  */
-#ifndef __PHYTIUM_NPU_X100_REG_H__
-#define __PHYTIUM_NPU_X100_REG_H__
+#ifndef __PHYTIUM_NPU_PX210_REG_H__
+#define __PHYTIUM_NPU_PX210_REG_H__
 
 #define NPU_SYS_CLK_STATUS				(0x0008U)
 #define NPU_SYS_MWDT					(0x0048U)
@@ -238,4 +238,4 @@
 #define NPU_PRE_WR_256		0x00200000
 #define NPU_PRELOAD_CFG		(NPU_PRE_CBUF | NPU_PRE_RD_256 | NPU_PRE_WR_256)
 
-#endif /* __PHYTIUM_NPU_LEOPARD_REG_H__ */
+#endif /* __PHYTIUM_NPU_PX210_REG_H__ */

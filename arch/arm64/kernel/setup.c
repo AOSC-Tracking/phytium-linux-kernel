@@ -54,8 +54,27 @@
 #include <asm/xen/hypervisor.h>
 #include <asm/mmu_context.h>
 
+#ifdef CONFIG_ARCH_PHYTIUM
+#include <asm/phytium_cputype.h>
+enum phyt_soc_type phyt_soc_type_t;
+EXPORT_SYMBOL(phyt_soc_type_t);
+#endif
+
 static int num_standard_resources;
 static struct resource *standard_resources;
+
+#ifdef CONFIG_ARM64_BOOTPARAM_HOTPLUG_CPU0
+static int arm64_cpu0_hotpluggable = 1;
+#else
+static int arm64_cpu0_hotpluggable;
+static int __init arm64_enable_cpu0_hotplug(char *str)
+{
+	arm64_cpu0_hotpluggable = 1;
+	return 1;
+}
+
+__setup("arm64_cpu0_hotplug", arm64_enable_cpu0_hotplug);
+#endif
 
 phys_addr_t __fdt_pointer __initdata;
 u64 mmu_enabled_at_boot __initdata;
@@ -342,6 +361,9 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 			   FW_BUG "Booted with MMU enabled!");
 	}
 
+#ifdef CONFIG_ARCH_PHYTIUM
+	phyt_soc_type_init();
+#endif
 	arm64_memblock_init();
 
 	paging_init();
@@ -393,25 +415,20 @@ static inline bool cpu_can_disable(unsigned int cpu)
 #ifdef CONFIG_HOTPLUG_CPU
 	const struct cpu_operations *ops = get_cpu_ops(cpu);
 
-	if (ops && ops->cpu_can_disable)
-		return ops->cpu_can_disable(cpu);
+	if (ops && ops->cpu_can_disable) {
+		if (cpu == 0)
+			return ops->cpu_can_disable(0) && arm64_cpu0_hotpluggable;
+		else
+			return ops->cpu_can_disable(cpu);
+		}
 #endif
 	return false;
 }
 
-static int __init topology_init(void)
+bool arch_cpu_is_hotpluggable(int num)
 {
-	int i;
-
-	for_each_present_cpu(i) {
-		struct cpu *cpu = &per_cpu(cpu_data.cpu, i);
-		cpu->hotpluggable = cpu_can_disable(i);
-		register_cpu(cpu, i);
-	}
-
-	return 0;
+	return cpu_can_disable(num);
 }
-subsys_initcall(topology_init);
 
 static void dump_kernel_offset(void)
 {
@@ -454,24 +471,3 @@ static int __init check_mmu_enabled_at_boot(void)
 	return 0;
 }
 device_initcall_sync(check_mmu_enabled_at_boot);
-
-#ifdef CONFIG_HOTPLUG_CPU
-
-int arch_register_cpu(int num)
-{
-	struct cpu *cpu = &per_cpu(cpu_data.cpu, num);
-
-	cpu->hotpluggable = 1;
-	return register_cpu(cpu, num);
-}
-EXPORT_SYMBOL(arch_register_cpu);
-
-void arch_unregister_cpu(int num)
-{
-	struct cpu *cpu = &per_cpu(cpu_data.cpu, num);
-
-	unregister_cpu(cpu);
-}
-EXPORT_SYMBOL(arch_unregister_cpu);
-
-#endif

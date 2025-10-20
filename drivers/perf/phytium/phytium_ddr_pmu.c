@@ -24,6 +24,7 @@
 #include <linux/smp.h>
 #include <linux/types.h>
 #include <linux/version.h>
+#include <linux/arm-smccc.h>
 
 #include <asm/cputype.h>
 #include <asm/local64.h>
@@ -31,9 +32,8 @@
 #undef pr_fmt
 #define pr_fmt(fmt) "phytium_ddr_pmu: " fmt
 
-
 #define PHYTIUM_DDR_MAX_COUNTERS 8
-#define DDR_PERF_DRIVER_VERSION "1.3.0"
+#define DDR_PERF_DRIVER_VERSION "1.3.3"
 
 #define DDR_START_TIMER		0x000
 #define DDR_STOP_TIMER		0x004
@@ -57,33 +57,16 @@
 #define DDR_CLK_FRE		0xe00
 #define DDR_DATA_WIDTH		0xe04
 
-#define DDR_PMU_OFL_STOP_TYPE_VAL	0x10
+#define DDR_PMU_OFL_STOP_TYPE_VAL 0x10
 
-#define SOC_ID_PS230XX		0x8
-#define SOC_ID_PS240XX		0x6
-#define MIDR_PSXX    		0x700F8620
+#define PBFVER_FUNC_ID		0x82000001
 
 #define to_phytium_ddr_pmu(p) (container_of(p, struct phytium_ddr_pmu, pmu))
 
 enum {
-	PS230XX			= 0x01,
-	PS240XX			= 0x02,
+	DDRV1P0 = 0x01,
+	DDRV1P5 = 0x02,
 };
-
-static inline int phytium_socs_type(void)
-{
-	unsigned int soc_id, cpu_id;
-
-	soc_id = read_sysreg_s(SYS_AIDR_EL1);
-	cpu_id = read_cpuid_id();
-
-	if ((soc_id == SOC_ID_PS230XX) && (cpu_id == MIDR_PSXX))
-		return PS230XX;
-	else if ((soc_id == SOC_ID_PS240XX) && (cpu_id == MIDR_PSXX))
-		return PS240XX;
-	else
-		return 0;
-}
 
 static int phytium_ddr_pmu_hp_state;
 
@@ -105,7 +88,7 @@ struct phytium_ddr_pmu {
 	int irq_bit;
 	int on_cpu;
 	int irq;
-	int soc_version;
+	int ver;
 	struct hlist_node node;
 };
 
@@ -118,7 +101,6 @@ static const u32 ddr_counter_reg_offset[] = {
 	DDR_EVENT_RXREQ_WNSF, DDR_EVENT_BANDWIDTH
 };
 
-
 ssize_t phytium_ddr_pmu_format_sysfs_show(struct device *dev,
 				  struct device_attribute *attr,
 				  char *buf)
@@ -126,6 +108,7 @@ ssize_t phytium_ddr_pmu_format_sysfs_show(struct device *dev,
 	struct dev_ext_attribute *eattr;
 
 	eattr = container_of(attr, struct dev_ext_attribute, attr);
+
 	return sprintf(buf, "%s\n", (char *)eattr->var);
 }
 
@@ -141,7 +124,7 @@ ssize_t phytium_ddr_pmu_event_sysfs_show(struct device *dev,
 }
 
 static ssize_t cpumask_show(struct device *dev, struct device_attribute *attr,
-			     char *buf)
+		     char *buf)
 {
 	struct phytium_ddr_pmu *ddr_pmu =
 		to_phytium_ddr_pmu(dev_get_drvdata(dev));
@@ -151,12 +134,12 @@ static ssize_t cpumask_show(struct device *dev, struct device_attribute *attr,
 
 #define PHYTIUM_PMU_ATTR(_name, _func, _config)                             \
 		(&((struct dev_ext_attribute[]){                                    \
-			{ __ATTR(_name, 0444, _func, NULL), (void *)_config } })[0] \
-			  .attr.attr)
+		{ __ATTR(_name, 0444, _func, NULL), (void *)_config } })[0] \
+		  .attr.attr)
 
 #define PHYTIUM_DDR_PMU_FORMAT_ATTR(_name, _config)                \
 		PHYTIUM_PMU_ATTR(_name, phytium_ddr_pmu_format_sysfs_show, \
-				 (void *)_config)
+			 (void *)_config)
 
 #define PHYTIUM_DDR_PMU_EVENT_ATTR(_name, _config)                \
 		PHYTIUM_PMU_ATTR(_name, phytium_ddr_pmu_event_sysfs_show, \
@@ -173,13 +156,13 @@ static const struct attribute_group phytium_ddr_pmu_format_group = {
 };
 
 static struct attribute *phytium_ddr_pmu_events_attr[] = {
-	PHYTIUM_DDR_PMU_EVENT_ATTR(cycles, 0x00),
+	PHYTIUM_DDR_PMU_EVENT_ATTR(ddr_cycles, 0x00),
 	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq, 0x01),
 	PHYTIUM_DDR_PMU_EVENT_ATTR(rxdat, 0x02),
 	PHYTIUM_DDR_PMU_EVENT_ATTR(txdat, 0x03),
-	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq_RNS, 0x04),
-	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq_WNSP, 0x05),
-	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq_WNSF, 0x06),
+	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq_rns, 0x04),
+	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq_wnsp, 0x05),
+	PHYTIUM_DDR_PMU_EVENT_ATTR(rxreq_wnsf, 0x06),
 	PHYTIUM_DDR_PMU_EVENT_ATTR(bandwidth, 0x07),
 	NULL,
 };
@@ -246,7 +229,7 @@ static void phytium_ddr_pmu_enable_clk(struct phytium_ddr_pmu *ddr_pmu)
 {
 	u32 val;
 
-	if (ddr_pmu->soc_version == PS240XX)
+	if (ddr_pmu->ver == DDRV1P5)
 		return;
 
 	val = readl(ddr_pmu->cfg_base);
@@ -258,7 +241,7 @@ static void phytium_ddr_pmu_disable_clk(struct phytium_ddr_pmu *ddr_pmu)
 {
 	u32 val;
 
-	if (ddr_pmu->soc_version == PS240XX)
+	if (ddr_pmu->ver == DDRV1P5)
 		return;
 
 	val = readl(ddr_pmu->cfg_base);
@@ -408,11 +391,9 @@ void phytium_ddr_pmu_event_del(struct perf_event *event, int flags)
 {
 	struct phytium_ddr_pmu *ddr_pmu = to_phytium_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
-	unsigned long val;
 
 	phytium_ddr_pmu_event_stop(event, PERF_EF_UPDATE);
-	val = phytium_ddr_pmu_get_irq_flag(ddr_pmu);
-	val = phytium_ddr_pmu_get_stop_state(ddr_pmu);
+
 	phytium_ddr_pmu_unmark_event(ddr_pmu, hwc->idx);
 
 	perf_event_update_userpage(event);
@@ -448,9 +429,8 @@ void phytium_ddr_pmu_reset(struct phytium_ddr_pmu *ddr_pmu)
 }
 
 static const struct acpi_device_id phytium_ddr_pmu_acpi_match[] = {
-	{
-		"PHYT0043",
-	},
+	{ "PHYT0043", },
+	{ "PHYT0067", },
 	{},
 };
 MODULE_DEVICE_TABLE(acpi, phytium_ddr_pmu_acpi_match);
@@ -494,6 +474,48 @@ static irqreturn_t phytium_ddr_pmu_overflow_handler(int irq, void *dev_id)
 	return IRQ_NONE;
 }
 
+static int phytium_verify_pbf_version(struct platform_device *pdev)
+{
+	struct arm_smccc_res res;
+	unsigned long major_ver, minor_ver;
+
+	arm_smccc_smc(PBFVER_FUNC_ID, 0, 0, 0, 0, 0, 0, 0, &res);
+	if (res.a0 <= 0) {
+		dev_warn(&pdev->dev, "Can not recognize PBF Firmware version!\n");
+		return -EINVAL;
+	}
+
+	minor_ver = res.a0 & 0xFFFF;
+	major_ver = (res.a0 >> 16) & 0xFFFF;
+
+	if (major_ver < 1 || (major_ver == 1 && minor_ver < 20)) {
+		dev_err(&pdev->dev,
+			"Driver load failed, Please upgrade PBF Firmware version to 1.20 or later!\n");
+		return -EINVAL;
+	}
+
+	return 0;
+
+}
+
+static int phytium_ddr_pmu_version(struct platform_device *pdev,
+		struct phytium_ddr_pmu *ddr_pmu)
+{
+	struct acpi_device *acpi_dev;
+
+	acpi_dev = ACPI_COMPANION(&pdev->dev);
+	if (!strcmp(acpi_device_hid(acpi_dev), "PHYT0043")) {
+		ddr_pmu->ver = DDRV1P0;
+	} else if (!strcmp(acpi_device_hid(acpi_dev), "PHYT0067")) {
+		ddr_pmu->ver = DDRV1P5;
+	} else {
+		dev_err(&pdev->dev, "The current driver does not support this device.\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 static int phytium_ddr_pmu_init_irq(struct phytium_ddr_pmu *ddr_pmu,
 				       struct platform_device *pdev)
 {
@@ -522,12 +544,6 @@ static int phytium_ddr_pmu_init_data(struct platform_device *pdev,
 					struct phytium_ddr_pmu *ddr_pmu)
 {
 	struct resource *res, *clkres, *irqres;
-
-	ddr_pmu->soc_version = phytium_socs_type();
-	if (ddr_pmu->soc_version == 0) {
-		dev_err(&pdev->dev, "The DDR PMU driver can't be installed in this SoC!\n");
-		return -EINVAL;
-	}
 
 	if (device_property_read_u32(&pdev->dev, "phytium,die-id",
 				     &ddr_pmu->die_id)) {
@@ -569,7 +585,7 @@ static int phytium_ddr_pmu_init_data(struct platform_device *pdev,
 		return PTR_ERR(ddr_pmu->cfg_base);
 	}
 
-	if (ddr_pmu->soc_version == PS240XX) {
+	if (ddr_pmu->ver == DDRV1P5) {
 		irqres = platform_get_resource(pdev, IORESOURCE_MEM, 2);
 		if (!irqres) {
 			dev_err(&pdev->dev, "failed for get ddr_pmu irq resource.\n");
@@ -593,6 +609,16 @@ static int phytium_ddr_pmu_dev_probe(struct platform_device *pdev,
 					struct phytium_ddr_pmu *ddr_pmu)
 {
 	int ret;
+
+	ret = phytium_ddr_pmu_version(pdev, ddr_pmu);
+	if (ret)
+		return ret;
+
+	if (ddr_pmu->ver == DDRV1P0) {
+		ret = phytium_verify_pbf_version(pdev);
+		if (ret)
+			return ret;
+	}
 
 	ret = phytium_ddr_pmu_init_data(pdev, ddr_pmu);
 	if (ret)

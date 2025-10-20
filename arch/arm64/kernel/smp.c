@@ -124,7 +124,8 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 	/* Now bring the CPU into our world */
 	ret = boot_secondary(cpu, idle);
 	if (ret) {
-		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
+		if (ret != -EPERM)
+			pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
 		return ret;
 	}
 
@@ -522,13 +523,15 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
 {
 	u64 hwid = processor->arm_mpidr;
 
+	if (!acpi_gicc_is_usable(processor)) {
+		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+		return;
+	}
+
 	if (hwid & ~MPIDR_HWID_BITMASK || hwid == INVALID_HWID) {
 		pr_err("skipping CPU entry with invalid MPIDR 0x%llx\n", hwid);
 		return;
 	}
-
-	if (!(processor->flags & ACPI_MADT_ENABLED))
-		pr_debug("disabled CPU entry with 0x%llx MPIDR\n", hwid);
 
 	if (is_mpidr_duplicate(cpu_count, hwid)) {
 		pr_err("duplicate CPU MPIDR 0x%llx in MADT\n", hwid);
@@ -752,13 +755,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (err)
 			continue;
 
-		if (acpi_disabled) {
-			set_cpu_present(cpu, true);
-		} else {
-			if ((cpu_madt_gicc[cpu].flags & ACPI_MADT_ENABLED))
-				set_cpu_present(cpu, true);
-		}
-
+		set_cpu_present(cpu, true);
 		numa_store_cpu_info(cpu);
 	}
 }

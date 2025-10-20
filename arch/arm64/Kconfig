@@ -135,6 +135,7 @@ config ARM64
 	select GENERIC_ARCH_TOPOLOGY
 	select GENERIC_CLOCKEVENTS_BROADCAST
 	select GENERIC_CPU_AUTOPROBE
+	select GENERIC_CPU_DEVICES
 	select GENERIC_CPU_VULNERABILITIES
 	select GENERIC_EARLY_IOREMAP
 	select GENERIC_IDLE_POLL_SETUP
@@ -1476,6 +1477,34 @@ config HOTPLUG_CPU
 	  Say Y here to experiment with turning CPUs off and on.  CPUs
 	  can be controlled through /sys/devices/system/cpu.
 
+config ARM64_BOOTPARAM_HOTPLUG_CPU0
+	bool "Set default setting of arm64_cpu0_hotpluggable"
+	default n
+	depends on HOTPLUG_CPU
+	help
+	  Set whether default state of arm64_cpu0_hotpluggable is on or off.
+
+	  Say Y here to set arm64_cpu0_hotpluggable on by default. If this
+	  switch is turned on, there is no need to give arm64_cpu0_hotplug
+	  kernel parameter and arm64_cpu0_hotpluggable is on by default.
+
+	  Please note: there may be some CPU0 dependencies if you want
+	  to enable the CPU0 hotplug feature either by this switch or by
+	  arm64_cpu0_hotplug kernel parameter.
+
+	  For example:
+	  We found the following issue related to CPU0 dependency:
+	  1. echo 0 > /sys/devices/system/cpu/cpu0/online
+	  2. reboot
+	  MegaRAID Tri-Mode SAS3508 may block the reboot process.
+
+	  Please make sure the dependencies are under your control before
+	  you enable this feature.
+
+ 	  Say N if you don't want to enable CPU0 hotplug feature by default.
+	  You still can set arm64_cpu0_hotpluggable on at boot by kernel
+	  parameter arm64_cpu0_hotplug.
+
 config ARM64_ERR_RECOV
 	bool "Support arm64 RAS error recovery"
 	depends on ACPI_APEI_SEA && MEMORY_FAILURE
@@ -1534,6 +1563,17 @@ config PARAVIRT
 	  This changes the kernel so it can modify itself when it is run
 	  under a hypervisor, potentially improving performance significantly
 	  over full virtualization.
+
+config PARAVIRT_SCHED
+	bool "Paravirtualization layer for sched"
+	depends on PARAVIRT
+	help
+	  This supports the vCPU preemption check to enhance lock performance on
+	  overcommitted hosts (more runnable vCPUs than physical CPUs in the
+	  system) as doing busy waits for preempted vCPUs will hurt system
+	  performance far worse than early yielding.
+
+	  If you are unsure how to answer this question, answer Y.
 
 config PARAVIRT_TIME_ACCOUNTING
 	bool "Paravirtual steal time accounting"

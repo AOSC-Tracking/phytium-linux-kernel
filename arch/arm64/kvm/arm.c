@@ -386,6 +386,8 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 
 	kvm_arm_pvtime_vcpu_init(&vcpu->arch);
 
+	kvm_arm_pvsched_vcpu_init(&vcpu->arch);
+
 	vcpu->arch.hw_mmu = &vcpu->kvm->arch.mmu;
 
 	err = kvm_vgic_vcpu_init(vcpu);
@@ -465,6 +467,9 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	if (!cpumask_test_cpu(cpu, vcpu->kvm->arch.supported_cpus))
 		vcpu_set_on_unsupported_cpu(vcpu);
+
+	if (kvm_arm_is_pvsched_enabled(&vcpu->arch))
+		kvm_update_pvsched_preempted(vcpu, 0);
 }
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
@@ -480,6 +485,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 
 	vcpu_clear_on_unsupported_cpu(vcpu);
 	vcpu->cpu = -1;
+
+	if (kvm_arm_is_pvsched_enabled(&vcpu->arch))
+		kvm_update_pvsched_preempted(vcpu, 1);
 }
 
 static void __kvm_arm_vcpu_power_off(struct kvm_vcpu *vcpu)
@@ -1334,6 +1342,8 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
 		WRITE_ONCE(vcpu->arch.mp_state.mp_state, KVM_MP_STATE_RUNNABLE);
 
 	spin_unlock(&vcpu->arch.mp_state_lock);
+
+	kvm_arm_pvsched_vcpu_init(&vcpu->arch);
 
 	return 0;
 }

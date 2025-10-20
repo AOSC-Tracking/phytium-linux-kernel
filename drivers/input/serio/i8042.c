@@ -22,7 +22,9 @@
 #include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/property.h>
-
+#if defined(CONFIG_PHYTIUM_PIO)
+#include "../../bus/phytium_pio.h"
+#endif
 #include <asm/io.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
@@ -535,10 +537,10 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id)
 	int ret = 1;
 
 	spin_lock_irqsave(&i8042_lock, flags);
-
-	if (phytium_check_cpu() == true)
-		base_ctrl_write_int_clear(0x0);
-
+#if defined(CONFIG_PHYTIUM_PIO)
+	if (check_cpu_type() == true)
+		phytium_pio_clear_interrupt(0x0);
+#endif
 	str = i8042_read_status();
 	if (unlikely(~str & I8042_STR_OBF)) {
 		spin_unlock_irqrestore(&i8042_lock, flags);
@@ -1460,7 +1462,7 @@ static int i8042_setup_aux(void)
 	int error;
 	int i;
 
-	if (!phytium_check_cpu() && i8042_check_aux())
+	if (i8042_check_aux())
 		return -ENODEV;
 
 	if (i8042_nomux || i8042_check_mux()) {
@@ -1477,19 +1479,16 @@ static int i8042_setup_aux(void)
 		aux_enable = i8042_enable_mux_ports;
 	}
 
-	if (!phytium_check_cpu()) {
-		error = request_irq(I8042_AUX_IRQ, i8042_interrupt, IRQF_SHARED,
-					"i8042", i8042_platform_device);
-		if (error)
-			goto err_free_ports;
-	}
+	error = request_irq(I8042_AUX_IRQ, i8042_interrupt, IRQF_SHARED,
+			    "i8042", i8042_platform_device);
+	if (error)
+		goto err_free_ports;
 
 	error = aux_enable();
 	if (error)
 		goto err_free_irq;
 
-	if (!phytium_check_cpu())
-		i8042_aux_irq_registered = true;
+	i8042_aux_irq_registered = true;
 	return 0;
 
  err_free_irq:
@@ -1499,6 +1498,43 @@ static int i8042_setup_aux(void)
 	return error;
 }
 
+#if defined(CONFIG_PHYTIUM_PIO)
+static int phytium_i8042_setup_kbd(void)
+{
+	int error;
+	int kbd_irq_num;
+
+	if (i8042_nokbd) {
+		i8042_register_ports();
+		return 0;
+	}
+	error = i8042_create_kbd_port();
+	if (error)
+		return error;
+
+	kbd_irq_num = phytium_pio_get_irq();
+	if (kbd_irq_num < 0) {
+		error = -EINVAL;
+		goto err_free_port;
+	}
+	error = devm_request_irq(&i8042_platform_device->dev, kbd_irq_num,
+				i8042_interrupt, IRQF_SHARED, "i8042", i8042_platform_device);
+	if (error)
+		goto err_free_port;
+	error = i8042_enable_kbd_port();
+	if (error)
+		goto err_free_port;
+
+	i8042_register_ports();
+	return 0;
+
+ err_free_port:
+	i8042_free_kbd_port();
+	i8042_controller_reset(false);
+
+	return error;
+}
+#endif
 static int i8042_setup_kbd(void)
 {
 	int error;
@@ -1507,17 +1543,8 @@ static int i8042_setup_kbd(void)
 	if (error)
 		return error;
 
-	if (phytium_check_cpu() == true) {
-		error = phytium_base_ctrl_irq();
-		if (error < 0)
-			goto err_free_port;
-
-		error = devm_request_irq(&i8042_platform_device->dev, error,
-				i8042_interrupt, IRQF_SHARED, "i8042", i8042_platform_device);
-	} else {
-		error = request_irq(I8042_KBD_IRQ, i8042_interrupt, IRQF_SHARED,
-					"i8042", i8042_platform_device);
-	}
+	error = request_irq(I8042_KBD_IRQ, i8042_interrupt, IRQF_SHARED,
+			    "i8042", i8042_platform_device);
 	if (error)
 		goto err_free_port;
 
@@ -1576,7 +1603,10 @@ static int i8042_probe(struct platform_device *dev)
 	if (i8042_dritek)
 		i8042_dritek_enable();
 #endif
-
+#if defined(CONFIG_PHYTIUM_PIO)
+	if (check_cpu_type() == true)
+		return phytium_i8042_setup_kbd();
+#endif
 	if (!i8042_noaux) {
 		error = i8042_setup_aux();
 		if (error && error != -ENODEV && error != -EBUSY)
@@ -1633,8 +1663,8 @@ static int __init i8042_init(void)
 	int err;
 
 	dbg_init();
-
-	if (!phytium_check_cpu()) {
+#if defined(CONFIG_PHYTIUM_PIO)
+	if (!check_cpu_type()) {
 		err = i8042_platform_init();
 		if (err)
 			return (err == -ENODEV) ? 0 : err;
@@ -1643,6 +1673,16 @@ static int __init i8042_init(void)
 		if (err)
 			goto err_platform_exit;
 	}
+#else
+	err = i8042_platform_init();
+	if (err)
+		return (err == -ENODEV) ? 0 : err;
+
+	err = i8042_controller_check();
+	if (err)
+		goto err_platform_exit;
+
+#endif
 	/* Set this before creating the dev to allow i8042_command to work right away */
 	i8042_present = true;
 

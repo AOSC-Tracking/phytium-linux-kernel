@@ -12,8 +12,8 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
-#include "include/phytium_npu.h"
-#include "include/phytium_npu_uapi.h"
+#include "phytium_npu.h"
+#include "phytium_npu_uapi.h"
 
 static int phytium_npu_open(struct inode *inode, struct file *file)
 {
@@ -326,7 +326,7 @@ static long phytium_npu_ioctl(struct file *file, unsigned int cmd, unsigned long
 {
 	struct phytium_npu_session *sess = file->private_data;
 	struct phytium_npu_dev *npu = sess->npu_dev;
-	int retval;
+	int retval = 0;
 
 	if (!sess)
 		return -EINVAL;

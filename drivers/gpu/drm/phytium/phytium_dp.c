@@ -1896,8 +1896,11 @@ void phytium_dp_hpd_work_func(struct work_struct *work)
 	drm_dbg_kms(dev, "running encoder hotplug work functions\n");
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
-		if (connector->force)
+		if (connector->force) {
+			connector->force = 0;
+			changed = true;
 			continue;
+		}
 		old_status = connector->status;
 		connector->status = drm_helper_probe_detect(connector, NULL, false);
 		if (old_status != connector->status) {
@@ -2226,6 +2229,9 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 		display_info->bpc = 8;
 		break;
 	}
+
+	if (phytium_dp->connector.force == DRM_FORCE_ON)
+		return MODE_OK;
 
 	if ((display_info->color_formats & DRM_COLOR_FORMAT_RGB444) == 0) {
 		DRM_DEBUG_KMS("not support color_format(%d)\n", display_info->color_formats);

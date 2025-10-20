@@ -7,11 +7,8 @@
 #include <linux/iopoll.h>
 #include "phytium_npu_mmu.h"
 #include "phytium_npu.h"
-#ifdef PHYTIUM_NPU_PLATFORM
-#include "phytium_npu_leopard_reg.h"
-#else
-#include "phytium_npu_reg.h"
-#endif
+#include "phytium_npu_pd2408_reg.h"
+
 #define POLL_PERIOD	100
 #define POLL_TIMEOUT	100000
 

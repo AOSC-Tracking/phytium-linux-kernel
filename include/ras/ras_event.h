@@ -460,6 +460,39 @@ TRACE_EVENT(memory_failure_event,
 	)
 );
 #endif /* CONFIG_MEMORY_FAILURE */
+
+/*
+ * Phytium Error Section Report
+ *
+ * This event is Phytium Error Record event.
+ *
+ */
+#define PHYTERR "Phytium Error Record"
+TRACE_EVENT(phyt_err_event,
+
+	TP_PROTO(u32 phyt_len,
+		u8 *phyt,
+		u8 sev),
+
+	TP_ARGS(phyt_len, phyt, sev),
+
+	TP_STRUCT__entry(
+		__field(u32, phyt_len)
+		__dynamic_array(u8, buf, phyt_len)
+		__field(u8, sev)
+	),
+
+	TP_fast_assign(
+		__entry->phyt_len = phyt_len;
+		memcpy(__get_dynamic_array(buf), phyt, phyt_len);
+		__entry->sev = sev;
+	),
+
+	TP_printk("%s: %s",
+		PHYTERR,
+		__print_hex(__get_dynamic_array(buf), __entry->phyt_len))
+);
+
 #endif /* _TRACE_HW_EVENT_MC_H */
 
 /* This part must be outside protection */

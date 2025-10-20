@@ -84,7 +84,7 @@ struct dw_wdt {
 	void __iomem		*regs;
 	struct clk		*clk;
 	struct clk		*pclk;
-	u64			rate;
+	u32			rate;
 	enum dw_wdt_rmod	rmod;
 	struct dw_wdt_timeout	timeouts[DW_WDT_NUM_TOPS];
 	struct watchdog_device	wdd;
@@ -595,7 +595,7 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 		 * are not available, so watchdog rate get from
 		 * clock-frequency property given in _DSD object.
 		 */
-		device_property_read_u64(dev, "clock-frequency",
+		device_property_read_u32(dev, "clock-frequency",
 					 &dw_wdt->rate);
 		if (dw_wdt->rate == 0)
 			return -EINVAL;

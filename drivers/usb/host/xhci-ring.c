@@ -1298,6 +1298,13 @@ void xhci_hc_died(struct xhci_hcd *xhci)
 	/* inform usb core hc died if PCI remove isn't already handling it */
 	if (!(xhci->xhc_state & XHCI_STATE_REMOVING))
 		usb_hc_died(xhci_to_hcd(xhci));
+
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pe220x() || is_pd2408()) {
+		if (xhci->get_xhci_wq && (xhci->quirks & XHCI_S1_SUSPEND_WAKEUP))
+			mod_delayed_work(xhci->get_xhci_wq(), &xhci->xhci_delay_wq, 1000);
+	}
+#endif
 }
 
 static void update_ring_for_set_deq_completion(struct xhci_hcd *xhci,
@@ -2255,6 +2262,13 @@ static int finish_td(struct xhci_hcd *xhci, struct xhci_virt_ep *ep,
 						 td->start_seg, td->first_trb));
 				return 0;
 			}
+#ifdef CONFIG_ARCH_PHYTIUM
+			if (is_pd2408() || is_pe220x()) {
+				xhci_clear_hub_tt_buffer(xhci, td, ep);
+				xhci_handle_halted_endpoint(xhci, ep, td, EP_SOFT_RESET);
+				return 0;
+			}
+#endif
 			/* endpoint not halted, don't reset it */
 			break;
 		}

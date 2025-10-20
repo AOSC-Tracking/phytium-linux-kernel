@@ -1,37 +1,34 @@
 # SPDX-License-Identifier: GPL-2.0
-menuconfig PHYTIUM_NPU
-    tristate "Phytium neural network processing unit"
-	depends on ARCH_PHYTIUM
-	help
-	  Say Y here if your want support for Phytium NPU controller framework.
-	  This is common support for devices that embed the Phytium NPU IP.
+config PHYTIUM_NPU
+        tristate "Phytium neural network processing unit"
+	    help
+	      Say Y here if your want support for Phytium NPU controller framework.
+	      This is common support for devices that embed the Phytium NPU IP.
 
-	  To compile this driver as a module, choose M here: the module will be
-	  called phytium_npu.
+	      To compile this driver as a module, choose M here: the module will be
+	      called phytium_npu.
 
 if PHYTIUM_NPU
-choice
-	prompt "Select the Phytium NPU Hardware"
-	default NPU_PLATFORM
-	help
-	  You need to select a suitable NPU controller in the current board.
-	  This option allows you to decide which Phytium NPU will be built
-	  in system.
-	  If in doubt, select 'N'
-	config NPU_PLATFORM
-		tristate "driver runs on platform"
-	help
-	  Say Y here if you want to support for IO Mapped Phytium NPU controller.
-	  This support is for devices that have the Phytium NPU controller IP.
-	  To compile this driver as a module, choose M here: the module will be
-	  called phytium_npu_platform.
-	config NPU_PCI
-		tristate "driver runs on PCI hardware"
-	help
-	  Say Y here if you want to support for Phytium NPU controller connected
-	  to the PCI bus. This support is for devices that have the Phytium NPU
-	  controller IP embedded into a PCI device.
-	  To compile this driver as a module, choose M here: the module will be
-	  called phytium_npu_pci.
-endchoice
+config PHYTIUM_NPU_PLATFORM
+		tristate "Phytium NPU platform support"
+		depends on ARCH_PHYTIUM && (ACPI || OF)
+		depends on PHYTIUM_NPU
+	    help
+	      Say Y here if you want to support for IO Mapped Phytium NPU controller.
+	      This support is for devices that have the Phytium NPU controller IP.
+
+	      To compile this driver as a module, choose M here: the module will be
+	      called phytium_npu_platform.
+
+config PHYTIUM_NPU_PCI
+		tristate "Phytium NPU PCI support"
+		depends on PCI
+		depends on PHYTIUM_NPU
+	    help
+	      Say Y here if you want to support for Phytium NPU controller connected
+	      to the PCI bus. This support is for devices that have the Phytium NPU
+	      controller IP embedded into a PCI device.
+
+	      To compile this driver as a module, choose M here: the module will be
+	      called phytium_npu_pci.
 endif

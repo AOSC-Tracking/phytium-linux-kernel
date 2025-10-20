@@ -14,6 +14,7 @@
 #include <linux/uaccess.h>
 #include <ras/ras_event.h>
 #include "edac_module.h"
+#include <linux/of_address.h>
 
 #define EDAC_MOD_STR			"phytium_edac"
 
@@ -36,21 +37,21 @@
 #define CORRECTED_ERROR			0
 #define UNCORRECTED_ERROR		1
 
-#define MAX_ERR_GROUP			3
+#define EDAC_DRIVER_VERSION "1.1.2"
 
-#define EDAC_DRIVER_VERSION "1.1.1"
+struct ras_error_info {
+	u32 index;
+	u32 error_type;
+	const char *error_str;
+};
 
 struct phytium_edac {
 	struct device		*dev;
 	void __iomem		**ras_base;
 	struct dentry		*dfs;
 	struct edac_device_ctl_info *edac_dev;
-};
-
-struct ras_error_info {
-	u32 index;
-	u32 error_type;
-	const char *error_str;
+	int num_err_group;
+	const struct ras_error_info **error_info;
 };
 
 /* error severity definition */
@@ -128,8 +129,182 @@ static const struct ras_error_info pe220x_ras_peu_error[] = {
 	{ 5, CORRECTED_ERROR, "axi_r_rsp_error" },
 };
 
+/* pd2208 error */
+static const struct ras_error_info pd2208_ras_err[] = {
+	{0, CORRECTED_ERROR, "lmu0_ras_ecc_corrected_err"},
+	{1, UNCORRECTED_ERROR, "lmu0_ras_ecc_uncorrected_err"},
+	{2, CORRECTED_ERROR, "lmu1_ras_ecc_corrected_err"},
+	{3, UNCORRECTED_ERROR, "lmu1_ras_ecc_uncorrected_err"},
+	{4, CORRECTED_ERROR, "sram_corrected_err"},
+	{5, UNCORRECTED_ERROR, "sram_uncorrected_err"},
+	{6, UNCORRECTED_ERROR, "qspi_ras_addr_err"},
+	{7, UNCORRECTED_ERROR, "qspi_ras_pstrb_err"},
+	{8, UNCORRECTED_ERROR, "intreq_err"},
+	{9, UNCORRECTED_ERROR, "gic_axim_err"},
+	{10, UNCORRECTED_ERROR, "gic_ecc_fatal"},
+	{11, UNCORRECTED_ERROR, "lsd_lbc_ras_err"},
+	{12, UNCORRECTED_ERROR, "nEXTERRIRQ_cluster0"},
+	{13, UNCORRECTED_ERROR, "nINTERRIRQ_cluster0"},
+	{14, UNCORRECTED_ERROR, "nEXTERRIRQ_cluster1"},
+	{15, UNCORRECTED_ERROR, "nINTERRIRQ_cluster1"},
+	{16, UNCORRECTED_ERROR, "nEXTERRIRQ_cluster2"},
+	{17, UNCORRECTED_ERROR, "nINTERRIRQ_cluster2"},
+	{18, UNCORRECTED_ERROR, "nEXTERRIRQ_cluster3"},
+	{19, UNCORRECTED_ERROR, "nINTERRIRQ_cluster3"},
+	{20, CORRECTED_ERROR, "lbc_ecc_corrected_err"},
+	{21, UNCORRECTED_ERROR, "lbc_ecc_uncorrected_err"},
+};
+
+static const struct ras_error_info pd2208_ras_sram_err[] = {
+	{0, CORRECTED_ERROR, "scp_sram_corrected_err"},
+	{1, UNCORRECTED_ERROR, "scp_sram_uncorrected_err"},
+	{2, CORRECTED_ERROR, "scp_sharemem_corrected_err"},
+	{3, UNCORRECTED_ERROR, "scp_sharemem_uncorrected_err"},
+	{4, CORRECTED_ERROR, "wr_cmd_buf_corrected_err"},
+	{5, UNCORRECTED_ERROR, "wr_cmd_buf_uncorrected_err"},
+	{6, CORRECTED_ERROR, "rd_dat_buf_corrected_err"},
+	{7, UNCORRECTED_ERROR, "rd_dat_buf_uncorrected_err"},
+	{8, CORRECTED_ERROR, "wr_cmd_buf_corrected_err"},
+	{9, UNCORRECTED_ERROR, "wr_cmd_buf_uncorrected_err"},
+	{10, CORRECTED_ERROR, "wr_dat_buf_corrected_err"},
+	{11, UNCORRECTED_ERROR, "wr_dat_buf_uncorrected_err"},
+	{12, CORRECTED_ERROR, "drtrch0_corrected_err"},
+	{13, UNCORRECTED_ERROR, "drtrch0_uncorrected_err"},
+	{14, CORRECTED_ERROR, "drtrch0_corrected_err"},
+	{15, UNCORRECTED_ERROR, "drtrch0_uncorrected_err"},
+	{16, CORRECTED_ERROR, "dmac_corrected_err"},
+	{17, UNCORRECTED_ERROR, "dmac_uncorrected_err"},
+	{18, CORRECTED_ERROR, "rmram0_corrected_err"},
+	{19, UNCORRECTED_ERROR, "rmram0_uncorrected_err"},
+	{20, CORRECTED_ERROR, "rmram1_corrected_err"},
+	{21, UNCORRECTED_ERROR, "rmram1_uncorrected_err"},
+	{22, CORRECTED_ERROR, "rmram2_corrected_err"},
+	{23, UNCORRECTED_ERROR, "rmram2_uncorrected_err"},
+	{24, CORRECTED_ERROR, "rmram3_corrected_err"},
+	{25, UNCORRECTED_ERROR, "rmram3_uncorrected_err"},
+	{26, CORRECTED_ERROR, "gmactx0_corrected_err"},
+	{27, UNCORRECTED_ERROR, "gmactx0_uncorrected_err"},
+	{28, CORRECTED_ERROR, "gmactx1_corrected_err"},
+	{29, UNCORRECTED_ERROR, "gmactx1_uncorrected_err"},
+	{30, CORRECTED_ERROR, "gmactx2_corrected_err"},
+	{31, UNCORRECTED_ERROR, "gmactx2_uncorrected_err"},
+	{32, CORRECTED_ERROR, "gmactx3_corrected_err"},
+	{33, UNCORRECTED_ERROR, "gmactx3_uncorrected_err"},
+};
+
+static const struct ras_error_info pd2208_ras_peu_sram0_err[] = {
+	{0, CORRECTED_ERROR, "c0p2a_corrected_err"},
+	{1, UNCORRECTED_ERROR, "c0p2a_uncorrected_err"},
+	{2, CORRECTED_ERROR, "c0a2p_corrected_err"},
+	{3, UNCORRECTED_ERROR, "c0a2p_uncorrected_err"},
+	{4, CORRECTED_ERROR, "c0rxbuf0_corrected_err"},
+	{5, UNCORRECTED_ERROR, "c0rxbuf0_uncorrected_err"},
+	{6, CORRECTED_ERROR, "c0rxbuf1_corrected_err"},
+	{7, UNCORRECTED_ERROR, "c0rxbuf1 _uncorrected_err"},
+	{8, CORRECTED_ERROR, "c0rxbuf2_corrected_err"},
+	{9, UNCORRECTED_ERROR, "c0rxbuf2 _uncorrected_err"},
+	{10, CORRECTED_ERROR, "c0rxbuf3_corrected_err"},
+	{11, UNCORRECTED_ERROR, "c0rxbuf3 _uncorrected_err"},
+	{12, CORRECTED_ERROR, "c0txbuf0_corrected_err"},
+	{13, UNCORRECTED_ERROR, "c0txbuf0_uncorrected_err"},
+	{14, CORRECTED_ERROR, "c0txbuf1_corrected_err"},
+	{15, UNCORRECTED_ERROR, "c0txbuf1 _uncorrected_err"},
+	{16, CORRECTED_ERROR, "c0txbuf2_corrected_err"},
+	{17, UNCORRECTED_ERROR, "c0txbuf2 _uncorrected_err"},
+	{18, CORRECTED_ERROR, "c0txbuf3_corrected_err"},
+	{19, UNCORRECTED_ERROR, "c0txbuf3 _uncorrected_err"},
+	{20, CORRECTED_ERROR, "c1p2a_corrected_err"},
+	{21, UNCORRECTED_ERROR, "c1p2a_uncorrected_err"},
+	{22, CORRECTED_ERROR, "c1a2p_corrected_err"},
+	{23, UNCORRECTED_ERROR, "c1a2p_uncorrected_err"},
+	{24, CORRECTED_ERROR, "c1rxbuf0_corrected_err"},
+	{25, UNCORRECTED_ERROR, "c1rxbuf0_uncorrected_err"},
+	{26, CORRECTED_ERROR, "c1rxbuf1_corrected_err"},
+	{27, UNCORRECTED_ERROR, "c1rxbuf1 _uncorrected_err"},
+	{28, CORRECTED_ERROR, "c1rxbuf2_corrected_err"},
+	{29, UNCORRECTED_ERROR, "c1rxbuf2 _uncorrected_err"},
+	{30, CORRECTED_ERROR, "c1rxbuf3_corrected_err"},
+	{31, UNCORRECTED_ERROR, "c1rxbuf3 _uncorrected_err"},
+	{32, CORRECTED_ERROR, "c1txbuf0_corrected_err"},
+	{33, UNCORRECTED_ERROR, "c1txbuf0_uncorrected_err"},
+	{34, CORRECTED_ERROR, "c1txbuf1_corrected_err"},
+	{35, UNCORRECTED_ERROR, "c1txbuf1 _uncorrected_err"},
+	{36, CORRECTED_ERROR, "c1txbuf2_corrected_err"},
+	{37, UNCORRECTED_ERROR, "c1txbuf2 _uncorrected_err"},
+	{38, CORRECTED_ERROR, "c1txbuf3_corrected_err"},
+	{39, UNCORRECTED_ERROR, "c1txbuf3 _uncorrected_err"},
+	{40, CORRECTED_ERROR, "c2p2a_corrected_err"},
+	{41, UNCORRECTED_ERROR, "c2p2a_uncorrected_err"},
+	{42, CORRECTED_ERROR, "c2a2p_corrected_err"},
+	{43, UNCORRECTED_ERROR, "c2a2p_uncorrected_err"},
+	{44, CORRECTED_ERROR, "c2rxbuf0_corrected_err"},
+	{45, UNCORRECTED_ERROR, "c2rxbuf0_uncorrected_err"},
+	{46, CORRECTED_ERROR, "c2rxbuf1_corrected_err"},
+	{47, UNCORRECTED_ERROR, "c2rxbuf1 _uncorrected_err"},
+	{48, CORRECTED_ERROR, "c2rxbuf2_corrected_err"},
+	{49, UNCORRECTED_ERROR, "c2rxbuf2 _uncorrected_err"},
+	{50, CORRECTED_ERROR, "c2rxbuf3_corrected_err"},
+	{51, UNCORRECTED_ERROR, "c2rxbuf3 _uncorrected_err"},
+	{52, CORRECTED_ERROR, "c2txbuf0_corrected_err"},
+	{53, UNCORRECTED_ERROR, "c2txbuf0_uncorrected_err"},
+	{54, CORRECTED_ERROR, "c2txbuf1_corrected_err"},
+	{55, UNCORRECTED_ERROR, "c2txbuf1 _uncorrected_err"},
+};
+
+static const struct ras_error_info pd2208_ras_peu_sram1_err[] = {
+	{0, CORRECTED_ERROR, "c2txbuf2_corrected_err"},
+	{1, UNCORRECTED_ERROR, "c2txbuf2_uncorrected_err"},
+	{2, CORRECTED_ERROR, "c2txbuf3_corrected_err"},
+	{3, UNCORRECTED_ERROR, "c2txbuf3_uncorrected_err"},
+	{4, CORRECTED_ERROR, "phy0_sram0_corrected_err"},
+	{5, UNCORRECTED_ERROR, "phy0_sram0_uncorrected_err"},
+	{6, CORRECTED_ERROR, "phy0_sram1_corrected_err"},
+	{7, UNCORRECTED_ERROR, "phy0_sram1 _uncorrected_err"},
+	{8, CORRECTED_ERROR, "phy0_sram2_corrected_err"},
+	{9, UNCORRECTED_ERROR, "phy0_sram2 _uncorrected_err"},
+	{10, CORRECTED_ERROR, "phy0_sram3_corrected_err"},
+	{11, UNCORRECTED_ERROR, "phy0_sram3 _uncorrected_err"},
+	{12, CORRECTED_ERROR, "phy1_sram0_corrected_err"},
+	{13, UNCORRECTED_ERROR, "phy1_sram0_uncorrected_err"},
+	{14, CORRECTED_ERROR, "mac0_rxdpram_corrected_err"},
+	{15, UNCORRECTED_ERROR, "mac0_rxdpram _uncorrected_err"},
+	{16, CORRECTED_ERROR, "mac0_txdpram_corrected_err"},
+	{17, UNCORRECTED_ERROR, "mac0_txdpram _uncorrected_err"},
+	{18, CORRECTED_ERROR, "mac1_rxdpram_corrected_err"},
+	{19, UNCORRECTED_ERROR, "mac1_rxdpram _uncorrected_err"},
+	{20, CORRECTED_ERROR, "mac1_txdpram_corrected_err"},
+	{21, UNCORRECTED_ERROR, "mac1_txdpram _uncorrected_err"},
+};
+
+static const struct ras_error_info pd2208_ras_peu_base_err[] = {
+	{0, UNCORRECTED_ERROR, "pio_rd_addr_error"},
+	{1, UNCORRECTED_ERROR, "pio_rd_timeout"},
+	{2, UNCORRECTED_ERROR, "pio_wr_addr_error"},
+	{3, UNCORRECTED_ERROR, "pio_wr_timeout"},
+	{4, CORRECTED_ERROR, "axi_b_rsp_error"},
+	{5, UNCORRECTED_ERROR, "axi_r_rsp_error"},
+	{6, UNCORRECTED_ERROR, "mac0_asf_trans_to_err"},
+	{7, UNCORRECTED_ERROR, "mac0_asf_protocol_err"},
+	{8, UNCORRECTED_ERROR, "mac0_asf_nonfatal_int"},
+	{9, UNCORRECTED_ERROR, "mac0_asf_fatal_int"},
+	{10, UNCORRECTED_ERROR, "mac1_asf_trans_to_err"},
+	{11, UNCORRECTED_ERROR, "mac1_asf_protocol_err"},
+	{12, UNCORRECTED_ERROR, "mac1_asf_nonfatal_int"},
+	{13, UNCORRECTED_ERROR, "mac1_asf_fatal_int"},
+};
+
 static const struct ras_error_info *pe220x_ras_error[] = {
-	pe220x_ras_soc_error, pe220x_ras_peu_psu_error, pe220x_ras_peu_error
+	pe220x_ras_soc_error,
+	pe220x_ras_peu_psu_error,
+	pe220x_ras_peu_error,
+};
+
+static const struct ras_error_info *pd2208_ras_error[] = {
+	pd2208_ras_err,
+	pd2208_ras_sram_err,
+	pd2208_ras_peu_sram0_err,
+	pd2208_ras_peu_sram1_err,
+	pd2208_ras_peu_base_err,
 };
 
 static inline unsigned int get_error_num(const struct phytium_edac *edac,
@@ -146,11 +321,11 @@ static inline void phytium_ras_setup(const struct phytium_edac *edac)
 {
 	u64 val = 0;
 	unsigned int i = 0;
+
 	/*
 	 * enable error report and generate interrupt for corrected error event
-	 * first error record owned by node present the node configuration
 	 */
-	for (i = 0; i < MAX_ERR_GROUP; i++) {
+	for (i = 0; i < edac->num_err_group; i++) {
 		val = readq(edac->ras_base[i] + ERR_CTLR(0));
 		val |= CTLR_ED | CTLR_UI | CTLR_CFI;
 		writeq(val, edac->ras_base[i] + ERR_CTLR(0));
@@ -190,7 +365,7 @@ static ssize_t phytium_edac_inject_ctrl_write(struct file *filp,
 		goto out;
 
 	res = kstrtouint(tmp, 0, &error_group);
-	if (res || error_group >= MAX_ERR_GROUP) {
+	if (res || error_group >= edac->num_err_group) {
 		dev_err(edac->dev, "invalid error group parameters");
 		goto out;
 	}
@@ -207,10 +382,10 @@ static ssize_t phytium_edac_inject_ctrl_write(struct file *filp,
 		goto out;
 	}
 
-	dev_dbg(edac->dev, "inject group%d, error_id: %d\n",
+	dev_dbg(edac->dev, "inject group: %d, error_id: %d\n",
 			error_group, error_id);
 
-	if (pe220x_ras_error[error_group][error_id].error_type
+	if (edac->error_info[error_group][error_id].error_type
 			== CORRECTED_ERROR) {
 		writeq(MISC0_CEC(0xFF),
 			edac->ras_base[error_group] + ERR_MISC0(error_id));
@@ -295,7 +470,7 @@ static int get_error_id(struct phytium_edac *edac, int *error_id,
 	int err_id = 0;
 
 	/* Iterate over the ras node to check error status */
-	for (i = 0; i < MAX_ERR_GROUP; i++) {
+	for (i = 0; i < edac->num_err_group; i++) {
 		error_num = get_error_num(edac, i);
 		error_bit = readq(edac->ras_base[i] + ERR_GSR);
 		for (err_id = 0; err_id < error_num; err_id++) {
@@ -311,7 +486,7 @@ static int get_error_id(struct phytium_edac *edac, int *error_id,
 		}
 	}
 
-	if (i >= MAX_ERR_GROUP) {
+	if (i >= edac->num_err_group) {
 		ret = -1;
 		dev_warn(edac->dev, "no error detect.\n");
 	}
@@ -323,7 +498,12 @@ static void phytium_edac_error_report(struct phytium_edac *edac,
 				const int error_id, const int error_group)
 {
 	const struct ras_error_info *err_info =
-		pe220x_ras_error[error_group];
+		edac->error_info[error_group];
+
+	/* ignore pe220x soc_err id 40~43 */
+	if ((err_info == pe220x_ras_soc_error) &&
+	    (error_id >= 40) && (error_id <= 43))
+		return;
 
 	if (err_info[error_id].error_type == UNCORRECTED_ERROR) {
 		edac_printk(KERN_CRIT, EDAC_MOD_STR, "uncorrected error: %s\n",
@@ -398,14 +578,23 @@ static int phytium_edac_probe(struct platform_device *pdev)
 	edac->dev = &pdev->dev;
 	platform_set_drvdata(pdev, edac);
 
-	edac->ras_base = devm_kcalloc(&pdev->dev, 3,
+	edac->error_info =
+	  (const struct ras_error_info **)of_device_get_match_data(&pdev->dev);
+
+	edac->num_err_group = of_address_count(pdev->dev.of_node);
+	if (edac->num_err_group <= 0) {
+		dev_err(&pdev->dev, "can't get error group count");
+		goto out;
+	}
+
+	edac->ras_base = devm_kcalloc(&pdev->dev, edac->num_err_group,
 			sizeof(*edac->ras_base), GFP_KERNEL);
 	if (!edac->ras_base) {
 		return -ENOMEM;
 		goto out;
 	}
 
-	for (i = 0; i < MAX_ERR_GROUP; i++) {
+	for (i = 0; i < edac->num_err_group; i++) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
 		edac->ras_base[i] = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(edac->ras_base[i])) {
@@ -463,7 +652,10 @@ static int phytium_edac_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id phytium_edac_of_match[] = {
-	{ .compatible = "phytium,pe220x-edac" },
+	{ .compatible = "phytium,pe220x-edac",
+	  .data = pe220x_ras_error },
+	{ .compatible = "phytium,pd2208-edac",
+	  .data = pd2208_ras_error },
 	{},
 };
 MODULE_DEVICE_TABLE(of, phytium_edac_of_match);

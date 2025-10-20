@@ -275,6 +275,12 @@ static int phytium_snoop_ctrl_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	regmap_update_bits(snoop_ctrl->regmap, snp_enable_reg,
+			snp_enable_reg_snp1_en | snp_enable_reg_snp1_int_en, 0);
+
+	regmap_update_bits(snoop_ctrl->regmap, snp_enable_reg,
+			snp_enable_reg_snp2_en | snp_enable_reg_snp2_int_en, 0);
+
 	rc = phytium_snoop_ctrl_config_irq(snoop_ctrl, pdev);
 	if (rc)
 		return rc;

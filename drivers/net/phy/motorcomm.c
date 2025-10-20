@@ -1558,6 +1558,8 @@ static int yt8521_read_status(struct phy_device *phydev)
 			ytxxxx_adjust_status(phydev, val_utp, 1);
 		} else {
 			link_utp = 0;
+			phydev->speed = SPEED_UNKNOWN;
+			phydev->duplex = DUPLEX_UNKNOWN;
 		}
 
 		if (link_utp) {

@@ -1135,6 +1135,10 @@ config SND_SOC_LOCHNAGAR_SC
 	  This driver support the sound card functionality of the Cirrus
 	  Logic Lochnagar audio development board.
 
+config SND_SOC_MA1026
+	tristate "Cubiclattice MA1026 CODEC"
+	depends on I2C
+
 config SND_SOC_MADERA
 	tristate
 	default y if SND_SOC_CS47L15=y

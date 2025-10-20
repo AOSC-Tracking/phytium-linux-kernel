@@ -189,6 +189,11 @@ config ICPLUS_PHY
 	help
 	  Currently supports the IP175C and IP1001 PHYs.
 
+config LINKYUM_PHY
+	tristate "LINKYUM PHYs"
+	help
+	  Currently supports the LY1211A LY1211S LY1241A LY1241BPHYs.
+
 config LXT_PHY
 	tristate "Intel LXT PHYs"
 	help

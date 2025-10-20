@@ -17430,6 +17430,9 @@ ARM/PHYTIUM SOC SUPPORT
 M:	Wang Yinfeng <wangyinfeng@phytium.com.cn>
 S:	Maintained
 W:	https://www.phytium.com.cn
+F:	arch/arm64/include/asm/pvsched-abi.h
+F:	arch/arm64/kernel/paravirt-spinlocks.c
+F:	Documentation/arch/arm64/cpu-hotplug.rst
 F:	Documentation/devicetree/bindings/dma/phytium,ddma.yaml
 F:	Documentation/devicetree/bindings/dma/phytium,gdma.yaml
 F:	Documentation/devicetree/bindings/edac/phytium-pe220x-edac.txt
@@ -17475,10 +17478,13 @@ F:	Documentation/devicetree/bindings/usb/phytium,usb2.yaml
 F:	Documentation/devicetree/bindings/usb/phytium.role-sw.yaml
 F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
 F:	Documentation/devicetree/bindings/staging/phytium-npu.yaml
+F:	Documentation/virt/kvm/arm/pvsched.rst
 F:	arch/arm64/boot/dts/phytium/*
+F:	arch/arm64/include/asm/phytium_cputype.h
+F:	arch/arm64/include/asm/phyt.h
 F:	arch/arm64/include/asm/ras.h
 F:	arch/arm64/kernel/ras.c
-F:	drivers/acpi/phytium_base_ctrl.c
+F:	drivers/bus/phytium_pio.c
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
@@ -17505,6 +17511,7 @@ F:	drivers/media/platform/phytium-jpeg/phytium_jpeg*
 F:	drivers/mfd/phytium_px210_i2s_lsd.c
 F:	drivers/mfd/phytium_px210_i2s_mmd.c
 F:	drivers/misc/phytium-snoop-ctrl.c
+F:	drivers/misc/phytium_pwrmon.c
 F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-mci-plat-v2.c
 F:	drivers/mmc/host/phytium-mci-v2*

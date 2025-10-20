@@ -25,8 +25,6 @@
 
 #define DEVICE_TYPE 9	//DMU ID
 
-#define UPDATE_INTERVAL_MS 10
-
 #define	DMU_PMU_STRIDE		0x80000
 
 #define	AXI_MONITOR2_L		0x084
@@ -41,7 +39,7 @@
 #define DDR_PMU_NOTICE_START  0x0
 #define DDR_PMU_NOTICE_STOP   0x1
 
-#define DMUFREQ_DRIVER_VERSION "1.0.0"
+#define DMUFREQ_DRIVER_VERSION "1.0.2"
 
 struct phytium_dmufreq {
 	struct device *dev;
@@ -52,6 +50,7 @@ struct phytium_dmufreq {
 
 	unsigned long	rate, target_rate;
 	unsigned long	bandwidth;
+	unsigned long	single_threshold_value;
 	int max_count;
 	int cnt;
 
@@ -59,9 +58,6 @@ struct phytium_dmufreq {
 
 	unsigned long	*read_bw;
 	unsigned long	*write_bw;
-
-	struct timer_list sampling;
-	struct work_struct work;
 
 	struct notifier_block nb;
 
@@ -91,7 +87,6 @@ static inline unsigned long dmu_read32(struct phytium_dmufreq *priv, int dmu,
 	return readl_relaxed(priv->base[dmu] + offest);
 }
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 BLOCKING_NOTIFIER_HEAD(dmu_pmu_notifier_chain);
 EXPORT_SYMBOL(dmu_pmu_notifier_chain);
 
@@ -116,9 +111,7 @@ static int dmu_pmu_notifier_call(struct notifier_block *nb, unsigned long event,
 
 	return NOTIFY_OK;
 }
-#endif
 
-static ktime_t stop;
 
 static int phytium_dmu_set_freq(struct device *dev, unsigned long freq)
 {
@@ -262,7 +255,7 @@ struct acpi_result phytium_read_threshold_value(struct device *dev)
 
 	status = acpi_evaluate_integer(handle, "BAND", NULL, &single_threshold_value);
 	if (ACPI_FAILURE(status)) {
-		dev_err(dev, "Failed to evaluate BAND method: ACPI status 0x%x\n", status);
+		WARN_ONCE(1, "Failed to evaluate BAND method: ACPI status 0x%x\n", status);
 		result.status = -EIO;
 		result.value = 0;
 		return result;
@@ -277,8 +270,9 @@ static u64 phytium_dmufreq_get_real_bw(struct phytium_dmufreq *priv)
 {
 	unsigned long peak_bw = 0;
 	unsigned long sum_peak_bw = 0;
+	int i;
 
-	for (int i = 0; i < priv->max_count; i++) {
+	for (i = 0; i < priv->max_count; i++) {
 		priv->read_bw[i] = dmu_read32(priv, i, AXI_MONITOR2_L);
 		priv->write_bw[i] = dmu_read32(priv, i, AXI_MONITOR3_L);
 
@@ -293,66 +287,36 @@ static u64 phytium_dmufreq_get_real_bw(struct phytium_dmufreq *priv)
 	return peak_bw;
 }
 
-static void sampling_timer_callback(struct timer_list *t)
+static void polling_handle(struct phytium_dmufreq *priv)
 {
-	struct phytium_dmufreq *priv = from_timer(priv, t, sampling);
-
-	schedule_work(&priv->work);
-}
-
-static void sampling_work_handle(struct work_struct *work)
-{
-	struct phytium_dmufreq *priv = container_of(work, struct phytium_dmufreq, work);
-	static unsigned long load_counter;
-	static int count;
-	unsigned long current_load;
+	int i;
 
 	/*if the pmu_reg is not active, return the last busy time(pmu_reg not work)*/
 	if (!priv->pmu_active) {
 		priv->bandwidth = priv->last_bust_time;
-		mod_timer(&priv->sampling, jiffies + msecs_to_jiffies(UPDATE_INTERVAL_MS));
 		return;
 	}
 	if (priv->cnt > 0) {
-		for (int i = 0; i < priv->max_count ; i++) {
+		for (i = 0; i < priv->max_count ; i++) {
 			dmu_write32(priv, i, AXI_MONITOR_EN, 0x101);
 			dmu_write32(priv, i, TIMER_STOP, 0x1);
 		}
-		current_load = phytium_dmufreq_get_real_bw(priv);
-		load_counter += current_load;
-		count += 1;
+		priv->bandwidth = phytium_dmufreq_get_real_bw(priv);
 	}
 	priv->cnt = 1;
-	if (ktime_after(ktime_get(), stop)) {
-		priv->bandwidth = div64_u64(load_counter, count);
-		load_counter = 0;
-		count = 0;
-		stop = ktime_add_ms(ktime_get(), priv->profile.polling_ms);
-		mod_timer(&priv->sampling, jiffies + msecs_to_jiffies(UPDATE_INTERVAL_MS));
-	} else
-		mod_timer(&priv->sampling, jiffies + msecs_to_jiffies(UPDATE_INTERVAL_MS));
 }
 
 static int phytium_dmu_get_dev_status(struct device *dev,
 					  struct devfreq_dev_status *stat)
 {
 	struct phytium_dmufreq *priv = dev_get_drvdata(dev);
-	struct acpi_result result;
-	unsigned long long single_threshold_value;
 
-	result = phytium_read_threshold_value(dev);
-	if (result.status) {
-		dev_err(dev, "Failed to get threshold value\n");
-		return -EINVAL;
-	}
-	single_threshold_value = result.value;
-	single_threshold_value = (single_threshold_value * 1024 * 1024) / 100;
+	polling_handle(priv);
+	priv->last_bust_time = stat->busy_time = priv->bandwidth;
+	stat->total_time = (priv->single_threshold_value * priv->rate) / priv->freq_table[0];
 
-	stat->busy_time = priv->bandwidth;
-	stat->total_time = (single_threshold_value * priv->rate) / priv->freq_table[0];
-	priv->last_bust_time = priv->bandwidth;
 	dev_dbg(dev, "busy_time = %lu, total_time = %lu,single_threshold_value = %llu\n",
-		stat->busy_time, stat->total_time, single_threshold_value);
+		stat->busy_time, stat->total_time, priv->single_threshold_value);
 
 	stat->current_frequency	= priv->rate;
 	return 0;
@@ -441,9 +405,6 @@ static __maybe_unused int phytium_dmufreq_suspend(struct device *dev)
 
 	dev_dbg(dev, "DMU is being suspended\n");
 
-	del_timer_sync(&priv->sampling);
-	flush_work(&priv->work);
-
 	ret = devfreq_suspend_device(priv->devfreq);
 	if (ret < 0) {
 		dev_err(dev, "failed to suspend the devfreq devices\n");
@@ -466,11 +427,6 @@ static __maybe_unused int phytium_dmufreq_resume(struct device *dev)
 		return ret;
 	}
 
-	if (!timer_pending(&priv->sampling))
-		mod_timer(&priv->sampling, jiffies + msecs_to_jiffies(UPDATE_INTERVAL_MS));
-	else
-		dev_warn(dev, "Sampling timer already active ,skipping reinitialization\n");
-
 	return 0;
 }
 
@@ -486,6 +442,9 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 	unsigned int max_state = get_freq_count(dev);
 	struct acpi_result result;
 	struct resource *res;
+
+	if (max_state <= 0)
+		return -EINVAL;
 
 	result = phytium_dmufreq_state(dev);
 	if (result.value == 0) {
@@ -505,8 +464,13 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 
 	priv->max_count = result.value;
 
-	if (max_state <= 0)
-		return max_state;
+	result = phytium_read_threshold_value(dev);
+	if (result.status) {
+		dev_err(dev, "Failed to get threshold value\n");
+		return -EINVAL;
+	}
+	priv->single_threshold_value = result.value;
+	priv->single_threshold_value = (priv->single_threshold_value * 1024 * 1024) / 10;
 
 	dev->init_name = "dmufreq";
 
@@ -519,7 +483,6 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 	}
 	platform_set_drvdata(pdev, priv);
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 	/* Register the notifier */
 	priv->nb.notifier_call = dmu_pmu_notifier_call;
 	ret = blocking_notifier_chain_register(&dmu_pmu_notifier_chain, &priv->nb);
@@ -527,14 +490,17 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register notifier\n");
 		return ret;
 	}
-#endif
 
 	/* Get the base address of the DMU PMU */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	for (int i = 0; i < priv->max_count; i++) {
-		priv->base[i] = ioremap(res->start + i * DMU_PMU_STRIDE, resource_size(res));
-		if (!priv->base[i])
-			return -ENOMEM;
+	for (i = 0; i < priv->max_count; i++) {
+		resource_size_t offset = res->start + i * DMU_PMU_STRIDE;
+
+		priv->base[i] = devm_ioremap(&pdev->dev, offset, resource_size(res));
+			if (IS_ERR(priv->base[i])) {
+				dev_err(dev, "Ioremap failed for dmu base resource\n");
+				return PTR_ERR(priv->base);
+			}
 	}
 
 	ret = phytium_dmu_get_freq_info(dev);
@@ -575,17 +541,12 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 
 	/*Enable PMU*/
 	if (priv->pmu_active) {
-		for (int i = 0; i < priv->max_count; i++) {
+		for (i = 0; i < priv->max_count; i++) {
 			dmu_write32(priv, i, AXI_MONITOR_EN, 0x101);
 			dmu_write32(priv, i, CLEAR_EVENT, 0x1);
 			dmu_write32(priv, i, TIMER_START, 0x1);
 		}
 	}
-
-	INIT_WORK(&priv->work, sampling_work_handle);
-	timer_setup(&priv->sampling, sampling_timer_callback, 0);
-	stop = ktime_add_ms(ktime_get(), priv->profile.polling_ms);
-	mod_timer(&priv->sampling, jiffies + msecs_to_jiffies(UPDATE_INTERVAL_MS));
 
 	priv->dev = dev;
 
@@ -593,7 +554,6 @@ static int phytium_dmufreq_probe(struct platform_device *pdev)
 
 err:
 	dev_pm_opp_of_remove_table(dev);
-	kfree(priv);
 	return ret;
 }
 
@@ -601,25 +561,19 @@ static int phytium_dmufreq_remove(struct platform_device *pdev)
 {
 	struct phytium_dmufreq *priv = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
+	int i;
 
-	for (int i = 0; i < priv->max_count; i++) {
-		dmu_write32(priv, i, AXI_MONITOR_EN, 0x0);
+	for (i = 0; i < priv->max_count; i++) {
 		dmu_write32(priv, i, TIMER_STOP, 0x1);
+		dmu_write32(priv, i, AXI_MONITOR_EN, 0x0);
 	}
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 	/*Unregister the notifier*/
 	blocking_notifier_chain_unregister(&dmu_pmu_notifier_chain, &priv->nb);
-#endif
 
 	if (!priv->devfreq)
 		return 0;
-	flush_work(&priv->work);
-	del_timer_sync(&priv->sampling);
-
 	dev_pm_opp_remove_all_dynamic(dev);
-
-	kfree(priv);
 
 	return 0;
 }
@@ -635,11 +589,9 @@ MODULE_DEVICE_TABLE(acpi, phytium_dmufreq_acpi_ids);
 #define phytium_dmu_acpi_ids NULL
 #endif
 
-#if IS_ENABLED(CONFIG_PHYT_DMU_PMU_PD2408)
 struct notifier_block nb = {
 	.notifier_call = dmu_pmu_notifier_call,
 };
-#endif
 
 static struct platform_driver phytium_dmufreq_driver = {
 	.probe		= phytium_dmufreq_probe,
@@ -655,5 +607,6 @@ module_platform_driver(phytium_dmufreq_driver);
 
 MODULE_DESCRIPTION("Phytium DDR Memory Unit frequency driver");
 MODULE_AUTHOR("Li Jiayi <lijiayi@phytium.com.cn>");
+MODULE_AUTHOR("Li Mingzhe <limingzhe@phytium.com.cn>");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DMUFREQ_DRIVER_VERSION);

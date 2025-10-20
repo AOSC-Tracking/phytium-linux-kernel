@@ -423,6 +423,9 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 	     (end - start) >= (MAX_TLBI_OPS * stride)) ||
 	    pages >= MAX_TLBI_RANGE_PAGES) {
 		flush_tlb_mm(vma->vm_mm);
+#ifdef CONFIG_ARCH_PHYTIUM
+		mmu_notifier_arch_invalidate_secondary_tlbs(vma->vm_mm, start, end);
+#endif
 		return;
 	}
 
