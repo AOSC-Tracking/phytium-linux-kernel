@@ -13,6 +13,7 @@ obj-$(CONFIG_USB_DWC2)		+= dwc2/
 obj-$(CONFIG_USB_ISP1760)	+= isp1760/
 
 obj-$(CONFIG_USB_PHYTIUM)	+= phytium/
+obj-$(CONFIG_USB_PHYTIUM_V2)	+= phytium_usb_v2/
 
 obj-$(CONFIG_USB_MON)		+= mon/
 obj-$(CONFIG_USB_MTU3)		+= mtu3/
