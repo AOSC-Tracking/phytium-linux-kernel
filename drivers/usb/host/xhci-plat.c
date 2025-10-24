@@ -116,7 +116,8 @@ static int xhci_plat_start(struct usb_hcd *hcd)
 }
 
 static const struct xhci_plat_priv xhci_plat_phytium_pe220x = {
-	.quirks = XHCI_RESET_ON_RESUME | XHCI_S1_SUSPEND_WAKEUP,
+	.quirks = XHCI_RESET_ON_RESUME | XHCI_S1_SUSPEND_WAKEUP |
+		XHCI_BROKEN_STREAMS,
 };
 
 #ifdef CONFIG_OF
@@ -367,7 +368,8 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	if (ret)
 		goto disable_usb_phy;
 
-	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+	if (HCC_MAX_PSA(xhci->hcc_params) >= 4 &&
+			!(xhci->quirks & XHCI_BROKEN_STREAMS))
 		xhci->shared_hcd->can_do_streams = 1;
 
 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
