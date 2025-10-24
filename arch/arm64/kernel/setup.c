@@ -64,6 +64,12 @@
 #include <asm/xen/hypervisor.h>
 #include <asm/mmu_context.h>
 
+#ifdef CONFIG_ARCH_PHYTIUM
+#include <asm/phytium_cputype.h>
+enum phyt_soc_type phyt_soc_type_t;
+EXPORT_SYMBOL(phyt_soc_type_t);
+#endif
+
 static int num_standard_resources;
 static struct resource *standard_resources;
 
@@ -311,6 +317,10 @@ void __init setup_arch(char **cmdline_p)
 
 	xen_early_init();
 	efi_init();
+
+#ifdef CONFIG_ARCH_PHYTIUM
+	phyt_soc_type_init();
+#endif
 	arm64_memblock_init();
 
 	paging_init();

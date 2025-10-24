@@ -1850,6 +1850,7 @@ M:	Chen Baozi <chenbaozi@phytium.com.cn>
 S:	Maintained
 W:	https://www.phytium.com.cn
 F:	arch/arm64/boot/dts/phytium/*
+F:	arch/arm64/include/asm/phytium_cputype.h
 F:	arch/arm64/include/asm/ras.h
 F:	arch/arm64/kernel/ras.c
 F:	arch/arm/include/asm/kvm_ras.h
