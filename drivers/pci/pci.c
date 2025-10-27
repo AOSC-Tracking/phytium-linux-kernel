@@ -32,6 +32,9 @@
 #include <asm/dma.h>
 #include <linux/aer.h>
 #include "pci.h"
+#ifdef CONFIG_ARCH_PHYTIUM
+#include <asm/phytium_cputype.h>
+#endif
 
 DEFINE_MUTEX(pci_slot_mutex);
 
@@ -4920,8 +4923,19 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
  */
 int pci_bridge_secondary_bus_reset(struct pci_dev *dev)
 {
-	pcibios_reset_secondary_bus(dev);
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pd2308()) {
+		int ret = 0;
 
+		pci_save_state(dev);
+		pcibios_reset_secondary_bus(dev);
+		ret = pci_bridge_wait_for_secondary_bus(dev, "bus reset",
+						PCIE_RESET_READY_POLL_MS);
+		pci_restore_state(dev);
+		return ret;
+	}
+#endif
+	pcibios_reset_secondary_bus(dev);
 	return pci_bridge_wait_for_secondary_bus(dev, "bus reset",
 						 PCIE_RESET_READY_POLL_MS);
 }
