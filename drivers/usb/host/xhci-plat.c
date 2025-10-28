@@ -19,10 +19,39 @@
 #include <linux/slab.h>
 #include <linux/acpi.h>
 
+#ifdef CONFIG_ARCH_PHYTIUM
+#include <linux/workqueue.h>
+#endif
+
 #include "xhci.h"
 #include "xhci-plat.h"
 #include "xhci-mvebu.h"
 #include "xhci-rcar.h"
+
+#ifdef CONFIG_ARCH_PHYTIUM
+static struct workqueue_struct *xhci_wq;
+static struct workqueue_struct *get_xhci_wq(void)
+{
+	return xhci_wq;
+}
+
+static int xhci_plat_probe(struct platform_device *pdev);
+static int xhci_plat_remove(struct platform_device *dev);
+
+static void xhci_delay_work_func(struct work_struct *work)
+{
+	struct xhci_hcd *xhci;
+	struct usb_hcd *hcd;
+	struct platform_device *pdev;
+
+	xhci = container_of(to_delayed_work(work), struct xhci_hcd, xhci_delay_wq);
+	hcd = xhci_to_hcd(xhci);
+	pdev = to_platform_device(hcd->self.controller);
+
+	xhci_plat_remove(pdev);
+	xhci_plat_probe(pdev);
+}
+#endif
 
 static struct hc_driver __read_mostly xhci_plat_hc_driver;
 
@@ -226,8 +255,19 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto disable_runtime;
 	}
-
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pe220x() || is_pd2408()) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		hcd->regs = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+	} else {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+	}
+#else
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+#endif
+
 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(hcd->regs)) {
 		ret = PTR_ERR(hcd->regs);
@@ -332,6 +372,13 @@ static int xhci_plat_probe(struct platform_device *pdev)
 
 	device_enable_async_suspend(&pdev->dev);
 	pm_runtime_put_noidle(&pdev->dev);
+
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pe220x() || is_pd2408()) {
+		INIT_DELAYED_WORK(&xhci->xhci_delay_wq, xhci_delay_work_func);
+		xhci->get_xhci_wq = get_xhci_wq;
+	}
+#endif
 
 	/*
 	 * Prevent runtime pm from being on as default, users should enable
@@ -472,6 +519,13 @@ MODULE_ALIAS("platform:xhci-hcd");
 
 static int __init xhci_plat_init(void)
 {
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pe220x() || is_pd2408()) {
+		xhci_wq = create_workqueue("xhci_wq");
+		if (!xhci_wq)
+			return -ENOMEM;
+	}
+#endif
 	xhci_init_driver(&xhci_plat_hc_driver, &xhci_plat_overrides);
 	return platform_driver_register(&usb_xhci_driver);
 }
@@ -479,6 +533,10 @@ module_init(xhci_plat_init);
 
 static void __exit xhci_plat_exit(void)
 {
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pe220x() || is_pd2408())
+		destroy_workqueue(xhci_wq);
+#endif
 	platform_driver_unregister(&usb_xhci_driver);
 }
 module_exit(xhci_plat_exit);
