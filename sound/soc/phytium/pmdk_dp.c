@@ -51,7 +51,8 @@ static int pmdk_dp0_init(struct snd_soc_pcm_runtime *runtime)
 	if (ret)
 		dev_warn(card->dev, "failed creating Jack kctl %d\n", ret);
 
-	snd_soc_component_set_jack(component, &priv->jack0, NULL);
+	ret = snd_soc_component_set_jack(component, &priv->jack0, NULL);
+
 	return ret;
 }
 
@@ -73,7 +74,8 @@ static int pmdk_dp1_init(struct snd_soc_pcm_runtime *runtime)
 				    SND_JACK_LINEOUT);
 	if (ret)
 		dev_warn(card->dev, "failed creating Jack kctl %d\n", ret);
-	snd_soc_component_set_jack(component, &priv->jack1, NULL);
+	ret = snd_soc_component_set_jack(component, &priv->jack1, NULL);
+
 	return ret;
 }
 
@@ -95,12 +97,14 @@ static int pmdk_dp2_init(struct snd_soc_pcm_runtime *runtime)
 				    SND_JACK_LINEOUT);
 	if (ret)
 		dev_warn(card->dev, "failed creating Jack kctl %d\n", ret);
-	snd_soc_component_set_jack(component, &priv->jack2, NULL);
+	ret = snd_soc_component_set_jack(component, &priv->jack2, NULL);
+
 	return ret;
 }
 
 static struct snd_soc_dai_link pmdk_dai0 = {
 	.name = "Phytium dp0-audio",
+	.id = 0,
 	.stream_name = "Playback",
 	.cpu_dai_name = "phytium-i2s-dp0",
 	.codec_dai_name = "i2s-hifi",
@@ -113,6 +117,7 @@ static struct snd_soc_dai_link pmdk_dai0 = {
 
 static struct snd_soc_dai_link pmdk_dai1 = {
 	.name = "Phytium dp1-audio",
+	.id = 1,
 	.stream_name = "Playback",
 	.cpu_dai_name = "phytium-i2s-dp1",
 	.codec_dai_name = "i2s-hifi",
@@ -125,6 +130,7 @@ static struct snd_soc_dai_link pmdk_dai1 = {
 
 static struct snd_soc_dai_link pmdk_dai2 = {
 	.name = "Phytium dp2-audio",
+	.id = 2,
 	.stream_name = "Playback",
 	.cpu_dai_name = "phytium-i2s-dp2",
 	.codec_dai_name = "i2s-hifi",

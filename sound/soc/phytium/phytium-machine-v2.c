@@ -43,6 +43,7 @@ static const struct snd_soc_dapm_route phyt_machine_audio_map[] = {
 static struct snd_soc_dai_link phyt_machine_dai[] = {
 	{
 		.name = "PHYTIUM HIFI V2",
+		.id = 0,
 		.stream_name = "PHYTIUM HIFI V2",
 		.dai_fmt = PMDK_DAI_FMT,
 		.cpu_dai_name = "phytium-i2s-v2",
