@@ -109,7 +109,12 @@ static int phytium_can_plat_probe(struct platform_device *pdev)
 			goto fail;
 		}
 		cdev->can.clock.freq = clk_get_rate(cdev->clk);
-		clk_prepare_enable(cdev->clk);
+
+		ret = clk_prepare_enable(cdev->clk);
+		if (ret) {
+			dev_err(&pdev->dev, "clock enable failed\n");
+			goto fail;
+		}
 
 		of_id = of_match_device(phytium_can_of_ids, &pdev->dev);
 		if (of_id && of_id->data)
