@@ -154,6 +154,7 @@ config VIDEO_TI_CAL
 config VIDEO_PHYTIUM_JPEG
         tristate "Phytium JPEG Encoder driver"
         depends on VIDEO_V4L2
+        depends on ARCH_PHYTIUM
         select VIDEOBUF2_DMA_CONTIG
 	help
           Support for the Phytium JPEG Encoder Engine embedded
