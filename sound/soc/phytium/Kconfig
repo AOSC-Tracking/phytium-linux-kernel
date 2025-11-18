@@ -36,6 +36,7 @@ config SND_PMDK_MA1026
 
 config SND_SOC_PHYTIUM_I2S_V2
         tristate "Phytium I2S V2 Device Driver"
+	depends on ARCH_PHYTIUM
         help
          Say Y or M if you want to add support for I2S v2 driver for
          Phytium I2S device . The device supports 2 channels each
