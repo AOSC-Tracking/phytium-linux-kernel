@@ -55,7 +55,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
 struct dw_wdt {
 	void __iomem		*regs;
 	struct clk		*clk;
-	u64			rate;
+	u32			rate;
 	struct watchdog_device	wdd;
 	struct reset_control	*rst;
 	/* Save/restore */
@@ -273,7 +273,7 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 		 * are not available, so watchdog rate get from
 		 * clock-frequency property given in _DSD object.
 		 */
-		device_property_read_u64(dev, "clock-frequency",
+		device_property_read_u32(dev, "clock-frequency",
 					 &dw_wdt->rate);
 		if (dw_wdt->rate == 0) {
 			ret = -EINVAL;
