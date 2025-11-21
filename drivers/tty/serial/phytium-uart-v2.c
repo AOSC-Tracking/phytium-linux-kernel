@@ -30,7 +30,7 @@
 #define cmd_id_type     uint8_t
 #define cmd_subid_type  uint8_t
 #define DEFAULT_CLK	10000000
-#define	PHYT_UART_DRV_VER	"1.1.0"
+#define	PHYT_UART_DRV_VER	"1.1.1"
 /*
  * We wrap our port structure around the generic uart_port.
  */
@@ -43,8 +43,8 @@ struct phytium_uart_port {
 	struct clk		*clk;
 	void __iomem		*shmem_base;
 	bool			m_buf_empty;
-	bool			heartbeat_enable_flag;
-	bool			debug_enable_flag;
+	bool			heartbeat_enable;
+	bool			debug_enable;
 	struct			timer_list alive_timer;
 };
 
@@ -1073,51 +1073,48 @@ static int phytium_register_port(struct phytium_uart_port *pup)
 	return rc;
 }
 
-#if defined(SERIAL_PHYTIUM_V2_DEBUG)
 static int phytium_uart_enable_debug(struct phytium_uart_port *pup,
-		bool new_enable_flag)
+		bool enable)
 {
 	u32 dbg_regval;
-	static bool old_enable_flag;
 
-	if (old_enable_flag == new_enable_flag) {
+	if (pup->debug_enable == enable) {
 		pr_warn("PHYUART:set enable debug with repeative operation.\n");
-		return -1;
+		return -EINVAL;
 	}
-	old_enable_flag = new_enable_flag;
+	pup->debug_enable = enable;
 	dbg_regval = phytium_uart_read(pup, PHYUART_DBG_REG);
-	pr_info("PHYUART: %s debug_regval %x\n", __func__, dbg_regval);
-	if (!old_enable_flag && (dbg_regval & PHYUART_DBG_ENABLE_MASK))
+	if (!enable)
 		dbg_regval &= ~PHYUART_DBG_ENABLE_MASK;
-	else if (dbg_regval && !(dbg_regval & PHYUART_DBG_ENABLE_MASK))
+	else
 		dbg_regval |= PHYUART_DBG_ENABLE_MASK;
 
-	pr_info("final PHYUART: %s debug_regval %x\n", __func__, dbg_regval);
 	phytium_uart_write(dbg_regval, pup, PHYUART_DBG_REG);
 	return 0;
 }
 
 static int phytium_uart_enable_heartbeat(struct phytium_uart_port *pup,
-		bool new_heartbeat_flag)
+		bool enable)
 {
 	u32 dbg_regval;
-	static bool old_heartbeat_flag;
 
-	if (old_heartbeat_flag == new_heartbeat_flag) {
+	if (pup->heartbeat_enable == enable) {
 		pr_warn("PHYUART:set heartbeat with repeative operation.\n");
-		return -1;
+		return -EINVAL;
 	}
-	old_heartbeat_flag = new_heartbeat_flag;
+	pup->heartbeat_enable = enable;
 	dbg_regval = phytium_uart_read(pup, PHYUART_DBG_REG);
-	pr_info("PHYUART: %s dbg_regval %x\n", __func__, dbg_regval);
-	if (!old_heartbeat_flag && (dbg_regval & PHYUART_DBG_HEARTBEAT_MASK))
-		dbg_regval &= ~PHYUART_DBG_HEARTBEAT_MASK;
-	else if (dbg_regval && !(dbg_regval & PHYUART_DBG_HEARTBEAT_MASK))
+	if (!enable) {
+		dbg_regval &= ~PHYUART_DBG_HEARTBEAT_ENABLE_MASK;
+		phytium_uart_write(dbg_regval, pup, PHYUART_DBG_REG);
+		del_timer(&pup->alive_timer);
+	} else {
 		dbg_regval |= PHYUART_DBG_HEARTBEAT_MASK
 			| PHYUART_DBG_HEARTBEAT_ENABLE_MASK;
+		phytium_uart_write(dbg_regval, pup, PHYUART_DBG_REG);
+		add_timer(&pup->alive_timer);
+	}
 
-	pr_info("final PHYUART: %s dbg_regval %x\n", __func__, dbg_regval);
-	phytium_uart_write(dbg_regval, pup, PHYUART_DBG_REG);
 	return 0;
 }
 
@@ -1133,7 +1130,6 @@ static void alive_timer_routine(struct timer_list *tlist)
 	}
 
 	dbg_regval = phytium_uart_read(pup, PHYUART_DBG_REG);
-	pr_debug("PHYUART: %s debug_regval 0x%x\n", __func__, dbg_regval);
 	phytium_uart_write(dbg_regval | PHYUART_DBG_HEARTBEAT_MASK,
 			pup, PHYUART_DBG_REG);
 	mod_timer(&pup->alive_timer, jiffies + msecs_to_jiffies(5000));
@@ -1144,7 +1140,7 @@ static ssize_t debug_enable_show(struct device *dev,
 {
 	struct phytium_uart_port *pup = dev_get_drvdata(dev);
 
-	return sprintf(buf, "%d\n", pup->debug_enable_flag);
+	return sprintf(buf, "%d\n", pup->debug_enable);
 }
 
 static ssize_t debug_enable_store(struct device *dev,
@@ -1159,8 +1155,7 @@ static ssize_t debug_enable_store(struct device *dev,
 		ret = -EINVAL;
 		return ret;
 	}
-	pup->debug_enable_flag = enable;
-	phytium_uart_enable_debug(pup, pup->debug_enable_flag);
+	phytium_uart_enable_debug(pup, enable);
 	return count;
 }
 
@@ -1169,7 +1164,7 @@ static ssize_t heartbeat_enable_show(struct device *dev,
 {
 	struct phytium_uart_port *pup = dev_get_drvdata(dev);
 
-	return sprintf(buf, "%d\n", pup->heartbeat_enable_flag);
+	return sprintf(buf, "%d\n", pup->heartbeat_enable);
 }
 
 static ssize_t heartbeat_enable_store(struct device *dev,
@@ -1184,13 +1179,11 @@ static ssize_t heartbeat_enable_store(struct device *dev,
 		ret = -EINVAL;
 		return ret;
 	}
-	pup->heartbeat_enable_flag = heartbeat_enable;
-	phytium_uart_enable_heartbeat(pup, pup->heartbeat_enable_flag);
+	phytium_uart_enable_heartbeat(pup, heartbeat_enable);
 	return count;
 }
 static DEVICE_ATTR_RW(debug_enable);
 static DEVICE_ATTR_RW(heartbeat_enable);
-#endif
 static int phytium_uart_probe(struct platform_device *pdev)
 {
 	struct phytium_uart_port *pup;
@@ -1267,16 +1260,12 @@ static int phytium_uart_probe(struct platform_device *pdev)
 	pup->old_cr = 0;
 	pup->m_buf_empty = true;
 	snprintf(pup->type, sizeof(pup->type), "phytium,uart-v2");
-#if defined(SERIAL_PHYTIUM_V2_DEBUG)
-	pup->debug_enable_flag = false;
-	pup->heartbeat_enable_flag = false;
-
-	phytium_uart_enable_heartbeat(pup, true);
-	phytium_uart_enable_debug(pup, true);
+	pup->debug_enable = false;
+	pup->heartbeat_enable = false;
 
 	pup->alive_timer.expires = jiffies + msecs_to_jiffies(5000);
 	timer_setup(&pup->alive_timer, alive_timer_routine, 0);
-	add_timer(&pup->alive_timer);
+	phytium_uart_enable_heartbeat(pup, true);
 	ret = device_create_file(&pdev->dev,
 				&dev_attr_debug_enable);
 	if (ret < 0) {
@@ -1289,18 +1278,15 @@ static int phytium_uart_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "PHYUART: device_create_heartbeat file error.\n");
 		goto heartbeat_enable_free;
 	}
-#endif
 	platform_set_drvdata(pdev, pup);
 	return phytium_register_port(pup);
 
-#if defined(SERIAL_PHYTIUM_V2_DEBUG)
 heartbeat_enable_free:
 	device_remove_file(pup->dev, &dev_attr_heartbeat_enable);
 debug_enable_free:
 	device_remove_file(pup->dev, &dev_attr_debug_enable);
-#endif
+	del_timer(&pup->alive_timer);
 free:
-	kfree(pup);
 	return -1;
 }
 
@@ -1311,7 +1297,9 @@ static int phytium_uart_remove(struct platform_device *pdev)
 	uart_remove_one_port(&phytium_uart, &pup->port);
 
 	phytium_unregister_port(pup);
-
+	device_remove_file(pup->dev, &dev_attr_heartbeat_enable);
+	device_remove_file(pup->dev, &dev_attr_debug_enable);
+	del_timer(&pup->alive_timer);
 	return 0;
 }
 
