@@ -780,6 +780,7 @@ config SPI_PHYTIUM
 
 config SPI_PHYTIUM_PLAT
 	tristate "Phytium SPI controller platform support"
+	depends on ARCH_PHYTIUM
 	select SPI_PHYTIUM
 	help
 	  This selects a platform driver for Phytium SPI controller.
@@ -789,7 +790,7 @@ config SPI_PHYTIUM_PLAT
 
 config SPI_PHYTIUM_PCI
 	tristate "Phytium SPI controller PCI support"
-	depends on PCI
+	depends on PCI && ARCH_PHYTIUM
 	select SPI_PHYTIUM
 	help
 	  This selects a PCI driver for Phytium SPI controller.
