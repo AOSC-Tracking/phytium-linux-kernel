@@ -251,7 +251,7 @@ static const struct snd_kcontrol_new input_right_mixer[] = {
 	SOC_DAPM_SINGLE("DMIC Right Input", MA1026_PWRCTRL1, 6, 1, 1),
 };
 
-static DECLARE_TLV_DB_SCALE(hpd_tlv, -10200, 50, 0);
+//static DECLARE_TLV_DB_SCALE(hpd_tlv, -10200, 50, 0);
 static DECLARE_TLV_DB_SCALE(hpa_tlv, -5400, 200, 0);
 
 static const unsigned int limiter_tlv[] = {
