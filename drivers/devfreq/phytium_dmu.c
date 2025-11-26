@@ -315,7 +315,7 @@ static int phytium_dmu_get_dev_status(struct device *dev,
 	priv->last_bust_time = stat->busy_time = priv->bandwidth;
 	stat->total_time = (priv->single_threshold_value * priv->rate) / priv->freq_table[0];
 
-	dev_dbg(dev, "busy_time = %lu, total_time = %lu,single_threshold_value = %llu\n",
+	dev_dbg(dev, "busy_time = %lu, total_time = %lu,single_threshold_value = %lu\n",
 		stat->busy_time, stat->total_time, priv->single_threshold_value);
 
 	stat->current_frequency	= priv->rate;
