@@ -87,6 +87,15 @@ config HISILICON_LPC
 	  Driver to enable I/O access to devices attached to the Low Pin
 	  Count bus on the HiSilicon Hip06/7 SoC.
 
+config PHYTIUM_PIO
+	bool "Support for ISA I/O space on Phytium SoCs"
+	depends on (ARM64 && ARCH_PHYTIUM)
+	depends on HAS_IOMEM
+	select INDIRECT_PIO if ARM64
+	help
+	  Driver to enable I/O access to devices attached to the Legacy IO ports
+	  on the Phytium SoCs.
+
 config IMX_WEIM
 	bool "Freescale EIM DRIVER"
 	depends on ARCH_MXC
