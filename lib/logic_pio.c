@@ -16,6 +16,14 @@
 #include <linux/sizes.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_PHYTIUM_PIO
+#include "../drivers/bus/phytium_pio.h"
+#endif
+
+__weak bool check_cpu_type(void)
+{
+	return false;
+}
 /* The unique hardware address list */
 static LIST_HEAD(io_range_list);
 static DEFINE_MUTEX(io_range_mutex);
@@ -237,28 +245,36 @@ type logic_in##bwl(unsigned long addr)					\
 {									\
 	type ret = (type)~0;						\
 									\
+	if (check_cpu_type() == true)					\
+		addr += MMIO_UPPER_LIMIT;				\
 	if (addr < MMIO_UPPER_LIMIT) {					\
 		ret = _in##bwl(addr);					\
 	} else if (addr >= MMIO_UPPER_LIMIT && addr < IO_SPACE_LIMIT) { \
 		struct logic_pio_hwaddr *entry = find_io_range(addr);	\
 									\
-		if (entry)						\
+		if (entry && entry->ops)				\
 			ret = entry->ops->in(entry->hostdata,		\
 					addr, sizeof(type));		\
-		else							\
-			WARN_ON_ONCE(1);				\
+		else {							\
+			if (check_cpu_type() == true)			\
+				ret = 1;				\
+			else						\
+				WARN_ON_ONCE(1);			\
+		}							\
 	}								\
 	return ret;							\
 }									\
 									\
 void logic_out##bwl(type value, unsigned long addr)			\
 {									\
+	if (check_cpu_type() == true)					\
+		addr += MMIO_UPPER_LIMIT;				\
 	if (addr < MMIO_UPPER_LIMIT) {					\
 		_out##bwl(value, addr);				\
 	} else if (addr >= MMIO_UPPER_LIMIT && addr < IO_SPACE_LIMIT) {	\
 		struct logic_pio_hwaddr *entry = find_io_range(addr);	\
 									\
-		if (entry)						\
+		if (entry && entry->ops)				\
 			entry->ops->out(entry->hostdata,		\
 					addr, value, sizeof(type));	\
 		else							\
