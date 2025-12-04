@@ -538,10 +538,11 @@ int phytium_npu_submit_stream(struct phytium_npu_dev *npu,
 static void phytium_npu_inference_complete(struct phytium_npu_dev *npudev)
 {
 	struct phytium_npu_stream *nstream = npudev->activated_stream;
-	struct phytium_npu_session *sess = nstream->session;
+	struct phytium_npu_session *sess;
 
 	if ((npudev->irq_status != NPU_INFERENCE_COMPLETE_EVENT) || !nstream)
 		return;
+	sess = nstream->session;
 	phytium_npu_update_stream_buf_status(nstream);
 	nstream->infer_status = NPU_STREAM_INFER_DONE;
 	GET_TIME_NS(&npudev->te);
