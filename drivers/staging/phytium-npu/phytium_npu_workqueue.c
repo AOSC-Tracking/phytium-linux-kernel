@@ -162,7 +162,6 @@ int phytium_npu_try_excute_queued_stream(struct phytium_npu_dev *npu)
 	}
 
 	if (npu->activated_stream) {
-		npu->activated_stream->infer_status = NPU_STREAM_INFER_DONE;
 		npu->activated_stream = NULL;
 	}
 
