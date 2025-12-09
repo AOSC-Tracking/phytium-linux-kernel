@@ -78,6 +78,9 @@
 #include "internal.h"
 #include "shuffle.h"
 #include "page_reporting.h"
+#ifdef CONFIG_ARCH_PHYTIUM
+#include <asm/phytium_cputype.h>
+#endif
 
 /* Free Page Internal flags: for internal, non-pcp variants of free_pages(). */
 typedef int __bitwise fpi_t;
@@ -5460,6 +5463,16 @@ EXPORT_SYMBOL_GPL(si_mem_available);
 void si_meminfo(struct sysinfo *val)
 {
 	val->totalram = totalram_pages();
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pd2408()) {
+		int nid;
+		unsigned long total_pages = 0;
+		for_each_node_state(nid, N_MEMORY) {
+			total_pages += node_present_pages(nid);
+		}
+		val->totalram = total_pages;
+	}
+#endif
 	val->sharedram = global_node_page_state(NR_SHMEM);
 	val->freeram = global_zone_page_state(NR_FREE_PAGES);
 	val->bufferram = nr_blockdev_pages();
@@ -5482,6 +5495,10 @@ void si_meminfo_node(struct sysinfo *val, int nid)
 	for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++)
 		managed_pages += zone_managed_pages(&pgdat->node_zones[zone_type]);
 	val->totalram = managed_pages;
+#ifdef CONFIG_ARCH_PHYTIUM
+	if (is_pd2408())
+		val->totalram = node_present_pages(nid);
+#endif
 	val->sharedram = node_page_state(pgdat, NR_SHMEM);
 	val->freeram = sum_zone_node_page_state(nid, NR_FREE_PAGES);
 #ifdef CONFIG_HIGHMEM
