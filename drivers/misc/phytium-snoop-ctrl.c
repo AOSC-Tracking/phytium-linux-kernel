@@ -56,7 +56,7 @@
 #define snp_data_reg_snp2_data_reg	GENMASK(15, 8)
 #define snp_data_reg_snp2_shift		8
 
-#define SNOOP_DRIVER_VERSION "1.1.1"
+#define SNOOP_DRIVER_VERSION "1.1.2"
 
 struct phytium_snoop_ctrl_channel {
 	struct kfifo		fifo;
@@ -274,6 +274,11 @@ static int phytium_snoop_ctrl_probe(struct platform_device *pdev)
 		dev_err(dev, "no snoop ports configured\n");
 		return -ENODEV;
 	}
+
+	regmap_update_bits(snoop_ctrl->regmap, snp_enable_reg,
+			snp_enable_reg_snp1_en | snp_enable_reg_snp1_int_en, 0);
+	regmap_update_bits(snoop_ctrl->regmap, snp_enable_reg,
+			snp_enable_reg_snp2_en | snp_enable_reg_snp2_int_en, 0);
 
 	rc = phytium_snoop_ctrl_config_irq(snoop_ctrl, pdev);
 	if (rc)
