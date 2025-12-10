@@ -25,7 +25,7 @@
 #include "spi-phytium.h"
 
 #define DRIVER_NAME "phytium_spi"
-#define DRIVER_VERSION	"1.0.0"
+#define DRIVER_VERSION	"1.0.1"
 
 #define SPI_PHYTIUM_DEFAULT_CLK_RATE	50000000
 
@@ -37,7 +37,7 @@ static int phytium_spi_probe(struct platform_device *pdev)
 	int ret;
 	int num_cs;
 	int cs_gpio;
-	int global_cs = 0;
+	int global_cs = 1;
 	int i;
 	u32 clk_rate = SPI_PHYTIUM_DEFAULT_CLK_RATE;
 
