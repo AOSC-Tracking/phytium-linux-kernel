@@ -2463,8 +2463,11 @@ int phytium_drm_device_init(struct drm_device *drm_dev)
 		priv->mem_pool_size = 1 << 27;
 		priv->mem_pool_start_address_phy = start_address;
 	}
-	priv->mem_pool_start_address_virt = (void *)ioremap_wc(priv->mem_pool_start_address_phy,
+
+	if (priv->mem_pool_size > 0) {
+		priv->mem_pool_start_address_virt = (void *)ioremap_wc(priv->mem_pool_start_address_phy,
 									priv->mem_pool_size);
+	}
 #endif
 
 	for (i = 0; i < priv->info.total_pipes; i++) {

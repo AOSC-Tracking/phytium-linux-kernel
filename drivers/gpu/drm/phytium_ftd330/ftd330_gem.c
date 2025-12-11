@@ -45,7 +45,7 @@ static void put_pages(unsigned int nr_page, struct ftd330_gem_object *ftd330_obj
 
 }
 
-#if !defined(CONFIG_PHYTIUM_NCC) && defined(CONFIG_PHYTIUM_MMU)
+#ifdef CONFIG_PHYTIUM_MMU
 static int get_pages(unsigned int nr_page, struct ftd330_gem_object *ftd330_obj)
 {
 	struct page *pages;
@@ -101,7 +101,6 @@ static int get_pages(unsigned int nr_page, struct ftd330_gem_object *ftd330_obj)
 }
 #endif
 
-#ifndef CONFIG_PHYTIUM_NCC
 static int ftd330_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 {
 	struct drm_device *dev = ftd330_obj->base.dev;
@@ -121,7 +120,7 @@ static int ftd330_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 #ifdef CONFIG_X86
 	ftd330_obj->dma_attrs = 0;
 #else
-	ftd330_obj->dma_attrs = DMA_ATTR_WRITE_COMBINE | DMA_ATTR_NO_KERNEL_MAPPING;
+	ftd330_obj->dma_attrs = DMA_ATTR_WRITE_COMBINE;
 #endif
 
 	if (!is_iommu_enabled(dev))
@@ -169,10 +168,10 @@ static int ftd330_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 
 	/* mmu for ree driver */
 	if (!ftd330_obj->get_pages)
-		ret = dc_mmu_map_memory_and_flush(dev, priv->mmu, (u64)phy_obj->dma_addr, nr_pages,
+		ret = dc_mmu_map_memory_and_flush(dev, priv->mmu, (u64)ftd330_obj->dma_addr, nr_pages,
 				&mmu_addr, true, false);
 	else
-		ret = dc_mmu_map_memory_and_flush(dev, priv->mmu, (u64)vs_obj->pages, nr_pages,
+		ret = dc_mmu_map_memory_and_flush(dev, priv->mmu, (u64)ftd330_obj->pages, nr_pages,
 				&mmu_addr, false, false);
 
 	if (ret) {
@@ -209,6 +208,7 @@ static int ftd330_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 		sg_free_table(&sgt);
 	}
 
+	ftd330_obj->vram_alloc = false;
 	return 0;
 
 err_sgt_free:
@@ -248,7 +248,7 @@ static void ftd330_gem_free_buf(struct ftd330_gem_object *ftd330_obj)
 	}
 
 	nr_pages = ftd330_obj->size >> PAGE_SHIFT;
-	dc_mmu_unmap_memory_and_flush(dev, priv->mmu, (u32)vs_obj->iova, nr_pages);
+	dc_mmu_unmap_memory_and_flush(dev, priv->mmu, (u32)ftd330_obj->iova, nr_pages);
 #endif
 
 	if (!ftd330_obj->get_pages) {
@@ -261,7 +261,6 @@ static void ftd330_gem_free_buf(struct ftd330_gem_object *ftd330_obj)
 		put_pages(ftd330_obj->size >> PAGE_SHIFT, ftd330_obj);
 	}
 }
-#endif
 
 #ifdef CONFIG_PHYTIUM_MMU
 static void _ftd330_mmu_free_buf(struct ftd330_gem_object *ftd330_obj)
@@ -298,6 +297,9 @@ static int phytium_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 		return 0;
 	}
 
+	if (!priv->mem_pool) {
+		return -1;
+	}
 #ifdef CONFIG_X86
 	ftd330_obj->dma_attrs = 0;
 #else
@@ -318,7 +320,7 @@ static int phytium_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 	ftd330_obj->dma_addr = gen_pool_virt_to_phys(priv->mem_pool, vaddr);
 	ftd330_obj->cookie = (void *)vaddr;
 
-	if (!ftd330_obj->dma_addr) {
+	if (!ftd330_obj->dma_addr || !vaddr) {
 		DRM_DEV_ERROR(dev->dev, "Error:mem_pool alloc buf failed\n");
 		goto err_free;
 	}
@@ -372,20 +374,26 @@ static int phytium_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 #endif
 		sg_free_table(&sgt);
 	}
+
+	ftd330_obj->vram_alloc = true;
 	return 0;
 
 err_sgt_free:
 	sg_free_table(&sgt);
 err_mem_free:
-	if (!ftd330_obj->get_pages)
-		gen_pool_free(priv->mem_pool, (unsigned long)ftd330_obj->cookie, ftd330_obj->size);
-	else
+	if (!ftd330_obj->get_pages) {
+		if (ftd330_obj->cookie) {
+			gen_pool_free(priv->mem_pool, (unsigned long)ftd330_obj->cookie, ftd330_obj->size);
+		}
+	} else
 		put_pages(nr_pages, ftd330_obj);
 err_free:
 	if (ftd330_obj->pages) {
 		kvfree(ftd330_obj->pages);
 		ftd330_obj->pages = NULL;
 	}
+
+	ftd330_obj->dma_addr = 0;
 
 	return ret;
 }
@@ -424,6 +432,12 @@ int phytium_mem_pool_init(struct drm_device *dev)
 {
 	int ret = 0;
 	struct ftd330_drm_private *priv = dev->dev_private;
+	int init_size = 3840*2200*4;
+
+	if (priv->mem_pool_size <= 0) {
+		FTD330_LOG("no mem reserverd for dc,use cpu memory instead\n");
+		return 0;
+	}
 
 	priv->mem_pool = gen_pool_create(VRAM_POOL_ALLOC_ORDER, -1);
 	if (priv->mem_pool == NULL) {
@@ -441,7 +455,10 @@ int phytium_mem_pool_init(struct drm_device *dev)
 		goto err_add_poll;
 	}
 
-	memset(priv->mem_pool_start_address_virt, 0 ,3840*2200*4);
+	if (priv->mem_pool_size < init_size) {
+		init_size = priv->mem_pool_size -1;
+	}
+	memset(priv->mem_pool_start_address_virt, 0 , init_size);
 	return 0;
 
 err_add_poll:
@@ -460,7 +477,9 @@ void phytium_mem_pool_deinit(struct drm_device *dev)
 	if (priv->mem_pool)
 		gen_pool_destroy(priv->mem_pool);
 
-	iounmap(priv->mem_pool_start_address_virt);
+	if (priv->mem_pool_start_address_virt) {
+		iounmap(priv->mem_pool_start_address_virt);
+	}
 }
 #endif
 
@@ -478,7 +497,11 @@ void ftd330_gem_free_object(struct drm_gem_object *obj)
 		if (!list_empty(&ftd330_obj->list))
 			list_del(&ftd330_obj->list);
 #ifdef CONFIG_PHYTIUM_NCC
-		phytium_gem_free_buf(ftd330_obj);
+		if (ftd330_obj->vram_alloc) {
+			phytium_gem_free_buf(ftd330_obj);
+		} else {
+			ftd330_gem_free_buf(ftd330_obj);
+		}
 #else
 		ftd330_gem_free_buf(ftd330_obj);
 #endif
@@ -552,6 +575,8 @@ struct ftd330_gem_object *ftd330_gem_create_object(struct drm_device *dev, size_
 
 #ifdef CONFIG_PHYTIUM_NCC
 	ret = phytium_gem_alloc_buf(ftd330_obj);
+	if (ret)
+		ret = ftd330_gem_alloc_buf(ftd330_obj);
 #else
 	ret = ftd330_gem_alloc_buf(ftd330_obj);
 #endif
@@ -690,7 +715,11 @@ static int ftd330_gem_prime_vmap(struct drm_gem_object *obj, struct iosys_map *m
 {
 	struct ftd330_gem_object *ftd330_obj = to_ftd330_gem_object(obj);
 
-	iosys_map_set_vaddr_iomem(map, ftd330_obj->cookie);
+	if (ftd330_obj->vram_alloc) {
+		iosys_map_set_vaddr_iomem(map, ftd330_obj->cookie);
+	} else {
+		iosys_map_set_vaddr(map, ftd330_obj->cookie);
+	}
 	return 0;
 }
 #elif KERNEL_VERSION(5, 11, 0) > LINUX_VERSION_CODE

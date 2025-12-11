@@ -44,6 +44,7 @@ struct ftd330_gem_object {
 	struct list_head list;
 	void *vaddr_save;
 	void *sub_gem;
+	bool vram_alloc;
 };
 
 static inline struct ftd330_gem_object *to_ftd330_gem_object(struct drm_gem_object *obj)
