@@ -771,7 +771,6 @@ phytium_scale_user_to_hw(struct phytium_panel *panel, u32 user_level, u32 user_m
 static int phytium_backlight_device_update_status(struct backlight_device *bd)
 {
 	struct phytium_panel *panel = bl_get_data(bd);
-	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
 	struct drm_device *dev = panel->dev;
 	uint32_t hw_level = 0;
 	int ret = 0;
@@ -781,16 +780,7 @@ static int phytium_backlight_device_update_status(struct backlight_device *bd)
 #endif
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	hw_level = phytium_scale_user_to_hw(panel, bd->props.brightness, bd->props.max_brightness);
-	if (!panel->phytium_bl_info.aux_set && panel->phytium_bl_info.pwm_set) {
-#if MAP_BL
-		panel->level = phytium_dp->edp_bl_map.edp_pwm_to_bright[hw_level];
-#else
-		panel->level = hw_level;
-#endif
-	}
-	else {
-		panel->level = hw_level;
-	}
+	panel->level = hw_level;
 #if BL_DEBUG
 	pr_info("Update status get hw level = %d, panel level = %d\n", hw_level, panel->level);
 #endif
