@@ -2405,9 +2405,12 @@ failure_handling:
 	phytium_dp_get_link_train_fallback_values(phytium_dp);
 	if (phytium_dp->train_retry_count < 5)
 		schedule_work(&phytium_dp->train_retry_work);
-	else
+	else {
+		phytium_dp->max_pass_link_rate = 0;
+		phytium_dp->max_pass_lane_count = 0;
 		DRM_ERROR("DP(%d) Link Training Unsuccessful, and stop Training\n",
 			   phytium_dp->port);
+		}
 
 out:
 	return -1;
