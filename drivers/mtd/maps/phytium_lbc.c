@@ -106,14 +106,58 @@ static void lbc_copy_to(struct map_info *map, unsigned long to,
 
 static int phytium_lbc_calac_device_size(int device_size)
 {
-	int ret = 0;
 	u32 value;
 
-	if (device_size%SZ_16K == 0) {
-		value = device_size/SZ_16K - 1;
-	} else {
-		ret = -EINVAL;
-		return ret;
+	switch (device_size) {
+	case SZ_16K:
+		value = 0x0;
+		break;
+	case SZ_32K:
+		value = 0x1;
+		break;
+	case SZ_64K:
+		value = 0X2;
+		break;
+	case SZ_128K:
+		value = 0X3;
+		break;
+	case SZ_256K:
+		value = 0x4;
+		break;
+	case SZ_512K:
+		value = 0x5;
+		break;
+	case SZ_1M:
+		value = 0X6;
+		break;
+	case SZ_2M:
+		value = 0X7;
+		break;
+	case SZ_4M:
+		value = 0x08;
+		break;
+	case SZ_8M:
+		value = 0x09;
+		break;
+	case SZ_16M:
+		value = 0Xa;
+		break;
+	case SZ_32M:
+		value = 0Xb;
+		break;
+	case SZ_64M:
+		value = 0xc;
+		break;
+	case SZ_128M:
+		value = 0xd;
+		break;
+	case SZ_256M:
+		value = 0xe;
+		break;
+	default:
+		value = -EINVAL;
+		pr_err("lbc: device size is invalid or not support.\n");
+		break;
 	}
 
 	return value;
