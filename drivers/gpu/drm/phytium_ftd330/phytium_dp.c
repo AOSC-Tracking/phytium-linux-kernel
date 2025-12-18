@@ -4586,6 +4586,9 @@ static void replace_custom_parameters(struct phytium_dp_device *phytium_dp) {
 			memcpy(phytium_dp->edp_bl_map.edp_bright_to_pwm,
 					bios_info->edp_bios_bl_map.edp_bright_to_pwm[port],
 					sizeof(bios_info->edp_bios_bl_map.edp_bright_to_pwm[port]));
+			memcpy(phytium_dp->edp_bl_map.edp_pwm_to_bright,
+					bios_info->edp_bios_bl_map.edp_pwm_to_bright[port],
+					sizeof(bios_info->edp_bios_bl_map.edp_pwm_to_bright[port]));
 			pr_info("dp-%d using acpi backlight map parameter\n", port);
 		}
 		break;
@@ -4606,6 +4609,9 @@ static void replace_custom_parameters(struct phytium_dp_device *phytium_dp) {
 			memcpy(phytium_dp->edp_bl_map.edp_bright_to_pwm,
 					bios_info->edp_bios_bl_map.edp_bright_to_pwm[port],
 					sizeof(bios_info->edp_bios_bl_map.edp_bright_to_pwm[port]));
+			memcpy(phytium_dp->edp_bl_map.edp_pwm_to_bright,
+					bios_info->edp_bios_bl_map.edp_pwm_to_bright[port],
+					sizeof(bios_info->edp_bios_bl_map.edp_pwm_to_bright[port]));
 			pr_info("dp-%d using acpi backlight map parameter\n", port);
 		}
 		break;
@@ -4626,6 +4632,9 @@ static void replace_custom_parameters(struct phytium_dp_device *phytium_dp) {
 			memcpy(phytium_dp->edp_bl_map.edp_bright_to_pwm,
 					bios_info->edp_bios_bl_map.edp_bright_to_pwm[port],
 					sizeof(bios_info->edp_bios_bl_map.edp_bright_to_pwm[port]));
+			memcpy(phytium_dp->edp_bl_map.edp_pwm_to_bright,
+					bios_info->edp_bios_bl_map.edp_pwm_to_bright[port],
+					sizeof(bios_info->edp_bios_bl_map.edp_pwm_to_bright[port]));
 			pr_info("dp-%d using acpi backlight map parameter\n", port);
 		}
 		break;
