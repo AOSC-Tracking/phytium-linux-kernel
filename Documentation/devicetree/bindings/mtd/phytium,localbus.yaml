@@ -23,6 +23,39 @@ properties:
                 description: localbus,configuration registers address space,
                              lbc_mm, memory mapped address space.
 
+patternProperties:
+  "^(norflash|sram)@[0-9a-f]+$":
+    type: object
+    properties:
+      device-type:
+        description: |
+          <1>: async flash
+          <2>: async sram
+        enum: [1, 2]
+      device-time-seq:
+        description: |
+          [0]: reg CSPR value
+          [1]: reg FTIM0_CS_{NOR/GPCM},
+          [2]: reg FTIM1_CS_{NOR/GPCM},
+          [4]: reg FTIM2_CS_{NOR/GPCM}
+        minItems: 4
+        maxItems: 4
+      device-size:
+        enum: [0x4000, 0x8000, 0x10000, 0x20000, 0x40000, 0x80000,
+              0x100000, 0x200000, 0x400000, 0x800000, 0x1000000,
+              0x2000000, 0x4000000, 0x8000000, 0x10000000]
+      bank-width:
+        description: |
+          <1>: 8 bits
+          <2>: 16 bits
+        enum: [1, 2]
+    required:
+      - device-type
+      - device-time-seq
+      - device-size
+      - bank-width
+    unevaluatedProperties: false
+
 required:
         - compatible
         - reg
@@ -34,13 +67,29 @@ examples:
                         compatible = "phytium,localbus";
                         #address-cells = <2>;
                         #size-cells = <1>;
-                        reg = <0x00 0x28003000 0x00 0x1000 0x01 0x10000000 0x0 0x10000000>;
+                        reg = <0x00 0x28003000 0x00 0x1000 0x00 0x10000000 0x0 0x10000000>;
                         reg-names = "localbus", "lbc_mm";
                         status = "disabled";
                         norflash@0 {
                                 device-type = <1>;
                                 device-time-seq = <0x0003 0x043043 0x3f1f01 0x3fc40f>;
                                 device-size = <0x10000000>;
+                                bank-width = <2>;
+                        };
+                };
+
+        - |
+                lbc: localbus@28007000 {
+                        compatible = "phytium,localbus";
+                        #address-cells = <2>;
+                        #size-cells = <1>;
+                        reg = <0x00 0x28007000 0x00 0x1000 0x00 0x10000000 0x0 0x10000000>;
+                        reg-names = "localbus", "lbc_mm";
+                        status = "disabled";
+                        sram@0 {
+                                device-type = <2>;
+                                device-time-seq = <0x0005 0x1101 0x4045 0x2106>;
+                                device-size = <0x200000>;
                                 bank-width = <2>;
                         };
                 };
