@@ -30,6 +30,10 @@ extern int ftd330_phytium_dc_log_level;
 	}
 #define DC_DRIVER_VERSION "1.1.9"
 
+#ifndef MAX_ORDER
+#define MAX_ORDER 11
+#endif
+
 #ifndef DRM_FORMAT_MOD_VENDOR_PHYTIUM
 #define DRM_FORMAT_MOD_VENDOR_PHYTIUM  0x06
 #endif

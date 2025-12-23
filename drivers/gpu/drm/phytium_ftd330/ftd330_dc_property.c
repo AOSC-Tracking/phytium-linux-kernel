@@ -75,7 +75,7 @@ err_cleanup:
 
 void ftd330_dc_deinitialize_property_states(struct ftd330_dc_property_state_group *states)
 {
-	if (!states || !states->mem.pool)
+	if (!states)
 		return;
 	/* TODO: Fixme
 	 *kfree(states->mem.pool);
