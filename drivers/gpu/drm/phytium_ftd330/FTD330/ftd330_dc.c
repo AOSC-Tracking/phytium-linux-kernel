@@ -1026,8 +1026,19 @@ static void update_cursor_plane(struct ftd330_dc *dc, struct ftd330_plane *plane
 	struct dc_hw_cursor cursor;
 	struct drm_crtc *crtc = state->crtc;
 	struct drm_display_mode *mode = &crtc->state->adjusted_mode;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 90))
+	int orig_hotx = state->hotspot_x;
+        int orig_hoty = state->hotspot_y;
+#elif defined(CONFIG_KYLIN_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
 	struct drm_framebuffer *fb = state->fb;
+	int orig_hotx = state->hotspot_x;
+	int orig_hoty = state->hotspot_y;
+#else
+	struct drm_framebuffer *fb = state->fb;
+	int orig_hotx = fb->hot_x;
+	int orig_hoty = fb->hot_y;
 
+#endif
 	cursor.address = (u32)plane->dma_addr[0];
 	cursor.x = state->crtc_x;
 	cursor.y = state->crtc_y;
@@ -1051,9 +1062,9 @@ static void update_cursor_plane(struct ftd330_dc *dc, struct ftd330_plane *plane
 	         (mode->crtc_vdisplay != mode->vdisplay)))	{
 		
 		if (cursor.x > 0) {
-			cursor.x = ((((cursor.x + fb->hot_x) << 13) * mode->crtc_hdisplay / mode->hdisplay) >> 13) - fb->hot_x;
+			cursor.x = ((((cursor.x + orig_hotx) << 13) * mode->crtc_hdisplay / mode->hdisplay) >> 13) - orig_hotx;
 		} else {
-			cursor.x = ((((fb->hot_x - cursor.hot_x) << 13) * mode->crtc_hdisplay / mode->hdisplay) >> 13) - fb->hot_x;
+			cursor.x = ((((orig_hotx - cursor.hot_x) << 13) * mode->crtc_hdisplay / mode->hdisplay) >> 13) - orig_hotx;
 			if (cursor.x >= 0) {
 				cursor.hot_x = 0;
 			} else {
@@ -1063,9 +1074,9 @@ static void update_cursor_plane(struct ftd330_dc *dc, struct ftd330_plane *plane
 		}
 	
 		if (cursor.y > 0) {
-			cursor.y = ((((cursor.y + fb->hot_y) << 13) * mode->crtc_vdisplay / mode->vdisplay) >> 13) - fb->hot_y;
+			cursor.y = ((((cursor.y + orig_hoty) << 13) * mode->crtc_vdisplay / mode->vdisplay) >> 13) - orig_hoty;
 		} else {
-			cursor.y = ((((fb->hot_y - cursor.hot_y) << 13) * mode->crtc_vdisplay / mode->vdisplay) >> 13) - fb->hot_y;
+			cursor.y = ((((orig_hoty - cursor.hot_y) << 13) * mode->crtc_vdisplay / mode->vdisplay) >> 13) - orig_hoty;
 			if (cursor.y >= 0) {
                                 cursor.hot_y = 0;
                         } else {

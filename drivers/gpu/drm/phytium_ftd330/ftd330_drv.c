@@ -8,7 +8,7 @@
 #include <linux/of_graph.h>
 #include <linux/version.h>
 #include <linux/async.h>
-
+#include <linux/vmalloc.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>

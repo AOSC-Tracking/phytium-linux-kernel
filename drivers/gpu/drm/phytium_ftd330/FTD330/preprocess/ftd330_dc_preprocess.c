@@ -325,7 +325,7 @@ static bool gamut_map_check(const struct dc_hw *hw, u8 hw_id, const void *data, 
 		return false;
 	}
 	if (gamut_map->mode == FTD330_GAMUT_USER_DEF) {
-		if (!gamut_map->coef || !sizeof(gamut_map->coef) ||
+		if (!sizeof(gamut_map->coef) ||
 		    sizeof(gamut_map->coef) > FTD330_MAX_GAMUT_COEF_NUM) {
 			pr_err("%s: Invalid user define gamut map coefficient.\n", __func__);
 			return false;
@@ -347,10 +347,6 @@ static bool gamut_map_config_hw(struct dc_hw *hw, u8 hw_id, bool enable, const v
 	else
 		dc_set_clear(hw, DC_OVERLAY_CONFIG + offset, enable << 29, BIT(29));
 	if (enable) {
-		if (!gamut_map->coef) {
-			pr_err("%s: Unkonwn mode %#x\n", __func__, gamut_map->mode);
-			return false;
-		}
 		dc_write(hw, reg->RGBToRGBCoef0 + offset,
 			 gamut_map->coef[0] | (gamut_map->coef[1] << 16));
 		dc_write(hw, reg->RGBToRGBCoef1 + offset,
