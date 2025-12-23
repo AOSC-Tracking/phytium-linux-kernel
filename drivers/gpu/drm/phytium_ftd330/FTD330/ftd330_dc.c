@@ -1028,7 +1028,7 @@ static void update_cursor_plane(struct ftd330_dc *dc, struct ftd330_plane *plane
 	struct drm_display_mode *mode = &crtc->state->adjusted_mode;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 90))
 	int orig_hotx = state->hotspot_x;
-        int orig_hoty = state->hotspot_y;
+	int orig_hoty = state->hotspot_y;
 #elif defined(CONFIG_KYLIN_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
 	struct drm_framebuffer *fb = state->fb;
 	int orig_hotx = state->hotspot_x;
@@ -1403,11 +1403,51 @@ irqreturn_t dc1_isr(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_DRM_PANIC
+static void phytium_drm_panic_buffer_replace(struct device *dev, struct drm_crtc *crtc)
+{
+	struct drm_device *drm_dev = crtc->dev;
+	struct ftd330_drm_private *priv;
+	struct dc_hw_plane *plane;
+	int display_id = drm_crtc_index(crtc);
+	int i = 0;
+	struct ftd330_dc *dc = dev_get_drvdata(dev);
+	u8 id, layer_num = dc->hw.info->layer_num;
 
+	if (!drm_dev) {
+		pr_err("drm panic replace buffer fail : no drm_dev \n");
+		return;
+	}
+
+	priv = drm_dev->dev_private;
+
+	if (priv && priv->in_drm_panic) {
+		for (i = 0;i < layer_num;i++) {
+			plane = &dc->hw.plane[i];
+			id = dc->hw.info->planes[i].id;
+
+			if (plane->fb.display_id != display_id)
+				continue;
+
+			if (id == PRIMARY_PLANE_0 || id == PRIMARY_PLANE_1 || id == PRIMARY_PLANE_2) {
+				if (priv->scanout_buffer[display_id].dirty && priv->scanout_buffer[display_id].enable) {
+					plane->fb = priv->scanout_buffer[display_id];
+					DRM_DEBUG_KMS("panic buffer replaced,plane_display_id:%d\n",plane->fb.display_id);
+				}
+			}
+		}
+	}
+	return;
+}
+#endif
 static void ftd330_dc_commit(struct device *dev, struct drm_crtc *crtc)
 {
 	struct ftd330_dc *dc = dev_get_drvdata(dev);
 	u8 display_id = to_ftd330_display_id(dc, crtc);
+
+#ifdef CONFIG_DRM_PANIC
+	phytium_drm_panic_buffer_replace(dev, crtc);
+#endif
 
 #ifdef CONFIG_PHYTIUM_DEC
 	if (dc->hw.info->cap_dec)
