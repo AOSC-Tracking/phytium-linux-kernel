@@ -225,6 +225,8 @@ struct ftd330_drm_private {
 	struct phytium_dp_device *phytium_dp[DISPLAY_NUM];
 	bool power_status_save[DISPLAY_NUM];
 	spinlock_t hotplug_irq_lock;
+	struct dc_hw_fb scanout_buffer[DISPLAY_NUM];
+	bool in_drm_panic;
 };
 
 int ftd330_drm_iommu_attach_device(struct drm_device *drm_dev, struct device *dev);

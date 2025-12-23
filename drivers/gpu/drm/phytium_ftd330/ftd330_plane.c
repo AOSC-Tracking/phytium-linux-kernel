@@ -13,6 +13,10 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_blend.h>
+#ifdef CONFIG_DRM_PANIC
+#include <drm/drm_atomic_uapi.h>
+#include <drm/drm_panic.h>
+#endif
 #if KERNEL_VERSION(6, 1, 0) > LINUX_VERSION_CODE
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_gem_cma_helper.h>
@@ -34,6 +38,8 @@
 #include "ftd330_gem.h"
 #include "ftd330_plane.h"
 #include "ftd330_type.h"
+#include "phytium_dp.h"
+
 #define fourcc_mod_ftd330_get_type(val) (((val) & DRM_FORMAT_MOD_FTD330_TYPE_MASK) >> 53)
 
 void ftd330_plane_destory(struct drm_plane *plane)
@@ -662,6 +668,115 @@ static void ftd330_plane_early_unregister(struct drm_plane *plane)
 	debugfs_remove_recursive(ftd330_plane->debugfs_entry);
 }
 
+#ifdef CONFIG_DRM_PANIC
+
+/*
+ * we can only create a new buffer to do panic display only.
+ * cause dc doesnot have the virtual address of import buffer
+ * from GPU(the orginal buffer).what's more ,YUV has  multiple
+ * buffers and not supported by kernel.
+ * */
+static int ftd330_primary_plane_get_scanout_buffer(struct drm_plane *plane,
+										struct drm_scanout_buffer *sb)
+{
+	int ret = 0;
+	struct drm_device *drm_dev = NULL;;
+	struct drm_plane_state *state = NULL;
+	struct drm_framebuffer *old_fb = NULL;
+	struct ftd330_gem_object *scanout_gem;
+	size_t size = 0;
+	struct ftd330_drm_private *priv = NULL;
+	int crtc_index = 0;
+	struct drm_crtc *crtc = NULL;
+	struct ftd330_crtc *ftd330_crtc = NULL;
+	struct drm_mode_fb_cmd2 cmd;
+
+	if (!plane)
+		goto out;
+
+	drm_dev = plane->dev;
+	state = plane->state;
+
+	if (!drm_dev)
+		goto out;
+
+	crtc = state->crtc;
+	if (!crtc)
+		goto out;
+	
+	/*clear hpd plut work*/
+	priv = drm_dev->dev_private;
+	phytium_dp_hpd_irq_setup(drm_dev, false, false);
+	phytium_dplp_deinit(priv);
+	cancel_work_sync(&priv->hotplug_work);
+
+	crtc_index = drm_crtc_index(crtc);
+	old_fb = state->fb;
+
+	/*create a new buffer and use it as scanout buffer*/
+	size = PAGE_ALIGN(ALIGN(old_fb->width * 4, 128)*old_fb->height);
+
+	ret = mutex_lock_interruptible(&drm_dev->struct_mutex);
+	if (ret < 0) {
+		DRM_ERROR("failed to get mutex lock\n");
+		return ret;
+	}
+
+	scanout_gem = ftd330_gem_create_object(drm_dev, size);
+	if (!scanout_gem) {
+		DRM_ERROR("failed to create scanout gem object\n");
+		return -ENOMEM;
+	}
+	mutex_unlock(&drm_dev->struct_mutex);
+
+	ftd330_crtc = to_ftd330_crtc(crtc);
+
+	cmd.pixel_format = DRM_FORMAT_XRGB8888;
+	cmd.width = old_fb->width;
+	cmd.height = old_fb->height;
+	cmd.pitches[0] = ALIGN(old_fb->width * 4, 128);
+
+	priv->scanout_buffer[crtc_index].y_address = scanout_gem->iova;
+	priv->scanout_buffer[crtc_index].u_address = 0;
+	priv->scanout_buffer[crtc_index].v_address = 0;
+	priv->scanout_buffer[crtc_index].water_mark = 0x5666;
+	priv->scanout_buffer[crtc_index].y_stride = ALIGN(old_fb->width * 4, 128);
+	priv->scanout_buffer[crtc_index].u_stride = 0;
+	priv->scanout_buffer[crtc_index].v_stride = 0;
+	priv->scanout_buffer[crtc_index].width = old_fb->width;
+	priv->scanout_buffer[crtc_index].height = old_fb->height;
+	priv->scanout_buffer[crtc_index].format = FORMAT_A8R8G8B8;
+	priv->scanout_buffer[crtc_index].tile_mode = 0;
+	priv->scanout_buffer[crtc_index].rotation = 0;
+	priv->scanout_buffer[crtc_index].yuv_gamut = CSC_GAMUT_2020;
+	priv->scanout_buffer[crtc_index].swizzle = 0;
+	priv->scanout_buffer[crtc_index].uv_swizzle = 0;
+	priv->scanout_buffer[crtc_index].dec_enable = false;
+	priv->scanout_buffer[crtc_index].enable = true;
+	priv->scanout_buffer[crtc_index].dirty = true;
+	priv->scanout_buffer[crtc_index].display_id = crtc_index;
+
+	sb->width = old_fb->width;
+	sb->height = old_fb->height;
+	sb->format = drm_get_format_info(drm_dev, &cmd);
+ 	sb->pitch[0] =  ALIGN(old_fb->width * 4, 128);
+
+	DRM_DEBUG_KMS("crtc:%d,sb:width:%d,height:%d,depth:%d,pitch:%d\n",crtc_index, sb->width,
+						sb->height,sb->format->depth,sb->pitch[0]);
+
+	scanout_gem->base.funcs->vmap(&scanout_gem->base, &sb->map[0]);
+
+	memset(scanout_gem->cookie, 0, size);
+	priv->in_drm_panic = true;
+	ftd330_crtc->funcs->commit(drm_dev->dev, crtc);
+
+	return 0;
+out:
+	return -1;
+}
+#endif
+
+
 const struct drm_plane_funcs ftd330_plane_funcs = {
 	.update_plane = drm_atomic_helper_update_plane,
 	.disable_plane = drm_atomic_helper_disable_plane,
@@ -760,13 +875,14 @@ const struct drm_plane_helper_funcs ftd330_plane_helper_funcs = {
 	.atomic_check = ftd330_plane_atomic_check,
 	.atomic_update = ftd330_plane_atomic_update,
 	.atomic_disable = ftd330_plane_atomic_disable,
-
 #if KERNEL_VERSION(5, 13, 0) > LINUX_VERSION_CODE
 	.prepare_fb = drm_gem_fb_prepare_fb,
 #else
 	.prepare_fb = drm_gem_plane_helper_prepare_fb,
 #endif
-
+#ifdef CONFIG_DRM_PANIC
+	.get_scanout_buffer = ftd330_primary_plane_get_scanout_buffer,
+#endif
 };
 
 void ftd330_plane_get_dec_tile_status(struct drm_device *dev, struct ftd330_gem_object *ftd330_gem,
