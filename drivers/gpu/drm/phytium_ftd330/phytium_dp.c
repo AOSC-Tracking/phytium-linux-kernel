@@ -270,7 +270,7 @@ phytium_dp_hw_aux_transfer_write(struct phytium_dp_device *phytium_dp, struct dr
 		ret = -EIO;
 		goto out;
 	} else if ((aux_status & REPLY_RECEIVED) != REPLY_RECEIVED) {
-		DRM_ERROR("aux(%d) write reply no response\n", phytium_dp->port);
+		DRM_DEBUG_KMS("aux(%d) write reply no response\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	}
@@ -341,7 +341,7 @@ phytium_dp_hw_aux_transfer_read(struct phytium_dp_device *phytium_dp, struct drm
 		ret = -EIO;
 		goto out;
 	} else if ((aux_status & REPLY_RECEIVED) != REPLY_RECEIVED) {
-		DRM_ERROR("aux(%d) read reply no response\n", phytium_dp->port);
+		DRM_DEBUG_KMS("aux(%d) read reply no response\n", phytium_dp->port);
 		ret = -EIO;
 		goto out;
 	}
