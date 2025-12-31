@@ -2134,6 +2134,7 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 	struct device_node *reserved_mem_node;
 	struct fwnode_handle *np;
 	int i = 0;
+	uint64_t tmp;
 #ifdef CONFIG_PHYTIUM_EDP_BL
 	u8 bios_psr_is_enable = 1;
 	u8 edp_need_poweron_state = 0;
@@ -2209,7 +2210,7 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 		}
 #ifdef CONFIG_PHYTIUM_EDP_BL
 		if (priv->info.edp_mask) {
-			priv->info.pwm_clk_rate = 100000000;
+			priv->info.pwm_clk_rate = 100000000; /* 100MHz */
 			ret =
 			of_property_read_u32(node, "pwm_output_freq",
 									&priv->info.pwm_freq);
@@ -2220,8 +2221,13 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 			}
 			pr_info("FTD330 pwm_output_freq: %dhz\n", priv->info.pwm_freq);
 
-			priv->info.pwm_periodns = 1000000000/priv->info.pwm_freq;
-			priv->info.pwm_div = 0x3E7;
+			/* A PWM period can be divided into 100 parts */
+			priv->info.pwm_div = priv->info.pwm_clk_rate/priv->info.pwm_freq/100;
+
+			tmp = (uint64_t)1000000000ULL * (uint64_t)priv->info.pwm_div * 100;
+			tmp = tmp / (uint64_t)priv->info.pwm_clk_rate;
+			priv->info.pwm_periodns = 1000000000*priv->info.pwm_div/priv->info.pwm_clk_rate;
+			priv->info.pwm_div -= 1;
 
 			ret =
 			of_property_read_u8(node, "edp_need_poweron",
@@ -2308,7 +2314,7 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 	
 #ifdef CONFIG_PHYTIUM_EDP_BL
 		if (priv->info.edp_mask) {
-			priv->info.pwm_clk_rate = 100000000;
+			priv->info.pwm_clk_rate = 100000000; /* 100MHz */
 			ret =
 			fwnode_property_read_u32(np, "pwm_output_freq",
 									&priv->info.pwm_freq);
@@ -2319,8 +2325,13 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 			}
 			pr_info("FTD330 pwm_output_freq: %dhz\n", priv->info.pwm_freq);
 
-			priv->info.pwm_periodns = 1000000000/priv->info.pwm_freq;
-			priv->info.pwm_div = 0x3E7;
+			/* A PWM period can be divided into 100 parts */
+			priv->info.pwm_div = priv->info.pwm_clk_rate/priv->info.pwm_freq/100;
+
+			tmp = (uint64_t)1000000000ULL * (uint64_t)priv->info.pwm_div * 100;
+			tmp = tmp / (uint64_t)priv->info.pwm_clk_rate;
+			priv->info.pwm_periodns = (uint32_t)tmp;
+			priv->info.pwm_div -= 1;
 
 			ret =
 			fwnode_property_read_u8(np, "edp_need_poweron",
