@@ -180,28 +180,22 @@ void pwm_phytium_init(struct ftd330_drm_private *priv, struct phytium_bl_pwm_chi
 	else if (pwm_chip->state.cntmod == 1)
 		reg |= 0x4;
 
-	/*4. enable time interrupt*/
-	reg |= 0x30; //bit[4],bit[5]
-
-	/*5. set div*/
+	/*4. set div*/
 	reg &= 0xffff;
 	reg |= (pwm_chip->state.div<<16);
 	phytium_writel_reg(priv, reg, group_offset, PWM_TIM_CTRL);
 
-	/*6. set period*/
+	/*5. set period*/
 	pwm_phytium_set_periodns(priv, pwm_chip, pwm_chip->set_periodns);
 
-	/*7. set pwm mode*/
+	/*6. set pwm mode*/
 	reg = phytium_readl_reg(priv, group_offset, PWM_CTRL);
 	reg |= 0x4; //bit[2], only support compare mode
 
-	/*8. enable pwm interrupt*/
-	reg |= 0x208; //bit[9],bit[3]
-
-	/*9. pwm CMP mode*/
+	/*7. pwm CMP mode*/
 	reg |= 0x40; //CMP=100
 
-	/*10. set duty mode*/
+	/*8. set duty mode*/
 	if (pwm_chip->state.dutymod == 0) // bit[8] duty src from pwm ccr
 		reg &= 0xfffffeff;
 	else if (pwm_chip->state.dutymod == 1)
