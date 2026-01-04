@@ -561,7 +561,7 @@ static void __init psci_init_system_suspend(void)
 
 	ret = psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND));
 
-	if (ret != PSCI_RET_NOT_SUPPORTED)
+	if (ret != PSCI_RET_NOT_SUPPORTED) {
 #ifdef CONFIG_ARCH_PHYTIUM
 		if (is_pd2408())
 			suspend_set_ops(&phytium_psci_suspend_ops);
@@ -570,6 +570,7 @@ static void __init psci_init_system_suspend(void)
 #else
 		suspend_set_ops(&psci_suspend_ops);
 #endif
+	}
 }
 
 static void __init psci_init_cpu_suspend(void)
