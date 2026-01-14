@@ -17534,6 +17534,7 @@ F:	drivers/net/ethernet/stmicro/stmmac/dwmac-phytium.c
 F:	drivers/pci/controller/pcie-phytium*
 F:	drivers/perf/phytium/*
 F:	drivers/perf/phytium/phytium_ddr_pmu.c
+F:	drivers/perf/phytium/phytium_msi_pmu.c
 F:	drivers/perf/phytium/phytium_pcie_link_pmu.c
 F:	drivers/perf/phytium/phytium_pcie_pmu.c
 F:	drivers/pwm/pwm-phytium.c
