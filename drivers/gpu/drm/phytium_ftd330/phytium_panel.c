@@ -19,6 +19,64 @@
 #include "phytium_edp_pwm.h"
 #include "ftd330_dp.h"
 
+/* COPY from intel_dp_aux_backlight.c in kernel 6.6
+ * TODO:
+ * Implement HDR, right now we just implement the bare minimum to bring us back into SDR mode so we
+ * can make people's backlights work in the mean time
+ */
+
+/*
+ * DP AUX registers for Intel's proprietary HDR backlight interface. We define
+ * them here since we'll likely be the only driver to ever use these.
+ */
+#define INTEL_EDP_HDR_TCON_CAP0                                        0x340
+
+#define INTEL_EDP_HDR_TCON_CAP1                                        0x341
+# define INTEL_EDP_HDR_TCON_2084_DECODE_CAP                           BIT(0)
+# define INTEL_EDP_HDR_TCON_2020_GAMUT_CAP                            BIT(1)
+# define INTEL_EDP_HDR_TCON_TONE_MAPPING_CAP                          BIT(2)
+# define INTEL_EDP_HDR_TCON_SEGMENTED_BACKLIGHT_CAP                   BIT(3)
+# define INTEL_EDP_HDR_TCON_BRIGHTNESS_NITS_CAP                       BIT(4)
+# define INTEL_EDP_HDR_TCON_OPTIMIZATION_CAP                          BIT(5)
+# define INTEL_EDP_HDR_TCON_SDP_COLORIMETRY_CAP                       BIT(6)
+# define INTEL_EDP_HDR_TCON_SRGB_TO_PANEL_GAMUT_CONVERSION_CAP        BIT(7)
+
+#define INTEL_EDP_HDR_TCON_CAP2                                        0x342
+# define INTEL_EDP_SDR_TCON_BRIGHTNESS_AUX_CAP                        BIT(0)
+
+#define INTEL_EDP_HDR_TCON_CAP3                                        0x343
+
+#define INTEL_EDP_HDR_GETSET_CTRL_PARAMS                               0x344
+# define INTEL_EDP_HDR_TCON_2084_DECODE_ENABLE                        BIT(0)
+# define INTEL_EDP_HDR_TCON_2020_GAMUT_ENABLE                         BIT(1)
+# define INTEL_EDP_HDR_TCON_TONE_MAPPING_ENABLE                       BIT(2) /* Pre-TGL+ */
+# define INTEL_EDP_HDR_TCON_SEGMENTED_BACKLIGHT_ENABLE                BIT(3)
+# define INTEL_EDP_HDR_TCON_BRIGHTNESS_AUX_ENABLE                     BIT(4)
+# define INTEL_EDP_HDR_TCON_SRGB_TO_PANEL_GAMUT_ENABLE                BIT(5)
+/* Bit 6 is reserved */
+# define INTEL_EDP_HDR_TCON_SDP_COLORIMETRY_ENABLE                    BIT(7)
+
+#define INTEL_EDP_HDR_CONTENT_LUMINANCE                                0x346 /* Pre-TGL+ */
+#define INTEL_EDP_HDR_PANEL_LUMINANCE_OVERRIDE                         0x34A
+#define INTEL_EDP_SDR_LUMINANCE_LEVEL                                  0x352
+#define INTEL_EDP_BRIGHTNESS_NITS_LSB                                  0x354
+#define INTEL_EDP_BRIGHTNESS_NITS_MSB                                  0x355
+#define INTEL_EDP_BRIGHTNESS_DELAY_FRAMES                              0x356
+#define INTEL_EDP_BRIGHTNESS_PER_FRAME_STEPS                           0x357
+
+#define INTEL_EDP_BRIGHTNESS_OPTIMIZATION_0                            0x358
+# define INTEL_EDP_TCON_USAGE_MASK                             GENMASK(0, 3)
+# define INTEL_EDP_TCON_USAGE_UNKNOWN                                    0x0
+# define INTEL_EDP_TCON_USAGE_DESKTOP                                    0x1
+# define INTEL_EDP_TCON_USAGE_FULL_SCREEN_MEDIA                          0x2
+# define INTEL_EDP_TCON_USAGE_FULL_SCREEN_GAMING                         0x3
+# define INTEL_EDP_TCON_POWER_MASK                                    BIT(4)
+# define INTEL_EDP_TCON_POWER_DC                                    (0 << 4)
+# define INTEL_EDP_TCON_POWER_AC                                    (1 << 4)
+# define INTEL_EDP_TCON_OPTIMIZATION_STRENGTH_MASK             GENMASK(5, 7)
+
+#define INTEL_EDP_BRIGHTNESS_OPTIMIZATION_1                            0x359
+
 /* Upper limits from eDP 1.3 spec */
 struct edp_drv_panel_timing edp_drv_panel_time = {
 	.drv_panel_power_up_delay = 210,	/* t1_t3 */
@@ -250,6 +308,7 @@ phytium_edp_dpcd_backlight_init(struct phytium_dp_device *phytium_dp)
 	if (ret < 0)
 		DRM_ERROR("DRM edp backlight init falied ret = %d\n", ret);
 }
+
 static int
 phytium_dp_aux_set_backlight(struct phytium_panel *panel, unsigned int level)
 {
@@ -559,9 +618,262 @@ static void phytium_dp_hw_setup_backlight(struct phytium_panel *panel)
 	}
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
+static bool
+phytium_dp_aux_supports_hdr_backlight(struct phytium_dp_device *phytium_dp)
+{
+	struct phytium_edp_backlight_info *phytium_bl_info = &phytium_dp->panel.phytium_bl_info;
+	u8 tcon_cap[4];
+	int ret;
+
+	phytium_edp_init_source_oui(phytium_dp, true);
+	phytium_dp_wait_source_oui(phytium_dp);
+
+	ret = drm_dp_dpcd_read(&phytium_dp->aux,
+			INTEL_EDP_HDR_TCON_CAP0, tcon_cap, sizeof(tcon_cap));
+	if (ret != sizeof(tcon_cap))
+		return false;
+
+	if (!(tcon_cap[1] & INTEL_EDP_HDR_TCON_BRIGHTNESS_NITS_CAP)) {
+#if BL_DEBUG
+		pr_info("Panel doesn't support HDR backlight control, tcon_cap[1] = 0x%x\n", tcon_cap[1]);
+#endif
+		return false;
+	}
+
+	if (tcon_cap[0] < 1) {
+#if BL_DEBUG
+		pr_info("Panel doesn't support HDR backlight control, tcon version %d < 1\n", tcon_cap[0]);
+#endif
+		return false;
+	}
+
+	phytium_bl_info->sdr_uses_aux = 
+		tcon_cap[2] & INTEL_EDP_SDR_TCON_BRIGHTNESS_AUX_CAP;
+#if BL_DEBUG
+		pr_info("panel sdr_uses_aux is %d\n", phytium_bl_info->sdr_uses_aux);
+#endif
+	return true;
+}
+
+static unsigned int phytium_dp_aux_hdr_get_backlight(struct phytium_panel *panel)
+{
+	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
+	struct phytium_edp_backlight_info *phytium_bl_info = &panel->phytium_bl_info;
+	u8 tmp;
+	u8 buf[2] = { 0 };
+	uint32_t level = 0;
+
+	if (drm_dp_dpcd_readb(&phytium_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, &tmp) != 1) {
+		DRM_ERROR("DP-%d Failed to read current backlight mode from DPCD\n",
+			phytium_dp->port);
+		return 0;
+	}
+
+	if (!(tmp & INTEL_EDP_HDR_TCON_BRIGHTNESS_AUX_ENABLE)) {
+#if BL_DEBUG
+		pr_info("dp-%d HDR backlight AUX control not enabled,\
+				dpcd 0x344 is 0x%x, try to using hw get\n",
+			phytium_dp->port, tmp);
+#endif
+		if (!phytium_bl_info->sdr_uses_aux)
+			return phytium_dp->funcs->dp_hw_get_backlight(phytium_dp);
+
+		/* Assume 100% brightness if backlight controls aren't enabled yet */
+		return panel->max;
+	}
+
+	if (drm_dp_dpcd_read(&phytium_dp->aux, INTEL_EDP_BRIGHTNESS_NITS_LSB, buf,
+			     sizeof(buf)) != sizeof(buf)) {
+		DRM_ERROR("dp-%d Failed to read brightness from DPCD\n",
+			phytium_dp->port);
+		return 0;
+	}
+
+	level = (buf[1] << 8 | buf[0]);
+#if BL_DEBUG
+		pr_info("%s get panel level: %d\n", __func__, level);
+#endif
+	return level;
+}
+
+static int
+phytium_dp_aux_hdr_set_aux_backlight(struct phytium_panel *panel, uint32_t level)
+{
+	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
+	u8 buf[4] = { 0 };
+	int ret = 0;
+
+	buf[0] = level & 0xFF;
+	buf[1] = (level & 0xFF00) >> 8;
+
+	if (drm_dp_dpcd_write(&phytium_dp->aux, INTEL_EDP_BRIGHTNESS_NITS_LSB, buf,
+			      sizeof(buf)) != sizeof(buf)) {
+		DRM_ERROR("dp-%d Failed to write brightness level to DPCD\n",
+			phytium_dp->port);
+		ret = -EIO;
+		}
+#if BL_DEBUG
+		pr_info("%s set panel level: %d\n", __func__, level);
+#endif
+	return ret;
+}
+
+static int
+phytium_dp_aux_hdr_set_backlight(struct phytium_panel *panel, uint32_t level)
+{
+	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
+	struct phytium_edp_backlight_info *phytium_bl_info = &panel->phytium_bl_info;
+	int ret = 0;
+
+	if (phytium_bl_info->sdr_uses_aux) {
+		ret = phytium_dp_aux_hdr_set_aux_backlight(panel, level);
+	} else {
+		ret = phytium_dp->funcs->dp_hw_set_backlight(phytium_dp, level);
+	}
+	return ret;
+}
+
+static void
+phytium_dp_aux_hdr_enable_backlight(struct phytium_panel *panel)
+{
+	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
+	struct phytium_edp_backlight_info *phytium_bl_info = &panel->phytium_bl_info;
+	int ret;
+	uint32_t level = panel->level;
+	u8 old_ctrl, ctrl;
+
+	phytium_dp_wait_source_oui(phytium_dp);
+
+	phytium_dp->funcs->dp_hw_enable_backlight(phytium_dp);
+	ret = drm_dp_dpcd_readb(&phytium_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, &old_ctrl);
+	if (ret != 1) {
+		DRM_ERROR("dp-%d Failed to read current backlight control mode: %d\n",
+			phytium_dp->port, ret);
+		return;
+	}
+
+	ctrl = old_ctrl;
+	if (phytium_bl_info->sdr_uses_aux) {
+		ctrl |= INTEL_EDP_HDR_TCON_BRIGHTNESS_AUX_ENABLE;
+		phytium_dp_aux_hdr_set_aux_backlight(panel, level);
+	} else {
+		phytium_dp->funcs->dp_hw_set_backlight(phytium_dp, level);
+	}
+
+	if (ctrl != old_ctrl &&
+	    drm_dp_dpcd_writeb(&phytium_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, ctrl) != 1)
+		DRM_ERROR("dp-%d Failed to configure DPCD brightness controls\n",
+			phytium_dp->port);
+
+#if BL_DEBUG
+	pr_info("%s enable backlight\n", __func__);
+#endif
+}
+
+static void
+phytium_dp_aux_hdr_disable_backlight(struct phytium_panel *panel)
+{
+	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
+	struct phytium_edp_backlight_info *phytium_bl_info = &panel->phytium_bl_info;
+	u8 ctrl;
+	int ret;
+
+#if BL_DEBUG
+	pr_info("%s disable backlight\n", __func__);
+#endif
+
+	phytium_dp->funcs->dp_hw_disable_backlight(phytium_dp);
+
+	if (!phytium_bl_info->sdr_uses_aux) {
+		phytium_dp->funcs->dp_hw_set_backlight(phytium_dp, panel->min);
+		return;
+	}
+
+	ret = drm_dp_dpcd_readb(&phytium_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, &ctrl);
+	if (ret != 1) {
+		DRM_ERROR("dp-%d Failed to read current backlight control mode: %d\n",
+			phytium_dp->port, ret);
+		return;
+	}
+	ctrl &= ~INTEL_EDP_HDR_TCON_BRIGHTNESS_AUX_ENABLE;
+	if (drm_dp_dpcd_writeb(&phytium_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, ctrl) != 1)
+		DRM_ERROR("dp-%d Failed to configure DPCD brightness controls\n",
+			phytium_dp->port);
+}
+
+static void
+phytium_dp_aux_hdr_setup_backlight(struct phytium_panel *panel)
+{
+	struct phytium_dp_device *phytium_dp = panel_to_dp_device(panel);
+	struct phytium_luminance_range_info *luminance_range =
+		&phytium_dp->luminance_range;
+	struct phytium_edp_backlight_info *phytium_bl_info = &phytium_dp->panel.phytium_bl_info;
+	int ret;
+	u8 ctrl;
+
+	if (!phytium_bl_info->sdr_uses_aux) {
+		DRM_INFO("SDR backlight is controlled through PWM, sdr_uses_aux is %d\n",
+			 phytium_bl_info->sdr_uses_aux);
+		phytium_dp_hw_setup_backlight(panel);
+	}
+
+	if (luminance_range->max_luminance) {
+		panel->max = luminance_range->max_luminance;
+		panel->min = luminance_range->min_luminance;
+	} else {
+		panel->max = 512;
+		panel->min = 0;
+	}
+
+	DRM_DEBUG_KMS("dp-%d Using AUX HDR interface for backlight control (range %d..%d)\n",
+		    phytium_dp->port,
+		    panel->min, panel->max);
+
+	
+	phytium_bl_info->max = panel->max;
+	if (!panel->level)
+		panel->level = phytium_dp_aux_hdr_get_backlight(panel);
+	if (panel->level <= panel->min)
+		panel->level = panel->max;
+
+	phytium_dp_aux_hdr_set_backlight(panel, panel->level);
+
+	ret = drm_dp_dpcd_readb(&phytium_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, &ctrl);
+	if (ret != 1) {
+		DRM_ERROR("dp-%d Failed to read current backlight control mode: %d\n",
+			phytium_dp->port, ret);
+		return;
+	}
+	if (ctrl & INTEL_EDP_HDR_TCON_BRIGHTNESS_AUX_ENABLE) {
+		panel->backlight_enabled = true;
+	} else {
+		panel->backlight_enabled = false;
+	}
+
+#if BL_DEBUG
+	pr_info("%s max_luminance: %d, min_luminance: %d\n",
+			__func__, luminance_range->max_luminance, luminance_range->min_luminance);
+#endif
+
+}
+#endif
+
 void phytium_dp_panel_init_backlight_funcs(struct phytium_dp_device *phytium_dp)
 {
 	struct phytium_edp_backlight_info *phytium_bl_info = &phytium_dp->panel.phytium_bl_info;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
+	if (phytium_dp_aux_supports_hdr_backlight(phytium_dp)) {
+		DRM_DEBUG_KMS("HDR Backlight Control Supported!\n");
+		phytium_dp->panel.setup_backlight = phytium_dp_aux_hdr_setup_backlight;
+		phytium_dp->panel.set_backlight = phytium_dp_aux_hdr_set_backlight;
+		phytium_dp->panel.get_backlight = phytium_dp_aux_hdr_get_backlight;
+		phytium_dp->panel.enable_backlight = phytium_dp_aux_hdr_enable_backlight;
+		phytium_dp->panel.disable_backlight = phytium_dp_aux_hdr_disable_backlight;
+		return;
+	}
+#endif
 
 	if (phytium_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP &&
 	   (phytium_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP) &&
@@ -712,6 +1024,9 @@ bool phytium_panel_poweron(struct phytium_panel *panel)
 			panel->power_enabled = true;
 		}
 		mutex_unlock(&panel->panel_lock);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
+		phytium_edp_init_source_oui(phytium_dp, false);
+#endif
 	}
 	return success;
 }

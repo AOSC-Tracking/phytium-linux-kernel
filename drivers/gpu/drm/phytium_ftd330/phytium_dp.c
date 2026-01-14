@@ -137,6 +137,105 @@ void phytium_wait_time_cycle(ktime_t now, ktime_t last, uint32_t delay_ms)
 		}
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
+static void phytium_calculate_luminance_range(struct phytium_dp_device *phytium_dp,
+												bool reset)
+{
+	struct drm_connector *connector = &phytium_dp->connector;
+	struct hdr_static_metadata *hdr_metadata = &connector->hdr_sink_metadata.hdmi_type1;
+	struct phytium_luminance_range_info *luminance_range =
+		&phytium_dp->luminance_range;
+	static const u8 pre_computed_values[] = {
+		50, 51, 52, 53, 55, 56, 57, 58, 59, 61, 62, 63, 65, 66, 68, 69,
+		71, 72, 74, 75, 77, 79, 81, 82, 84, 86, 88, 90, 92, 94, 96, 98
+	};
+	u32 max_avg, min_cll, max, min, q, r;
+
+	if (!(hdr_metadata->metadata_type & BIT(HDMI_STATIC_METADATA_TYPE1))) {
+		DRM_DEBUG_KMS("dp-%d metadata_type: 0x%x is not HDMI_STATIC_METADATA_TYPE1\n",
+					phytium_dp->port, hdr_metadata->metadata_type);
+		return;
+	}
+
+	if (reset) {
+		memset(luminance_range, 0, sizeof(*luminance_range));
+		return;
+	}
+
+	max_avg = hdr_metadata->max_fall;
+	min_cll = hdr_metadata->min_cll;
+
+	/*
+	 * From the specification (CTA-861-G), for calculating the maximum
+	 * luminance we need to use:
+	 *	Luminance = 50*2**(CV/32)
+	 * Where CV is a one-byte value.
+	 * For calculating this expression we may need float point precision;
+	 * to avoid this complexity level, we take advantage that CV is divided
+	 * by a constant. From the Euclids division algorithm, we know that CV
+	 * can be written as: CV = 32*q + r. Next, we replace CV in the
+	 * Luminance expression and get 50*(2**q)*(2**(r/32)), hence we just
+	 * need to pre-compute the value of r/32. For pre-computing the values
+	 * We just used the following Ruby line:
+	 *	(0...32).each {|cv| puts (50*2**(cv/32.0)).round}
+	 * The results of the above expressions can be verified at
+	 * pre_computed_values.
+	 */
+	q = max_avg >> 5;
+	r = max_avg % 32;
+	max = (1 << q) * pre_computed_values[r];
+
+	/* min luminance: maxLum * (CV/255)^2 / 100 */
+	q = DIV_ROUND_CLOSEST(min_cll, 255);
+	min = max * DIV_ROUND_CLOSEST((q * q), 100);
+
+	luminance_range->min_luminance = min;
+	luminance_range->max_luminance = max;
+	DRM_DEBUG_KMS("%s luminance range min: %u, max: %u, max_avg: %u, min_cll: %u\n",
+				__func__, min, max, max_avg, min_cll);
+}
+#endif
+
+void
+phytium_edp_init_source_oui(struct phytium_dp_device *phytium_dp, bool careful)
+{
+	u8 oui[] = { 0x00, 0xaa, 0x01 };
+	u8 buf[3] = { 0 };
+
+	FTD330_LOG_TRACE;
+	/*
+	 * During driver init, we want to be careful and avoid changing the source OUI if it's
+	 * already set to what we want, so as to avoid clearing any state by accident
+	 */
+	if (careful) {
+		if (drm_dp_dpcd_read(&phytium_dp->aux, DP_SOURCE_OUI, buf, sizeof(buf)) < 0)
+			DRM_ERROR("Failed to read source OUI\n");
+
+		if (memcmp(oui, buf, sizeof(oui)) == 0)
+			return;
+	}
+
+	if (drm_dp_dpcd_write(&phytium_dp->aux, DP_SOURCE_OUI, oui, sizeof(oui)) < 0)
+		DRM_ERROR("Failed to write source OUI\n");
+
+	phytium_dp->last_oui_write = jiffies;
+}
+
+void phytium_dp_wait_source_oui(struct phytium_dp_device *phytium_dp)
+{
+	struct drm_connector *connector = &phytium_dp->connector;
+	u16 hdr_dpcd_refresh_timeout = 30;
+
+
+	DRM_DEBUG_KMS("[CONNECTOR:%d:%s] Performing OUI wait (%u ms)\n",
+		    connector->base.id, connector->name,
+		    hdr_dpcd_refresh_timeout);
+
+	wait_remaining_ms_from_jiffies(phytium_dp->last_oui_write,
+				       hdr_dpcd_refresh_timeout);
+}
+
+
 static int phytium_port_virtual_to_physical(struct phytium_dp_device *phytium_dp)
 {
 	struct drm_device *dev =  phytium_dp->dev;
@@ -722,6 +821,9 @@ static int phytium_connector_get_modes(struct drm_connector *connector)
     if (edid && drm_edid_is_valid(edid)) {
         drm_connector_update_edid_property(connector, edid);
         ret = drm_add_edid_modes(connector, edid);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
+		phytium_calculate_luminance_range(phytium_dp, false);
+#endif
 		ret += phytium_add_custom_modes(connector, edid);
         phytium_dp->has_audio = drm_detect_monitor_audio(edid);
         phytium_get_native_mode(phytium_dp);
@@ -732,6 +834,9 @@ static int phytium_connector_get_modes(struct drm_connector *connector)
 		phytium_dp->custom_panel_id = edid_extract_panel_id(edid);
     } else {
         drm_connector_update_edid_property(connector, NULL);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
+		phytium_calculate_luminance_range(phytium_dp, true);
+#endif
         phytium_dp->has_audio = false;
     }
 
