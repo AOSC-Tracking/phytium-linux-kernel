@@ -304,6 +304,10 @@ static const struct dpcd_block phytium_dpcd_debug[] = {
 	{ .offset = DP_EDP_DBC_MINIMUM_BRIGHTNESS_SET, .end = DP_EDP_DBC_MAXIMUM_BRIGHTNESS_SET },
 	{ .offset = DP_DEVICE_SERVICE_IRQ_VECTOR, .size = 1 },
 	{ .offset = DP_TEST_REQUEST, .end = DP_TEST_PATTERN },
+	/* Intel HDR backlight */
+	{ .offset = 0x300, .size = 3},
+	{ .offset = 0x340, .size = 10 },
+	{ .offset = 0x350, .size = 10 },
 };
 
 static loff_t phytium_dpcd_llseek(struct file *file, loff_t offset, int whence)

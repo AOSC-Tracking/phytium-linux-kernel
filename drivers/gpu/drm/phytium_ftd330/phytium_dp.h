@@ -160,7 +160,10 @@ struct phytium_vrr {
 	struct detailed_data_monitor_range *range;
 	struct dc_hw_display_mode *vrr_mode;
 };
-
+struct phytium_luminance_range_info {
+	u32 min_luminance;
+	u32 max_luminance;
+};
 
 struct phytium_dp_device {
 	struct drm_device *dev;
@@ -243,6 +246,10 @@ struct phytium_dp_device {
 	int custom_delay_ms;
 	int custom_fifo_value;
 	uint32_t custom_panel_id;
+
+	struct phytium_luminance_range_info luminance_range;
+	/* When we last wrote the OUI for eDP */
+	unsigned long last_oui_write;
 };
 enum phytium_dp_power_operation {
 	PHYTIUM_POWER_KEEP,
@@ -388,8 +395,10 @@ bool phytium_dp_hw_audio_is_enable(struct phytium_dp_device *phytium_dp);
 int phytium_dp_start_link_train(struct phytium_dp_device *phytium_dp, bool sink_needs_dpms);
 bool phytium_dp_fast_link_train(struct phytium_dp_device *phytium_dp);
 void phytium_dp_fast_link_train_detect(struct phytium_dp_device *phytium_dp);
-
 void phytium_wait_time_cycle(ktime_t now, ktime_t last, uint32_t delay_ms);
+void phytium_dp_wait_source_oui(struct phytium_dp_device *phytium_dp);
+void phytium_edp_init_source_oui(struct phytium_dp_device *phytium_dp,
+				 bool careful);
 #endif
 
 extern int source0_max_lane_count;

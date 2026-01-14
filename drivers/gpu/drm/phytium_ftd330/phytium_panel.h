@@ -23,6 +23,7 @@ struct phytium_edp_backlight_info {
 	bool aux_enable : 1;
 	bool aux_set : 1;
 	bool pwm_set : 1;
+	bool sdr_uses_aux;
 };
 
 struct edp_drv_panel_timing {
@@ -41,7 +42,6 @@ struct edp_panel_timing {
 	uint32_t panel_power_down_delay;
 	uint32_t panel_power_cycle_delay;
 };
-
 struct phytium_panel {
 	struct drm_device *dev;
 	bool backlight_enabled;
