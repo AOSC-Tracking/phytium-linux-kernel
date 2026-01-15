@@ -161,7 +161,7 @@ static struct logic_pio_hwaddr *find_io_range(unsigned long pio)
 	}
 	rcu_read_unlock();
 
-	if (!found_range)
+	if (!found_range && !check_cpu_type())
 		pr_err("PIO entry token 0x%lx invalid\n", pio);
 
 	return found_range;
@@ -276,7 +276,8 @@ void logic_out##bw(type value, unsigned long addr)			\
 			entry->ops->out(entry->hostdata,		\
 					addr, value, sizeof(type));	\
 		else							\
-			WARN_ON_ONCE(1);				\
+			if (!check_cpu_type())				\
+				WARN_ON_ONCE(1);			\
 	}								\
 }									\
 									\
