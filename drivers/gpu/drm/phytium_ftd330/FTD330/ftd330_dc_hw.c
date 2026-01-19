@@ -29,7 +29,6 @@
 #endif
 
 extern void phytium_dc_scale_register_config(struct dc_hw *hw, uint32_t display_id, uint32_t hw_id);
-static void display_set_gamma(struct dc_hw *hw, u8 hw_id, struct dc_hw_gamma *gamma);
 
 /* The default horizontal scale coefficient data
  * with the filter tap of 3.
@@ -2052,7 +2051,8 @@ static void display_set_ctm(struct dc_hw *hw, u8 hw_id, struct dc_hw_ctm *ctm)
 	}
 	ctm->dirty = false;
 }
-static void display_set_gamma(struct dc_hw *hw, u8 hw_id, struct dc_hw_gamma *gamma)
+
+void display_set_gamma(struct dc_hw *hw, u8 hw_id, struct dc_hw_gamma *gamma)
 {
 
 	u32 i, value;
@@ -2110,9 +2110,6 @@ static void display_commit(struct dc_hw *hw, u8 display_id)
 
 		if (display->ctm.dirty)
 			display_set_ctm(hw, hw_id, &display->ctm);
-
-		if (display->gamma.dirty)
-			display_set_gamma(hw, hw_id, &display->gamma);
 
 		/* commit dc property */
 		for (i = 0; i < display->states.num; i++) {
