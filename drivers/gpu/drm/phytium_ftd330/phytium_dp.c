@@ -2888,8 +2888,19 @@ void phytium_display_power_request(struct ftd330_drm_private *priv, bool enable,
 	bool power_status;
 	u32 group_offset = 0;
 
-	group_offset = PHYTIUM_FTD330_DP_REG_OFFSET + display_id*PHYTIUM_FTD330_DP_REG_INTERVAL;
-	val = phytium_readl_reg(priv, group_offset, PHYTIUM_DP_DISPLAYPORT_VERSION);
+	if ((display_id == DISPLAY_0)) {
+		group_offset = PHYTIUM_FTD330_DP_REG_OFFSET + display_id*PHYTIUM_FTD330_DP_REG_INTERVAL;
+		val = phytium_readl_reg(priv, group_offset, PHYTIUM_DP_DISPLAYPORT_VERSION);
+	} else {
+		if (priv->info.pipe_mask & BIT(DISPLAY_1)) {
+			group_offset = PHYTIUM_FTD330_DP_REG_OFFSET + DISPLAY_1*PHYTIUM_FTD330_DP_REG_INTERVAL;
+			val |= phytium_readl_reg(priv, group_offset, PHYTIUM_DP_DISPLAYPORT_VERSION);
+		}
+		if (priv->info.pipe_mask & BIT(DISPLAY_2)) {
+			group_offset = PHYTIUM_FTD330_DP_REG_OFFSET + DISPLAY_2*PHYTIUM_FTD330_DP_REG_INTERVAL;
+			val |= phytium_readl_reg(priv, group_offset, PHYTIUM_DP_DISPLAYPORT_VERSION);
+		}
+	}
 
 	if (val != 0) {
 		power_status = true;
