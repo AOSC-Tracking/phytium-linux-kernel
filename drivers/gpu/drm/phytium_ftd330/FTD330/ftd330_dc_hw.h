@@ -815,6 +815,7 @@ u32 get_dc_from_display(struct dc_hw *hw, u32 id);
 u32 dc_get_offset_from_plane(struct dc_hw *hw, u32 id);
 u32 dc_get_offset_from_display(struct dc_hw *hw, u32 id);
 u32 phytium_get_efifb_address(struct dc_hw *hw, u32 reg);
+void display_set_gamma(struct dc_hw *hw, u8 hw_id, struct dc_hw_gamma *gamma);
 void phytium_dc_disable_before_init(struct dc_hw *hw);
 #ifdef CONFIG_PHYTIUM_DEC
 u32 get_offset_from_stream_id(struct dc_hw *hw, u8 stream_id);

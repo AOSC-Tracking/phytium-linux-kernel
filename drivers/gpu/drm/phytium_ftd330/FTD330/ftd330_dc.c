@@ -1311,6 +1311,7 @@ irqreturn_t dc0_isr(int irq, void *data)
 	const struct ftd330_dc_info *dc_info = dc->hw.info;
 	struct dc_hw_interrupt_status status = {0};
 	u32 i;
+	struct dc_hw_display *display = NULL;
 
 	dc_hw_get_interrupt(&dc->hw, &status, DC_0);
 
@@ -1323,10 +1324,17 @@ irqreturn_t dc0_isr(int irq, void *data)
 		u8 display_id = dc_info->displays[i].id;
 		u8 display_mask = BIT(display_id);
 
+		display = &dc->hw.display[i];
+
 		if (display_mask & status.display_underflow)
 			pr_warn_ratelimited("%s: display[%d] underflow\n", __func__, display_id);
 
 		if (display_mask & status.display_frm_done) {
+
+		if (display && display->gamma.dirty) {
+			display_set_gamma(&dc->hw, display_id, &display->gamma);
+		}
+
 			ftd330_crtc_handle_vblank(&dc->crtc[i]->base);
 			ftd330_crtc_handle_flip_done_while_hw_done(&dc->crtc[i]->base);
 			ftd330_crtc_handle_frame_done(&dc->crtc[i]->base);
@@ -1361,6 +1369,7 @@ irqreturn_t dc1_isr(int irq, void *data)
 	const struct ftd330_dc_info *dc_info = dc->hw.info;
 	struct dc_hw_interrupt_status status = {0};
 	u32 i;
+	struct dc_hw_display *display = NULL;
 
 	dc_hw_get_interrupt(&dc->hw, &status, DC_1);
 
@@ -1372,11 +1381,18 @@ irqreturn_t dc1_isr(int irq, void *data)
 	for (i = 0; i < dc_info->display_num; i++) {
 		u8 display_id = dc_info->displays[i].id;
 		u8 display_mask = BIT(display_id);
+		
+		display = &dc->hw.display[i];
 
 		if (display_mask & status.display_underflow)
 			pr_warn_ratelimited("%s: display[%d] underflow\n", __func__, display_id);
 		
                 if (display_mask & status.display_frm_done) {
+
+		if (display && display->gamma.dirty) {
+			display_set_gamma(&dc->hw, display_id, &display->gamma);
+		}
+
                         ftd330_crtc_handle_vblank(&dc->crtc[i]->base);
                         ftd330_crtc_handle_flip_done_while_hw_done(&dc->crtc[i]->base);
                         ftd330_crtc_handle_frame_done(&dc->crtc[i]->base);
