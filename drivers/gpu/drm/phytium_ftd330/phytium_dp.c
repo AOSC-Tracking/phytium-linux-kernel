@@ -3684,6 +3684,8 @@ static void phytium_encoder_disable(struct drm_encoder *encoder)
 	if (phytium_dp->is_edp)
 		phytium_edp_backlight_off(phytium_dp);
 #endif
+	if (phytium_dp->has_audio)
+		handle_plugged_change(phytium_dp, false);
 	if (phytium_dp_hw_audio_is_enable(phytium_dp))
 		phytium_dp_hw_disable_audio(phytium_dp);
 
@@ -3983,6 +3985,7 @@ static void phytium_encoder_enable(struct drm_encoder *encoder)
 	}
 #endif
 	if (phytium_dp->has_audio) {
+		handle_plugged_change(phytium_dp, true);
 		if (phytium_dp->custom_delay_ms)
 			mdelay(phytium_dp->custom_delay_ms);
 		else
