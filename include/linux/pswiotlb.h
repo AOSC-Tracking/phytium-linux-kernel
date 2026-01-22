@@ -76,10 +76,6 @@ void pswiotlb_store_local_node(struct pci_dev *dev, struct pci_bus *bus);
 void iommu_dma_unmap_sg_pswiotlb(struct device *dev, struct scatterlist *sg, unsigned long iova,
 			size_t mapped, int nents, enum dma_data_direction dir, unsigned long attrs);
 void pswiotlb_setup_dma_ops(struct device *dev);
-static inline unsigned int dma_get_min_align_mask(struct device *dev)
-{
-	return 0;
-}
 #ifdef CONFIG_PSWIOTLB
 struct pswiotlb_passthroughlist {
 	struct list_head node;
