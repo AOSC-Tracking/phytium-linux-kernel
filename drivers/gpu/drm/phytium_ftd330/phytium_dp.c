@@ -2887,6 +2887,30 @@ void phytium_display_power_request(struct ftd330_drm_private *priv, bool enable,
 	int val = 0;
 	bool power_status;
 	u32 group_offset = 0;
+	bool dc1_dc2_exited = false;
+
+	/* DC1 and DC2 share a common power domain.
+	 * When powering DC2, the driver defaults
+	 * to operating DC1. However, the scmi driver
+	 * under U-Boot aims to detect power operations
+	 * on both DC1 and DC2. Therefore, it is necessary
+	 * to distinguish power operations targeting DC2
+	 * and send corresponding commands.
+	 */
+	if ((priv->info.pipe_mask & BIT(DISPLAY_1)) &&
+	    (priv->info.pipe_mask & BIT(DISPLAY_2))) {
+			dc1_dc2_exited = true;
+		}
+
+	
+	if (pdev->dev.of_node) {
+		if (!(priv->info.pipe_mask & BIT(DISPLAY_1))) {
+			if (priv->info.pipe_mask & BIT(DISPLAY_2) &&
+			    (display_id == DISPLAY_1)) {
+				display_id = DISPLAY_2;
+			}
+		}
+	}
 
 	if ((display_id == DISPLAY_0)) {
 		group_offset = PHYTIUM_FTD330_DP_REG_OFFSET + display_id*PHYTIUM_FTD330_DP_REG_INTERVAL;
@@ -2917,8 +2941,15 @@ void phytium_display_power_request(struct ftd330_drm_private *priv, bool enable,
 	}
 
 	FTD330_LOG_TRACE;
-	if (pdev->dev.of_node)
-		phytium_display_power_request_se(priv, enable, display_id);
+	if (pdev->dev.of_node) {
+		if (dc1_dc2_exited) {
+			if (display_id == DISPLAY_1)
+				phytium_display_power_request_se(priv, enable, DISPLAY_2);
+			phytium_display_power_request_se(priv, enable, display_id);
+		} else {
+			phytium_display_power_request_se(priv, enable, display_id);
+		}
+	}
 	else if (has_acpi_companion(&pdev->dev))
 		phytium_display_power_request_acpi(priv, enable, display_id);
 #endif

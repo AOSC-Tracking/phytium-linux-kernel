@@ -39,6 +39,7 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 18))
 #include <linux/acpi.h>
 #endif
+#include <linux/pm_domain.h>
 
 #include "ftd330_crtc.h"
 #include "ftd330_dc.h"
@@ -1022,6 +1023,27 @@ err_mode:
 	return ret;
 }
 
+static int phytium_detach_pm_domains(struct device *dev,
+					 struct ftd330_drm_private *priv)
+{
+	struct phytium_pm_domains *dev_pm = &priv->dev_pm;
+	int i;
+
+	if (dev_pm->num_domains <= 1 || !priv->dev_pm.attached)
+		return 0;
+
+	for (i = 0; i < dev_pm->num_domains; i++) {
+		if (!dev_pm->pd_dev[i])
+			continue;
+		if (dev_pm->pd_dev_link[i])
+			device_link_del(dev_pm->pd_dev_link[i]);
+
+		dev_pm_domain_detach(dev_pm->pd_dev[i], true);
+	}
+
+	return 0;
+}
+
 static int ftd330_drm_platform_remove(struct platform_device *pdev)
 {
 	struct drm_device *dev = dev_drm;
@@ -1057,6 +1079,7 @@ static int ftd330_drm_platform_remove(struct platform_device *pdev)
          phytium_mem_pool_deinit(dev);
 #endif
 
+	phytium_detach_pm_domains(&pdev->dev, priv);
 	dev->dev_private = NULL;
 	dev_set_drvdata(&pdev->dev, NULL);
 	drm_dev_put(dev);

@@ -156,6 +156,18 @@ struct phytium_device_info {
 	bool bios_psr_is_enable;
 };
 
+/**
+ * struct clk_imx_acm_pm_domains - structure for multi power domain
+ * @pd_dev: power domain device
+ * @pd_dev_link: power domain device link
+ * @num_domains: power domain nummber
+ */
+struct phytium_pm_domains {
+	struct device **pd_dev;
+	struct device_link **pd_dev_link;
+	int    num_domains;
+	bool   attached;
+};
 
 /*
  *
@@ -227,6 +239,8 @@ struct ftd330_drm_private {
 	spinlock_t hotplug_irq_lock;
 	struct dc_hw_fb scanout_buffer[DISPLAY_NUM];
 	bool in_drm_panic;
+
+	struct phytium_pm_domains dev_pm;
 };
 
 int ftd330_drm_iommu_attach_device(struct drm_device *drm_dev, struct device *dev);

@@ -15,6 +15,8 @@
 #include <drm/drm_framebuffer.h>
 #include <drm/ftd330_drm.h>
 #include <linux/of_graph.h>
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 
 #include "phytium_dp.h"
 #include "ftd330_crtc.h"
@@ -2140,6 +2142,64 @@ static int ftd330_dc_pci_init(struct drm_device *drm_dev, struct ftd330_dc *dc)
 }
 #else
 
+static int phytium_pm_domain_init(struct device *dev,
+					 struct phytium_pm_domains *dev_pm)
+{
+	int ret;
+	int i;
+
+	dev_pm->num_domains = of_count_phandle_with_args(dev->of_node,
+						 "power-domains",
+						 "#power-domain-cells");
+
+	pr_info("FTD330 get num_domains is %d\n", dev_pm->num_domains);
+
+	if (dev_pm->num_domains < 1)
+		return -1;
+
+	if (dev_pm->num_domains == 1) {
+		pm_runtime_enable(dev);
+	} else {
+		dev_pm->pd_dev = devm_kmalloc_array(dev, dev_pm->num_domains,
+							sizeof(*dev_pm->pd_dev),
+							GFP_KERNEL);
+		if (!dev_pm->pd_dev)
+			return -ENOMEM;
+
+		dev_pm->pd_dev_link = devm_kmalloc_array(dev,
+							dev_pm->num_domains,
+							sizeof(*dev_pm->pd_dev_link),
+							GFP_KERNEL);
+		if (!dev_pm->pd_dev_link)
+			return -ENOMEM;
+
+		for (i = 0; i < dev_pm->num_domains; i++) {
+			dev_pm->pd_dev[i] = dev_pm_domain_attach_by_id(dev, i);
+			if (IS_ERR(dev_pm->pd_dev[i]))
+				return PTR_ERR(dev_pm->pd_dev[i]);
+
+			dev_pm->pd_dev_link[i] = device_link_add(dev,
+								dev_pm->pd_dev[i],
+								DL_FLAG_STATELESS |
+								DL_FLAG_PM_RUNTIME |
+								DL_FLAG_RPM_ACTIVE);
+			if (IS_ERR(dev_pm->pd_dev_link[i])) {
+				dev_pm_domain_detach(dev_pm->pd_dev[i], false);
+				ret = PTR_ERR(dev_pm->pd_dev_link[i]);
+				goto detach_pm;
+			}
+		}
+	}
+	return 0;
+
+detach_pm:
+	while (--i >= 0) {
+		device_link_del(dev_pm->pd_dev_link[i]);
+		dev_pm_domain_detach(dev_pm->pd_dev[i], false);
+	}
+	return ret;
+}
+
 /* platform driver */
 static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc *dc)
 {
@@ -2224,6 +2284,15 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 		} else {
 			priv->info.para_table_valid = true;
 		}
+
+		ret = phytium_pm_domain_init(&pdev->dev, &priv->dev_pm);
+		if (ret < 0) {
+			priv->dev_pm.attached = false;
+			pr_info("FTD330 failed to init power domain\n");
+		} else {
+			priv->dev_pm.attached = true;
+		}
+
 #ifdef CONFIG_PHYTIUM_EDP_BL
 		if (priv->info.edp_mask) {
 			priv->info.pwm_clk_rate = 100000000; /* 100MHz */
@@ -2398,12 +2467,13 @@ static int ftd330_dc_platform_init(struct drm_device *drm_dev, struct ftd330_dc 
 	}
 
 	priv->info.total_pipes = 0;
-	for (i = DISPLAY_0;i < DISPLAY_NUM ; i++)
-	    if (BIT(i) & priv->info.pipe_mask)
-		priv->info.total_pipes++;
+	for (i = DISPLAY_0;i < DISPLAY_NUM ; i++) {
+		if (BIT(i) & priv->info.pipe_mask)
+			priv->info.total_pipes++;
+	}
 
-        dc->hw.total_pipes = priv->info.total_pipes;
-        dc->hw.pipe_mask =  priv->info.pipe_mask;
+	dc->hw.total_pipes = priv->info.total_pipes;
+	dc->hw.pipe_mask =  priv->info.pipe_mask;
 	dc->hw.overlay_enable = priv->info.overlay_enable;
 
 
@@ -2527,7 +2597,17 @@ int phytium_drm_device_init(struct drm_device *drm_dev)
 #ifdef CONFIG_PHYTIUM_PCIE
 		ftd330_dc_pci_init(drm_dev, dc);
 #else
-		ftd330_dc_platform_init(drm_dev, dc);
+	ftd330_dc_platform_init(drm_dev, dc);
+
+#ifdef CONFIG_PHYTIUM_POWER_OPERATION
+	if (priv->info.total_pipes > priv->dev_pm.num_domains &&
+		priv->dev_pm.attached) {
+		pr_err("ERROR: FTD330 pipe num: %d is greater than power domain num: %d\n",
+			priv->info.total_pipes, priv->dev_pm.num_domains);
+		return -EINVAL;
+	}
+#endif
+
 #endif
 
 	dc->hw.reg_base = dc->hw.hi_base;
