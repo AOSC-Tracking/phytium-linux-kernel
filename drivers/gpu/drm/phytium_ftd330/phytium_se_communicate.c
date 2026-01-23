@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2021-2025, Phytium Technology Co., Ltd.
  */
+#include <linux/pm_runtime.h>
 #include "phytium_se_communicate.h"
 
 static inline void
@@ -85,6 +86,49 @@ void phytium_display_power_request_se(struct ftd330_drm_private *priv, bool enab
 	uint32_t value_1 = DCDP_POWER_PAYLOAD1_RESERVEE;
 	uint32_t domain_id = display_id;
 
+	if (priv->dev_pm.attached) {
+		if (priv->dev_pm.num_domains > 1) {
+			if (enable) {
+				ret = pm_runtime_get_sync(priv->dev_pm.pd_dev[display_id]);
+				if (ret) {
+					DRM_ERROR("Failed to power on DC-%d domain\n", display_id);
+					goto send_power_request_se;
+				} else {
+					pr_info("Success to power on DC-%d domain\n", display_id);
+				}
+			}
+			else {
+				ret = pm_runtime_put_sync(priv->dev_pm.pd_dev[display_id]);
+				if (ret) {
+					DRM_ERROR("Failed to power off DC-%d domain\n", display_id);
+					goto send_power_request_se;
+				} else {
+					pr_info("Success to power off DC-%d domain\n", display_id);
+				}
+			}
+		} else if (priv->dev_pm.num_domains == 1) {
+			if (enable) {
+				ret = pm_runtime_get_sync(priv->dc_dev);
+				if (ret) {
+					DRM_ERROR("Failed to power on DC domain\n");
+					goto send_power_request_se;
+				} else {
+					pr_info("Success to power on DC domain\n");
+				}
+			} else {
+				ret = pm_runtime_put_sync(priv->dc_dev);
+				if (ret) {
+					DRM_ERROR("Failed to power off DC domain\n");
+					goto send_power_request_se;
+				} else {
+					pr_info("Success to power off DC domain\n");
+				}
+			}
+		}
+		return;
+	}
+
+send_power_request_se:
 	value_0 = ((payload_0 << 24) | (protocol_id << 16) | (message_id << 8) | (domain_id << 1));
 
 	value_1 |= (enable ? DCDP_POWER_STATE_ENABLE : DCDP_POWER_STATE_DISABLE);
