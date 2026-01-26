@@ -763,7 +763,7 @@ static void ucsi_handle_connector_change(struct work_struct *work)
 	con->unprocessed_changes |= inferred_changes;
 
 	/* 6. If PPM reported a new change, then restart in order to ACK */
-	if (post_ack_status.change)
+	if (changed_flags && post_ack_status.change)
 		goto out_unlock;
 
 	/* 7. Continue as if nothing happened */
