@@ -137,13 +137,30 @@ static const struct file_operations fops = {
 static int ftd330_debugfs_planes_show(struct seq_file *s, void *data)
 {
 	struct drm_info_node *node = (struct drm_info_node *)s->private;
-	struct drm_device *dev = node->minor->dev;
+	struct drm_device *dev = NULL;
 	struct drm_plane *plane;
 
-	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
-		struct drm_plane_state *state = plane->state;
-		struct ftd330_plane_state *plane_state = to_ftd330_plane_state(state);
+	if (!node) {
+		return 0;
+	}
 
+	dev = node->minor->dev;
+	if (!dev) {
+		return 0;
+	}
+
+	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
+		struct drm_plane_state *state = NULL;
+		struct ftd330_plane_state *plane_state = NULL;
+
+		state = plane->state;
+		if (!state) {
+			return 0;
+		}
+		plane_state = to_ftd330_plane_state(state);
+		if (!plane_state) {
+			return 0;
+		}
 		seq_printf(s, "plane[%u]: %s\n", plane->base.id, plane->name);
 		seq_printf(s, "\tcrtc = %s\n", state->crtc ? state->crtc->name : "(null)");
 		seq_printf(s, "\tcrtc id = %u\n", state->crtc ? state->crtc->base.id : 0);
@@ -152,7 +169,9 @@ static int ftd330_debugfs_planes_show(struct seq_file *s, void *data)
 		seq_printf(s, "\tsrc-pos = " DRM_RECT_FP_FMT "\n",
 			   DRM_RECT_FP_ARG(&plane_state->status.src));
 #if KERNEL_VERSION(5, 14, 0) <= LINUX_VERSION_CODE
-		seq_printf(s, "\tformat = %p4cc\n", &state->fb->format->format);
+		if (state && state->fb && state->fb->format) {
+			seq_printf(s, "\tformat = %p4cc\n", &state->fb->format->format);
+		}
 #else
 		seq_printf(s, "\tformat = %s\n",
 			   state->fb ? plane_state->status.format_name.str : "(null)");
