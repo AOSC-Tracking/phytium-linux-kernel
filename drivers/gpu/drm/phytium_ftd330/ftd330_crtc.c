@@ -444,10 +444,7 @@ static const struct file_operations ftd330_crtc_debugfs_fops = {
 
 static int ftd330_crtc_pattern_show(struct seq_file *s, void *data)
 {
-	struct drm_crtc *crtc = s->private;
-	struct ftd330_crtc *ftd330_crtc = to_ftd330_crtc(crtc);
-
-	return ftd330_crtc->funcs->show_pattern_config(s);
+	return 0;
 
 }
 

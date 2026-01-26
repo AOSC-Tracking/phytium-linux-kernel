@@ -346,8 +346,8 @@ static ssize_t phytium_dpcd_read(struct file *file, char __user *buf,
 	struct phytium_dp_device *phytium_dp = connector_to_dp_device(connector);
 	unsigned long p = *ppos;
 
-	ssize_t err;
-	char *kbuf;
+	ssize_t err = 0;
+	char *kbuf = NULL;
 
 	if (connector->status != connector_status_connected)
 		return -ENODEV;
@@ -370,12 +370,12 @@ static ssize_t phytium_dpcd_read(struct file *file, char __user *buf,
 
 	if (copy_to_user(buf, kbuf, size)) {
 		kfree(kbuf);
-		return -EFAULT;
+		return 0;
 	}
 
 	kfree(kbuf);
 	*ppos += size;
-	return err;
+	return 0;
 }
 
 static ssize_t
@@ -713,20 +713,30 @@ static int phytium_vrr_state_show(struct seq_file *m, void *data)
 	struct drm_connector *connector = m->private;
 	struct phytium_dp_device *phytium_dp = connector_to_dp_device(connector);
 	int port = phytium_dp->port;
-	struct drm_crtc *crtc = connector->state->crtc;
+	struct drm_crtc *crtc = NULL;
 	struct drm_device *dev = phytium_dp->dev;
 	struct ftd330_drm_private *priv = dev->dev_private;
 	struct ftd330_dc *dc = dev_get_drvdata(priv->dc_dev);
-	struct ftd330_crtc *ftd330_crtc = to_ftd330_crtc(crtc);
+	struct ftd330_crtc *ftd330_crtc = NULL;
 	struct dc_hw *hw = &dc->hw;
 	uint32_t dp_group_offset = priv->dp_reg_base[port];
 	uint32_t dplp_offset = priv->dplp_reg_base[port];
 	uint32_t val;
 	bool vrr_support = false;
+	u32 dc_group_offset = 0;
 
-	u32 dc_group_offset = display_get_addr_offset(hw, ftd330_crtc->id);
 	vrr_support = phytium_sink_supports_vrr(phytium_dp);
+	crtc = connector->state->crtc;
+	if (!crtc) {
+		return 0;
+	}
 
+	ftd330_crtc = to_ftd330_crtc(crtc);
+	if (!ftd330_crtc) {
+		return 0;
+	}
+
+	dc_group_offset = display_get_addr_offset(hw, ftd330_crtc->id);
 	if (vrr_support)
 		seq_printf(m, "panel supports VRR, Adjustment range %d - %d\n",
 					phytium_dp->vrr.range->min_vfreq,
