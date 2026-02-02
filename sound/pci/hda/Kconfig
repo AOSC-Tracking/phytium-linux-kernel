@@ -29,6 +29,7 @@ config SND_HDA_INTEL
 config SND_HDA_PHYTIUM
 	tristate "PHYTIUM HD Audio"
 	depends on SOUND
+	depends on ARCH_PHYTIUM
 	select SND_HDA
 	select SND_HDA_ALIGNED_MMIO
 	help
