@@ -94,4 +94,6 @@
 #define DMA_CONTROL(engnum)       (DMA_ENGINE0_BASE + 0x40 * engnum + 0x1c)  // 0x45C
 #define DMA_STATUS(engnum)        (DMA_ENGINE0_BASE + 0x40 * engnum + 0x20)  // 0x460
 
-
+/* DMA transfer state */
+#define DMA_STATUS_DONE				BIT(0)
+#define DMA_STATUS_ERROR				0xfffffffe

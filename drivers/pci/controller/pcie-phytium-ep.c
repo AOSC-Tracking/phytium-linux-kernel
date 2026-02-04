@@ -342,6 +342,7 @@ static int phytium_pcie_ep_start_dma(struct pci_epc *epc, u8 func_no, u64 cpu_ad
 {
 	u32 value;
 	struct phytium_pcie_ep *priv = epc_get_drvdata(epc);
+	int timeout;
 
 	func_no++;
 	dev_dbg(&epc->dev, "%s func_no %d cpu_addr %llu pci_addr %llu size %zu mode %d\n",
@@ -387,6 +388,17 @@ static int phytium_pcie_ep_start_dma(struct pci_epc *epc, u8 func_no, u64 cpu_ad
 	}
 	phytium_pcie_writel(priv, func_no, DMA_LENGTH(mode), size);
 	phytium_pcie_writel(priv, func_no, DMA_CONTROL(mode), PHYTIUM_PCIE_EP_DMA_CONTROL_VALUE);
+
+	timeout = (size / 0x1000 + 1) * 10 * 8;
+	while (!(phytium_pcie_readl(priv, func_no, DMA_STATUS(mode)) &
+	       DMA_STATUS_DONE)) {
+		timeout -= 5;
+		udelay(1);
+		if (timeout <= 0) {
+			dev_err(&epc->dev, "dma transfer timeout!\n");
+			return -ETIME;
+		}
+	}
 
 	return 0;
 }

@@ -154,7 +154,7 @@ static inline int pci_epf_vnet_ep2rc_dma(struct pci_epf_vnet *vnet,
 	if (ret) {
 		dev_err(&epc->dev, "ep2rc pci_epc_start_dma fail! ret %d\n",
 			ret);
-		return -EIO;
+		return ret;
 	}
 
 	return 0;
@@ -167,12 +167,16 @@ static inline int pci_epf_vnet_rc2ep_dma(struct pci_epf_vnet *vnet,
 	int ret;
 	struct pci_epc *epc = vnet->epf->epc;
 
+	dma_sync_single_range_for_device(epc->dev.parent,
+					 buffer_dma_addr, 0,
+					 data_size, DMA_FROM_DEVICE);
+
 	ret = pci_epc_start_dma(epc, vnet->epf->func_no, buffer_dma_addr, addr,
 				data_size, DMA_READ);
 	if (ret) {
 		dev_err(&epc->dev, "rc2ep pci_epc_start_dma fail! ret %d\n",
 			ret);
-		return -EIO;
+		return ret;
 	}
 
 	return 0;
@@ -669,7 +673,6 @@ static int pci_epf_vnet_rx(struct pci_epf_vnet *vnet, int budget)
 	void *pkt_data;
 	unsigned int entry;
 	int ret = 0;
-	int timeout;
 	struct ep_rx_buffer *rx_buffer_info;
 	u32 rx_head, rx_tail;
 
@@ -724,27 +727,6 @@ static int pci_epf_vnet_rx(struct pci_epf_vnet *vnet, int budget)
 			desc->ctrl &= ~PCI_EP_DMA_DESC_CTRL_PKT_USED;
 			dma_wmb();
 			goto next_cycle;
-		}
-
-		timeout = (mul32(len) / DIVISOR + 1) * 10 * 8;
-		while (!(pci_epc_dma_status(epc, epf->func_no, DMA_READ) &
-			 DMA_STATUS_DONE)) {
-			timeout -= 5;
-			udelay(1);
-			if (timeout <= 0) {
-				spin_unlock(&vnet->rx_lock);
-				netdev_err(vnet->netdev,
-					   "%s:dma transfer timeout!\n",
-					   __func__);
-				vnet->netdev->stats.rx_dropped++;
-				rx_buffer_info->pagecnt_bias++;
-				ep_put_rx_buffer(vnet, rx_buffer_info);
-
-				desc->ctrl |= PCI_EP_DMA_DESC_CTRL_PKT_ERR;
-				desc->ctrl &= ~PCI_EP_DMA_DESC_CTRL_PKT_USED;
-				dma_wmb();
-				goto next_cycle;
-			}
 		}
 
 		spin_unlock(&vnet->rx_lock);
@@ -894,7 +876,6 @@ static netdev_tx_t vnet_start_xmit(struct sk_buff *skb,
 {
 	u32 tail;
 	u32 crc32;
-	int timeout;
 	int len;
 	char *data;
 	dma_addr_t src_addr, dst_addr = 0;
@@ -906,8 +887,6 @@ static netdev_tx_t vnet_start_xmit(struct sk_buff *skb,
 
 	struct pci_epf_vnet *vnet = netdev_priv(netdev);
 	struct pci_ep_queue *queue = vnet->queue;
-	struct pci_epf *epf = vnet->epf;
-	struct pci_epc *epc = epf->epc;
 	struct ep_queue *tx_queue = &queue->ep_tx_queue;
 
 	data = skb->data;
@@ -960,20 +939,6 @@ static netdev_tx_t vnet_start_xmit(struct sk_buff *skb,
 		vnet->netdev->stats.tx_dropped++;
 		netdev_err(vnet->netdev, "dma failed(%d)!\n", ret);
 		return NETDEV_TX_OK;
-	}
-
-	timeout = (mul32(len) / DIVISOR + 1) * 10 * 8;
-	while (!(pci_epc_dma_status(epc, epf->func_no, DMA_WRITE) &
-		 DMA_STATUS_DONE)) {
-		timeout -= 5;
-		udelay(1);
-		if (timeout <= 0) {
-			netdev_err(vnet->netdev, "%s:dma transfer timeout!\n", __func__);
-			spin_unlock_irqrestore(&vnet->tx_lock, tx_lock_flags);
-			dev_kfree_skb_any(skb);
-			vnet->netdev->stats.tx_dropped++;
-			return NETDEV_TX_OK;
-		}
 	}
 
 	/* Move the tail pointer of the ep2rc descriptor */
@@ -1150,7 +1115,6 @@ static int epf_cdev_open(struct inode *inode, struct file *filp)
 static int epf_read_rc_mem(u64 rc_addr, u64 len)
 {
 	int ret;
-	int timeout;
 	unsigned long lock_flags;
 
 	if (len < 0 || len > MEM_MAX)
@@ -1165,21 +1129,6 @@ static int epf_read_rc_mem(u64 rc_addr, u64 len)
 		netdev_err(epf_cdev_mdata.cdev_vnet->netdev,
 			   "dma transfer failure(err %d)\n", ret);
 		return ret;
-	}
-
-	timeout = (mul32(len) / DIVISOR + 1) * 20 * 8;
-	while (!(pci_epc_dma_status(epf_cdev_mdata.cdev_vnet->epf->epc,
-				    epf_cdev_mdata.cdev_vnet->epf->func_no, DMA_READ) &
-				    DMA_STATUS_DONE)) {
-		timeout -= 5;
-		udelay(1);
-		if (timeout <= 0) {
-			spin_unlock_irqrestore(&epf_cdev_mdata.cdev_vnet->rx_lock, lock_flags);
-			netdev_err(epf_cdev_mdata.cdev_vnet->netdev,
-				   "%s:dma transfer timeout!\n",
-				   __func__);
-			return -ETIME;
-		}
 	}
 
 	spin_unlock_irqrestore(&epf_cdev_mdata.cdev_vnet->rx_lock, lock_flags);
