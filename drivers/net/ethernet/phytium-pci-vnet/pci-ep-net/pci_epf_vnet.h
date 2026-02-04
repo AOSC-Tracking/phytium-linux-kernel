@@ -17,16 +17,12 @@
 #include <linux/ethtool.h>
 
 #define DRV_MODULE_NAME		"pci_epf_vnet"
-#define DRV_VERSION		"1.0.0"
+#define DRV_VERSION		"1.0.1"
 
 /* IRQ type */
 #define IRQ_TYPE_LEGACY					0
 #define IRQ_TYPE_MSI					1
 #define IRQ_TYPE_MSIX					2
-
-/* DMA transfer state */
-#define DMA_STATUS_DONE					BIT(0)
-#define DMA_STATUS_ERROR				0xfffffffe
 
 /* DMA transmission direction */
 #define DMA_READ					0
