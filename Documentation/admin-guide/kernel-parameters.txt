@@ -4133,6 +4133,19 @@
 			fully seed the kernel's CRNG. Default is controlled
 			by CONFIG_RANDOM_TRUST_BOOTLOADER.
 
+	reserve_mem=	[ARM64] Format: <size>@<address>[:<flags>][,<size>@<address>[:<flags>],...]
+			Reserve memory regions at boot time, providing device tree
+			reserved-memory functionality in UEFI/ACPI environments.
+
+			<size>: Memory size to reserve (with K/M/G/T/P suffix)
+			<address>: Physical start address (with K/M/G/T/P suffix)
+			<flags>: Optional flags:
+				- nomap: Do not create kernel linear mapping
+
+			Examples:
+				reserve_mem=256M@0xb0000000:nomap
+				reserve_mem=128M@0xc0000000,64M@0xd0000000:nomap
+
 	ras=option[,option,...]	[KNL] RAS-specific options
 
 		cec_disable	[X86]
