@@ -313,6 +313,163 @@ static int __init early_mem(char *p)
 }
 early_param("mem", early_mem);
 
+#define MAX_RESERVE_MEM_ENTRIES 8
+
+struct reserve_mem_entry {
+	phys_addr_t base;
+	phys_addr_t size;
+	bool nomap;
+};
+
+static struct reserve_mem_entry reserve_mem_table[MAX_RESERVE_MEM_ENTRIES] __initdata;
+static int nr_reserve_mem __initdata;
+
+/* Parse a single memory region: size@address[:flags] */
+static int __init parse_reserve_mem_one(char *p)
+{
+	char *endp;
+	phys_addr_t size, base;
+	bool nomap = false;
+
+	if (!p)
+		return -EINVAL;
+
+	/* Parse size: size@address[:flags] */
+	size = memparse(p, &endp);
+	if (p == endp) {
+		pr_err("reserve_mem: invalid size specification\n");
+		return -EINVAL;
+	}
+
+	if (size == 0) {
+		pr_err("reserve_mem: size cannot be zero\n");
+		return -EINVAL;
+	}
+
+	/* Check for @ separator */
+	if (*endp != '@') {
+		pr_err("reserve_mem: missing '@' separator\n");
+		return -EINVAL;
+	}
+
+	/* Parse address */
+	p = endp + 1;
+	base = memparse(p, &endp);
+	if (p == endp) {
+		pr_err("reserve_mem: invalid address specification\n");
+		return -EINVAL;
+	}
+
+	/* Check for optional flags */
+	if (*endp == ':') {
+		p = endp + 1;
+		if (!strncmp(p, "nomap", 5)) {
+			nomap = true;
+			p += 5;
+			/* Check for extra characters after nomap */
+			if (*p != '\0' && *p != ' ' && *p != '\t' && *p != ',') {
+				pr_err("reserve_mem: unexpected characters after 'nomap' flag\n");
+				return -EINVAL;
+			}
+		} else {
+			pr_err("reserve_mem: unknown flag '%s'\n", p);
+			return -EINVAL;
+		}
+	}
+
+	/* Page alignment */
+	size = PAGE_ALIGN(size);
+	if (!IS_ALIGNED(base, PAGE_SIZE)) {
+		pr_warn("reserve_mem: base 0x%pap is not page-aligned, rounding down\n",
+			&base);
+		base = round_down(base, PAGE_SIZE);
+	}
+
+	/* Store in global table */
+	if (nr_reserve_mem >= MAX_RESERVE_MEM_ENTRIES) {
+		pr_err("reserve_mem: too many entries (max %d)\n",
+		       MAX_RESERVE_MEM_ENTRIES);
+		return -EINVAL;
+	}
+
+	reserve_mem_table[nr_reserve_mem].base = base;
+	reserve_mem_table[nr_reserve_mem].size = size;
+	reserve_mem_table[nr_reserve_mem].nomap = nomap;
+	nr_reserve_mem++;
+
+	return 0;
+}
+
+static int __init parse_reserve_mem(char *str)
+{
+	char *next;
+	int ret;
+
+	while (str) {
+		next = strchr(str, ',');
+		if (next)
+			*next = '\0';
+
+		ret = parse_reserve_mem_one(str);
+		if (ret)
+			return ret;
+
+		str = next ? next + 1 : NULL;
+	}
+
+	return 0;
+}
+early_param("reserve_mem", parse_reserve_mem);
+
+/* Reserve memory regions from the reserve_mem= parameter */
+static void __init reserve_mem_regions(void)
+{
+	int i;
+
+	if (nr_reserve_mem == 0)
+		return;
+
+	for (i = 0; i < nr_reserve_mem; i++) {
+		phys_addr_t base = reserve_mem_table[i].base;
+		phys_addr_t size = reserve_mem_table[i].size;
+		bool nomap = reserve_mem_table[i].nomap;
+
+		/* Validate memory region */
+		if (!memblock_is_region_memory(base, size)) {
+			pr_err("reserve_mem: region [mem %pap-%pap] is not valid memory\n",
+			       &base, &(phys_addr_t){base + size - 1});
+			continue;
+		}
+
+		if (memblock_is_region_reserved(base, size)) {
+			pr_warn("reserve_mem: region [mem %pap-%pap] already reserved\n",
+				&base, &(phys_addr_t){base + size - 1});
+			continue;
+		}
+
+		/* Execute reservation */
+		if (nomap) {
+			/* Do not create kernel linear mapping */
+			if (memblock_mark_nomap(base, size) != 0) {
+				pr_err("reserve_mem: failed to mark [mem %pap-%pap] as nomap\n",
+				       &base, &(phys_addr_t){base + size - 1});
+				continue;
+			}
+			pr_info("reserve_mem: reserved [mem %pap-%pap] (%lld MB, nomap)\n",
+				&base, &(phys_addr_t){base + size - 1}, size >> 20);
+		} else {
+			/* Only reserve memory */
+			if (memblock_reserve(base, size) != 0) {
+				pr_err("reserve_mem: failed to reserve [mem %pap-%pap]\n",
+				       &base, &(phys_addr_t){base + size - 1});
+				continue;
+			}
+			pr_info("reserve_mem: reserved [mem %pap-%pap] (%lld MB)\n",
+				&base, &(phys_addr_t){base + size - 1}, size >> 20);
+		}
+	}
+}
+
 void __init arm64_memblock_init(void)
 {
 	s64 linear_region_size = PAGE_END - _PAGE_OFFSET(vabits_actual);
@@ -438,6 +595,8 @@ void __init arm64_memblock_init(void)
 	}
 
 	early_init_fdt_scan_reserved_mem();
+
+	reserve_mem_regions();
 
 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
 }
