@@ -402,7 +402,7 @@ static int parse_bios_panel_info_content(void __iomem *start, u32 id,
 		u16 mfg_id;
 		u16 prod_code;
 		
-		void __iomem *entry_base = start + base_offset + i * 8; // 每个结构8字节
+		void __iomem *entry_base = start + base_offset + i * 16; // 每个结构16字节
 
 		// 读取edid信息
 		mfg_id = readw(entry_base);
