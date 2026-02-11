@@ -735,6 +735,8 @@ static void macb_handle_link_change(struct net_device *dev)
 			if ((bp->caps & MACB_CAPS_SEL_CLK) && bp->sel_clk_hw)
 				bp->sel_clk_hw(bp);
 
+			/* Enable TX and RX */
+			macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(RE) | MACB_BIT(TE));
 			netif_carrier_on(dev);
 			netdev_info(dev, "link up (%d/%s)\n",
 				    phydev->speed,
@@ -2668,6 +2670,7 @@ static void macb_init_hw(struct macb *bp)
 {
 	struct macb_queue *queue;
 	unsigned int q;
+	struct device_node *np;
 
 	u32 config;
 
@@ -2740,8 +2743,11 @@ static void macb_init_hw(struct macb *bp)
 			     MACB_BIT(HRESP));
 	}
 
-	/* Enable TX and RX */
-	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(RE) | MACB_BIT(TE));
+	np = bp->pdev->dev.of_node;
+	if (np && of_phy_is_fixed_link(np)) {
+		/* Enable TX and RX */
+		macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(RE) | MACB_BIT(TE));
+	}
 }
 
 /* The hash address register is 64 bits long and takes up two
