@@ -28,7 +28,7 @@ extern int ftd330_phytium_dc_log_level;
 	if (ftd330_phytium_dc_log_level > FTD330_PHYTIUM_DC_NO_LOG) { \
 		pr_err(fmt, ##__VA_ARGS__);\
 	}
-#define DC_DRIVER_VERSION "1.1.10"
+#define DC_DRIVER_VERSION "1.1.11"
 
 #ifndef MAX_ORDER
 #define MAX_ORDER 11
