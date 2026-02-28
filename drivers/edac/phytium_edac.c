@@ -90,7 +90,7 @@
 #define MC_REG_VERSION_1	1
 #define MC_REG_VERSION_2	2
 
-#define EDAC_DRIVER_VERSION "1.1.2"
+#define EDAC_DRIVER_VERSION "1.1.3"
 
 struct ras_error_info {
 	u32 index;
