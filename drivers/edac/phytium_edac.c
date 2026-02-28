@@ -19,7 +19,7 @@
 
 #define EDAC_MOD_STR			"phytium_edac"
 
-/* register offset */
+/* RAS register offset */
 #define ERR_STATUS(n)			(0x10 + ((n) * 64))
 #define ERR_CTLR(n)			(0x08 + ((n) * 64))
 #define ERR_MISC0(n)			(0x20 + ((n) * 64))
@@ -38,15 +38,37 @@
 #define CORRECTED_ERROR			0
 #define UNCORRECTED_ERROR		1
 
-#define PE220X_IGNORE_ERR_ID_MIN	
-#define PE220X_IGNORE_ERR_ID_MAX
+#define PE220X_IGNORE_ERR_ID_MIN	40
+#define PE220X_IGNORE_ERR_ID_MAX	43
 
-#define PE220X_ECC_ERR_ID_MIN
-#define PE220X_ECC_ERR_ID_MAX
+#define PE220X_ECC_ERR_ID_MIN		23
+#define PE220X_ECC_ERR_ID_MAX		24
 
-#define PD2208_ECC_ERR_ID_MIN
-#define PD2208_ECC_ERR_ID_MAX
+#define PD2208_ECC_ERR_ID_MIN		0
+#define PD2208_ECC_ERR_ID_MAX		3
 
+/* MC version 1 register */
+#define ECCSTAT		0x78
+#define ECCCLR		0x7C
+#define ECCERRCNT	0x80
+#define ECCCADDR0	0x84
+#define ECCCADDR1	0x88
+#define ECCUADDR0	0xA4
+#define ECCUADDR1	0xA8
+
+#define ECC_RANK_MASK		GENMASK(25, 24)
+#define ECC_ROW_MASK		GENMASK(17, 0)
+#define ECC_CID_MASK		GENMASK(29, 28)
+#define ECC_BG_MASK		GENMASK(25, 24)
+#define ECC_BANK_MASK		GENMASK(18, 16)
+#define ECC_COL_MASK		GENMASK(11, 0)
+#define ECC_CORR_ERR_CNT_MASK	GENMASK(15, 0)
+#define ECC_UNCORR_ERR_CNT_MASK	GENMASK(31, 16)
+
+#define ECC_CLR_UNCORR_ERR	(BIT_MASK(3) | BIT_MASK(1))
+#define ECC_CLR_CORR_ERR	(BIT_MASK(2) | BIT_MASK(0))
+
+/* MC version 2 register */
 #define DDRC_PADDR	0x80
 #define DDRC_PDATA	0x84
 #define ECC_U_ADDR_L	0x7B8
@@ -57,7 +79,16 @@
 #define ECC_C_ADDR_H	0x7CC
 #define ECC_C_DATA_L	0x7D0
 #define ECC_C_DATA_H	0x7D4
-#define MEM_ADDR_MASK	((1UL << 10) - 1)
+#define INT_STATUS_ECC	0x944
+#define INT_ACK_ECC	0x964
+
+#define MEM_ADDR_MASK	GENMASK(9, 0)
+#define INT_STATUS_MASK	GENMASK(8, 0)
+#define ECC_C_ERR_MASK	GENMASK(3, 2)
+#define ECC_U_ERR_MASK	GENMASK(1, 0)
+
+#define MC_REG_VERSION_1	1
+#define MC_REG_VERSION_2	2
 
 #define EDAC_DRIVER_VERSION "1.1.2"
 
@@ -84,6 +115,7 @@ struct phytium_edac {
 	int num_err_group;
 	const struct ras_error_info **error_info;
 	struct list_head mc_list;
+	int mc_reg_version;
 };
 
 /* error severity definition */
@@ -463,7 +495,7 @@ static int phytium_edac_device_add(struct phytium_edac *edac)
 	edac_dev->dev = edac->dev;
 	edac_dev->mod_name = EDAC_MOD_STR;
 	edac_dev->ctl_name = "phytium ras";
-	edac_dev->dev_name = "soc";
+	edac_dev->dev_name = "phytium_edac_soc";
 
 	phytium_edac_create_debugfs_nodes(edac);
 
@@ -526,16 +558,81 @@ static int get_error_id(struct phytium_edac *edac, int *error_id,
 	return ret;
 }
 
-static void phytium_edac_mc_check(struct phytium_edac_mc_ctx *ctx,
-				  const struct ras_error_info *err_info,
-				  const int error_id)
+static void phytium_edac_mc_check_ver1(struct mem_ctl_info *mci)
+{
+	u32 corr_err_cnt = 0;
+	u32 uncorr_err_cnt = 0;
+	u32 value = 0;
+	u32 rank = 0;
+	u32 bank = 0;
+	u32 row = 0;
+	u32 column = 0;
+	u32 cid = 0;
+	u32 bg = 0;
+	struct phytium_edac_mc_ctx *ctx = mci->pvt_info;
+
+	writel(ECCERRCNT, ctx->reg_base + DDRC_PADDR);
+	value = readl(ctx->reg_base + DDRC_PDATA);
+	corr_err_cnt = value & ECC_CORR_ERR_CNT_MASK;
+	uncorr_err_cnt = (value & ECC_UNCORR_ERR_CNT_MASK) >> 16;
+
+	if (corr_err_cnt > 0) {
+		writel(ECCCADDR0, ctx->reg_base + DDRC_PADDR);
+		value = readl(ctx->reg_base + DDRC_PDATA);
+		rank = (value & ECC_RANK_MASK) >> 24;
+		row = value & ECC_ROW_MASK;
+		writel(ECCCADDR1, ctx->reg_base + DDRC_PADDR);
+		value = readl(ctx->reg_base + DDRC_PDATA);
+		cid = (value & ECC_CID_MASK) >> 28;
+		bg = (value & ECC_BG_MASK) >> 24;
+		bank = (value & ECC_BANK_MASK) >> 16;
+		column = value & ECC_COL_MASK;
+		edac_mc_chipset_printk(mci, KERN_WARNING, "Phytium",
+				"ECC correctable error at rank %d bank %d column %d row %d cid %d bg %d count %d\n",
+				rank, bank, column, row, bg, cid, corr_err_cnt);
+		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+				1, 0, 0, 0, 0, 0, -1, mci->ctl_name, "");
+		
+		/* clear correct error */
+		writel(ECCCLR, ctx->reg_base + DDRC_PADDR);
+		writel(ECC_CLR_CORR_ERR, ctx->reg_base + DDRC_PDATA);
+	}
+	
+	if (uncorr_err_cnt > 0) {
+		writel(ECCUADDR0, ctx->reg_base + DDRC_PADDR);
+		value = readl(ctx->reg_base + DDRC_PDATA);
+		rank = (value & ECC_RANK_MASK) >> 24;
+		row = value & ECC_ROW_MASK;
+		writel(ECCUADDR1, ctx->reg_base + DDRC_PADDR);
+		value = readl(ctx->reg_base + DDRC_PDATA);
+		cid = (value & ECC_CID_MASK) >> 28;
+		bg = (value & ECC_BG_MASK) >> 24;
+		bank = (value & ECC_BANK_MASK) >> 16;
+		column = value & ECC_COL_MASK;
+		edac_mc_chipset_printk(mci, KERN_ERR, "Phytium",
+				"ECC uncorrectable error at rank %d bank %d column %d row %d cid %d bg %d count %d\n",
+				rank, bank, column, row, bg, cid, corr_err_cnt);
+		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
+				1, 0, 0, 0, 0, 0, -1, mci->ctl_name, "");
+		/* clear uncorrect error */
+		writel(ECCCLR, ctx->reg_base + DDRC_PADDR);
+		writel(ECC_CLR_UNCORR_ERR, ctx->reg_base + DDRC_PDATA);
+	}
+}
+
+static void phytium_edac_mc_check_ver2(struct mem_ctl_info *mci)
 {
 	u64 temp1 = 0;
 	u64 temp2 = 0;
 	u64 err_addr = 0;
 	u64 err_data = 0;
+	u32 ecc_status = 0;
+	struct phytium_edac_mc_ctx *ctx = mci->pvt_info;
 
-	if (err_info[error_id].error_type == UNCORRECTED_ERROR) {
+	writel(INT_STATUS_ECC, ctx->reg_base + DDRC_PADDR);
+	ecc_status = readl(ctx->reg_base + DDRC_PDATA) & INT_STATUS_MASK;
+
+	if (ecc_status & ECC_C_ERR_MASK) {
 		writel(ECC_U_ADDR_L, ctx->reg_base + DDRC_PADDR);
 		temp1 = readl(ctx->reg_base + DDRC_PDATA);
 		writel(ECC_U_ADDR_H, ctx->reg_base + DDRC_PADDR);
@@ -549,7 +646,11 @@ static void phytium_edac_mc_check(struct phytium_edac_mc_ctx *ctx,
 		edac_mc_chipset_printk(ctx->mci, KERN_ERR, "Phytium",
 			"ECC channel %d uncorrectable error at address  %#016llx\n",
 			ctx->channel_id, err_addr);
-	} else {
+		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+				1, 0, 0, 0, 0, 0, -1, mci->ctl_name, "");
+	}
+
+	if (ecc_status & ECC_U_ERR_MASK) {
 		writel(ECC_C_ADDR_L, ctx->reg_base + DDRC_PADDR);
 		temp1 = readl(ctx->reg_base + DDRC_PDATA);
 		writel(ECC_C_ADDR_H, ctx->reg_base + DDRC_PADDR);
@@ -563,6 +664,15 @@ static void phytium_edac_mc_check(struct phytium_edac_mc_ctx *ctx,
 		edac_mc_chipset_printk(ctx->mci, KERN_ERR, "Phytium",
 			"ECC channel %d correctable error at address  %#016llx\n",
 			ctx->channel_id, err_addr);
+		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
+				1, 0, 0, 0, 0, 0, -1, mci->ctl_name, "");
+	}
+
+	/* clear ecc int status */
+	if (ecc_status) {
+		writel(INT_ACK_ECC, ctx->reg_base + DDRC_PADDR);
+		writel(ECC_C_ERR_MASK | ECC_U_ERR_MASK,
+			ctx->reg_base + DDRC_PDATA);
 	}
 }
 
@@ -576,24 +686,27 @@ static void phytium_edac_error_report(struct phytium_edac *edac,
 
 	/* ignore pe220x soc_err id 40~43 */
 	if ((err_info == pe220x_ras_soc_error) &&
-	    (error_id >= 40) && (error_id <= 43))
+	    (error_id >= PE220X_IGNORE_ERR_ID_MIN) &&
+	    (error_id <= PE220X_IGNORE_ERR_ID_MAX))
 		return;
 
 	/* ecc error report */
 	if ((err_info == pe220x_ras_soc_error) &&
-	     (error_id >= 23) && (error_id <= 24)) {
+	     (error_id >= PE220X_ECC_ERR_ID_MIN) &&
+	     (error_id <= PE220X_ECC_ERR_ID_MAX)) {
 		list_for_each_entry(ctx, &edac->mc_list , next)
-			phytium_edac_mc_check(ctx, err_info, error_id);
+			phytium_edac_mc_check_ver2(ctx->mci);
 	}
 
 	if ((err_info == pd2208_ras_err) &&
-	     (error_id >= 0) && (error_id <= 3)) {
+	     (error_id >= PD2208_ECC_ERR_ID_MIN) &&
+	     (error_id <= PD2208_ECC_ERR_ID_MAX)) {
 		list_for_each_entry(ctx, &edac->mc_list , next)
-			phytium_edac_mc_check(ctx, err_info, error_id);
+			phytium_edac_mc_check_ver2(ctx->mci);
 	}
 
 	if (err_info[error_id].error_type == UNCORRECTED_ERROR) {
-		edac_printk(KERN_CRIT, EDAC_MOD_STR, "uncorrected error: %s\n",
+		edac_printk(KERN_ERR, EDAC_MOD_STR, "uncorrected error: %s\n",
 			err_info[error_id].error_str);
 		edac_device_handle_ue(edac->edac_dev, 0, 0,
 				err_info[error_id].error_str);
@@ -604,7 +717,7 @@ static void phytium_edac_error_report(struct phytium_edac *edac,
 					err_info[error_id].error_str,
 					strlen(err_info[error_id].error_str));
 	} else {
-		edac_printk(KERN_CRIT, EDAC_MOD_STR, "corrected error: %s\n",
+		edac_printk(KERN_WARNING, EDAC_MOD_STR, "corrected error: %s\n",
 			err_info[error_id].error_str);
 		edac_device_handle_ce(edac->edac_dev, 0, 0,
 				err_info[error_id].error_str);
@@ -719,6 +832,13 @@ static int phytium_edac_mc_add(struct phytium_edac *edac,
 	mci->ctl_page_to_phys = NULL;
 	mci->scrub_cap = SCRUB_FLAG_HW_SRC;
 	mci->scrub_mode = SCRUB_HW_SRC;
+	if (edac->num_err_group <= 0) {
+		edac_op_state = EDAC_OPSTATE_POLL;
+		if (edac->mc_reg_version == MC_REG_VERSION_1)
+			mci->edac_check = phytium_edac_mc_check_ver1;
+		else if (edac->mc_reg_version == MC_REG_VERSION_2)
+			mci->edac_check = phytium_edac_mc_check_ver2;
+	}
 
 	ret = edac_mc_add_mc(mci);
 	if (ret) {
@@ -729,7 +849,7 @@ static int phytium_edac_mc_add(struct phytium_edac *edac,
 	list_add(&p_ctx->next, &edac->mc_list);
 
 	devres_remove_group(edac->dev, phytium_edac_mc_add);
-	dev_info(edac->dev, "Phytium EDAC MC registered\n");
+	dev_info(edac->dev, "Phytium EDAC MC %d registered\n", p_ctx->channel_id);
 	return 0;
 
 err_free:
@@ -744,6 +864,7 @@ out:
 
 static int phytium_edac_probe(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
 	struct phytium_edac *edac;
 	struct resource *res;
 	struct device_node *child;
@@ -762,20 +883,34 @@ static int phytium_edac_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, edac);
 	INIT_LIST_HEAD(&edac->mc_list);
 
+	if (of_device_is_compatible(np, "phytium,pd1904-edac"))
+		edac->mc_reg_version = MC_REG_VERSION_1;
+	else
+		edac->mc_reg_version = MC_REG_VERSION_2;
+
 	edac->error_info =
 	  (const struct ras_error_info **)of_device_get_match_data(&pdev->dev);
 
 	edac->num_err_group = of_address_count(pdev->dev.of_node);
-	if (edac->num_err_group <= 0) {
-		dev_err(&pdev->dev, "can't get error group count");
-		goto out;
+	
+	/* memory controller reg */
+	for_each_child_of_node(pdev->dev.of_node, child) {
+		if (!of_device_is_available(child))
+			continue;
+		if (of_device_is_compatible(child, "phytium,edac-mc")) {
+			ret = phytium_edac_mc_add(edac, child);
+			if (ret < 0)
+				goto out;
+		}
 	}
 
-	edac->ras_base = devm_kcalloc(&pdev->dev, edac->num_err_group,
-			sizeof(*edac->ras_base), GFP_KERNEL);
-	if (!edac->ras_base) {
-		return -ENOMEM;
-		goto out;
+	if (edac->num_err_group > 0) {
+		edac->ras_base = devm_kcalloc(&pdev->dev, edac->num_err_group,
+				sizeof(*edac->ras_base), GFP_KERNEL);
+		if (!edac->ras_base) {
+			ret = -ENOMEM;
+			goto out;
+		}
 	}
 
 	for (i = 0; i < edac->num_err_group; i++) {
@@ -787,15 +922,6 @@ static int phytium_edac_probe(struct platform_device *pdev)
 			goto out;
 		}
 	}
-	
-	/* memory controller reg */
-	for_each_child_of_node(pdev->dev.of_node, child) {
-		if (!of_device_is_available(child))
-			continue;
-		if (of_device_is_compatible(child, "phytium,edac-mc"))
-			phytium_edac_mc_add(edac, child);
-	}
-	
 
 	edac->dfs = edac_debugfs_create_dir(EDAC_MOD_STR);
 
@@ -808,7 +934,7 @@ static int phytium_edac_probe(struct platform_device *pdev)
 	phytium_ras_setup(edac);
 
 	irq_cnt = platform_irq_count(pdev);
-	if (irq_cnt < 0) {
+	if (irq_cnt < 0 && edac->num_err_group > 0) {
 		dev_err(&pdev->dev, "no irq resource\n");
 		ret = -EINVAL;
 		goto out;
@@ -861,7 +987,11 @@ static const struct of_device_id phytium_edac_of_match[] = {
 	  .data = pe220x_ras_error },
 	{ .compatible = "phytium,pd2208-edac",
 	  .data = pd2208_ras_error },
-	{},
+	{ .compatible = "phytium,pd2008-edac",
+	  .data = NULL},
+	{ .compatible = "phytium,pd1904-edac",
+	  .data = NULL},
+	{}
 };
 MODULE_DEVICE_TABLE(of, phytium_edac_of_match);
 
