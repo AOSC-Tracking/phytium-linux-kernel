@@ -113,21 +113,21 @@ static const struct ras_error_info pe220x_ras_soc_error[] = {
 
 /* pcie controller error record */
 static const struct ras_error_info pe220x_ras_peu_psu_error[] = {
-	{ 0, CORRECTED_ERROR, "pio_rd_addr_error" },
+	{ 0, UNCORRECTED_ERROR, "pio_rd_addr_error" },
 	{ 1, UNCORRECTED_ERROR, "pio_wr_addr_error" },
-	{ 2, CORRECTED_ERROR, "pio_rd_timeout" },
-	{ 3, CORRECTED_ERROR, "pio_wr_timeout" },
-	{ 4, CORRECTED_ERROR, "axi_b_rsp_error" },
-	{ 5, CORRECTED_ERROR, "axi_r_rsp_error" },
+	{ 2, UNCORRECTED_ERROR, "pio_rd_timeout" },
+	{ 3, UNCORRECTED_ERROR, "pio_wr_timeout" },
+	{ 4, UNCORRECTED_ERROR, "axi_b_rsp_error" },
+	{ 5, UNCORRECTED_ERROR, "axi_r_rsp_error" },
 };
 
 static const struct ras_error_info pe220x_ras_peu_error[] = {
-	{ 0, CORRECTED_ERROR, "pio_rd_addr_error" },
+	{ 0, UNCORRECTED_ERROR, "pio_rd_addr_error" },
 	{ 1, UNCORRECTED_ERROR, "pio_wr_addr_error" },
-	{ 2, CORRECTED_ERROR, "pio_rd_timeout" },
-	{ 3, CORRECTED_ERROR, "pio_wr_timeout" },
-	{ 4, CORRECTED_ERROR, "axi_b_rsp_error" },
-	{ 5, CORRECTED_ERROR, "axi_r_rsp_error" },
+	{ 2, UNCORRECTED_ERROR, "pio_rd_timeout" },
+	{ 3, UNCORRECTED_ERROR, "pio_wr_timeout" },
+	{ 4, UNCORRECTED_ERROR, "axi_b_rsp_error" },
+	{ 5, UNCORRECTED_ERROR, "axi_r_rsp_error" },
 };
 
 /* pd2208 error */
