@@ -506,11 +506,10 @@ config EDAC_TI
 	  Support for error detection and correction on the TI SoCs.
 
 config EDAC_PHYTIUM
-	tristate "Phytium Pe220x SoC"
+	tristate "Phytium SoC"
 	depends on (ARM64)
 	help
-	  Support for error detection and correction on the
-	  Phytium Pe220x family of SOCs.
+	  Support for error detection and correction in Phytium SoC families.
 
 config EDAC_QCOM
 	tristate "QCOM EDAC Controller"
