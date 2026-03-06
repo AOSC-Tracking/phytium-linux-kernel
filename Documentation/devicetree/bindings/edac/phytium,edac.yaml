@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/edac/phytium,edac.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Phytium SoC EDAC node
+
+maintainers:
+  - Huang Jie <huangjie1663@phytium.com.cn>
+  - Chen Baozi <chenbaozi@phytium.com.cn>
+
+description: |
+  This binding describes the EDAC (Error Detection and Correction) controller
+  found in Phytium SoC families, The EDAC unit is responsible for monitoring and
+  reporting errors from various system components, including the memory
+  controller.
+
+properties:
+
+  compatible:
+    oneOf:
+      - description: For Phytium PE220x series SoCs
+        items:
+          - const: phytium,pe220x-edac
+
+      - description: For Phytium PD2008 series SoCs
+        items:
+          - const: phytium,pd2008-edac
+
+      - description: For Phytium PD2208 series SoCs
+        items:
+          - const: phytium,pd2208-edac
+
+      - description: For Phytium PD1904 series SoCs
+        items:
+          - const: phytium,pd1904-edac
+
+  reg:
+    description:
+      A list of memory regions for the RAS register sets.
+    maxItems: 3
+
+  interrupts:
+    description:
+      The interrupt lines from RAS.
+    maxItems: 3
+
+  ranges:
+    type: boolean
+
+  "#address-cells":
+    const: 2
+
+  "#size-cells":
+    const: 2
+
+patternProperties:
+  "memory-controller":
+    type: object
+    description:
+      Represents a memory controller instance that is managed by the main EDAC
+      controller.
+
+    properties:
+      compatible:
+        const: phytium,edac-mc
+
+      reg:
+        maxItems: 1
+        description: Register region for this memory controller.
+
+      memory-controller:
+        description: The ID of this memory controller.
+
+    required:
+      - compatible
+      - reg
+      - memory-controller
+
+    additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - "#address-cells"
+  - "#size-cells"
+
+additionalProperties: false
+
+examples:
+  - |
+    edac: edac@32b28000 {
+      compatible = "phytium,pe220x-edac";
+      ranges;
+      reg = <0x0 0x32b28000 0x0 0x1000>,
+            <0x0 0x31400000 0x0 0x1000>,
+            <0x0 0x31401000 0x0 0x1000>;
+      interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+              <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+      #address-cells = <2>;
+      #size-cells = <2>;
+
+      memory_controller@32b33000 {
+        compatible = "phytium,edac-mc";
+        reg = <0x0 0x32b33000 0x0 0x1000>;
+        memory-controller = <0>;
+      };
+    };
