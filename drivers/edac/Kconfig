@@ -500,6 +500,12 @@ config EDAC_TI
 	help
 	  Support for error detection and correction on the TI SoCs.
 
+config EDAC_PHYTIUM
+	tristate "Phytium SoC"
+	depends on (ARM64)
+	help
+	  Support for error detection and correction in Phytium SoC families.
+
 config EDAC_QCOM
 	tristate "QCOM EDAC Controller"
 	depends on ARCH_QCOM && QCOM_LLCC
@@ -536,12 +542,5 @@ config EDAC_DMC520
 	help
 	  Support for error detection and correction on the
 	  SoCs with ARM DMC-520 DRAM controller.
-
-config EDAC_PHYTIUM
-	tristate "Phytium Pe220x SoC"
-	depends on (ARM64)
-	help
-	  Support for error detection and correction on the
-	  Phytium Pe220x family of SOCs.
 
 endif # EDAC
