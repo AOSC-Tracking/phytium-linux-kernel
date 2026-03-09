@@ -522,6 +522,27 @@ bool is_dp_powered(struct phytium_dp_device *phytium_dp)
 	}
 }
 
+
+static void phytium_dp_set_bpc(struct phytium_dp_device *phytium_dp)
+{
+	struct drm_connector *connector = &phytium_dp->connector;
+	struct drm_display_info *display_info = &connector->display_info;
+
+	switch (display_info->bpc) {
+		case 10:
+		case 8:
+		case 6:
+			break;
+		default:
+			DRM_INFO("not support bpc(%d)\n",display_info->bpc);
+			display_info->bpc = 8;
+			break;
+	}
+
+	phytium_dp->bpc = display_info->bpc;
+	return;
+}
+
 static void phytium_dp_clean_display_modes(struct phytium_dp_device *phytium_dp) {
 	struct phytium_display_mode *mode, *tmp;
 
@@ -821,6 +842,7 @@ static int phytium_connector_get_modes(struct drm_connector *connector)
     if (edid && drm_edid_is_valid(edid)) {
         drm_connector_update_edid_property(connector, edid);
         ret = drm_add_edid_modes(connector, edid);
+	phytium_dp_set_bpc(phytium_dp);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 18))
 		phytium_calculate_luminance_range(phytium_dp, false);
 #endif
@@ -1594,13 +1616,11 @@ void phytium_dp_hw_config_video(struct phytium_dp_device *phytium_dp)
 	int port = phytium_dp->port;
 	uint32_t group_offset = priv->dp_reg_base[port];
 	unsigned long link_bw, date_rate = 0;
-	struct drm_display_info *display_info = &phytium_dp->connector.display_info;
 	struct phytium_display_mode *phytium_mode = NULL;
 	unsigned char tu_size = 64;
 	unsigned long data_per_tu = 0;
 	int symbols_per_tu, frac_symbols_per_tu, symbol_count, udc, value;
 
-	phytium_dp->bpc = display_info->bpc;
 	list_for_each_entry(phytium_mode, &phytium_dp->phytium_mode.list, list) {
 	if (phytium_display_mode_compare(phytium_mode, &phytium_dp->mode) &&
 		phytium_mode->reduced_bpc) {
@@ -3744,12 +3764,10 @@ static void phytium_encoder_disable(struct drm_encoder *encoder)
 
 void phytium_dp_adjust_link_train_parameter(struct phytium_dp_device *phytium_dp)
 {
-	struct drm_display_info *display_info = &phytium_dp->connector.display_info;
 	struct phytium_display_mode *phytium_mode = NULL;
 	unsigned long link_bw, date_rate = 0, bs_limit, bs_request;
 	int rate = 0;
 
-	phytium_dp->bpc = display_info->bpc;
 	list_for_each_entry(phytium_mode, &phytium_dp->phytium_mode.list, list) {
 		if (phytium_display_mode_compare(phytium_mode, &phytium_dp->mode) &&
 			phytium_mode->reduced_bpc) {
@@ -4056,17 +4074,7 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 	struct phytium_display_mode *phytium_mode = NULL;
 	int requested_bpc;
 
-	switch (display_info->bpc) {
-	case 10:
-	case 6:
-	case 8:
-		break;
-	default:
-		DRM_INFO("not support bpc(%d)\n", display_info->bpc);
-		display_info->bpc = 8;
-		break;
-	}
-	requested_bpc = display_info->bpc;
+	requested_bpc = phytium_dp->bpc;
 
 	if ((display_info->color_formats & DRM_COLOR_FORMAT_RGB444) == 0) {
 		DRM_INFO("not support color_format(%d)\n", display_info->color_formats);
@@ -4100,7 +4108,7 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 				requested_bpc -= 2;
 	} while ((requested >= actual) && requested_bpc >= 8);
 
-	if (requested_bpc != display_info->bpc) {
+	if (requested_bpc != phytium_dp->bpc) {
 		if (requested_bpc < 8 || (requested >= actual)) {
 			DRM_DEBUG_KMS("Mode %dx%d-%dHz (clock=%d) requested=%d more than actual=%d\n",
 					mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode),
@@ -4168,7 +4176,7 @@ static int phytium_encoder_atomic_check(struct drm_encoder *encoder,
 	struct drm_display_mode *mode = &crtc_state->adjusted_mode;
 	u32 bus_format;
 
-	switch (info->bpc) {
+	switch (phytium_dp->bpc) {
 		case 6:
 			bus_format = MEDIA_BUS_FMT_RGB666_1X18;
 			break;
