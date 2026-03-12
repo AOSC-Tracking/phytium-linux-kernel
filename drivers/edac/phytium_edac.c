@@ -15,6 +15,7 @@
 #include <ras/ras_event.h>
 #include "edac_module.h"
 #include <linux/of_address.h>
+#include <linux/acpi.h>
 
 #define EDAC_MOD_STR			"phytium_edac"
 
@@ -759,13 +760,12 @@ out:
 }
 
 static int phytium_edac_mc_add(struct phytium_edac *edac,
-			       struct device_node *np)
+			       struct resource *res, int mc_id)
 {
 	struct mem_ctl_info *mci = NULL;
 	struct edac_mc_layer layer;
 	struct phytium_edac_mc_ctx ctx;
 	struct phytium_edac_mc_ctx *p_ctx;
-	struct resource res;
 	int ret = 0;
 
 	if (!devres_open_group(edac->dev, phytium_edac_mc_add, GFP_KERNEL)) {
@@ -773,22 +773,11 @@ static int phytium_edac_mc_add(struct phytium_edac *edac,
 		goto out;
 	}
 
-	ret = of_address_to_resource(np, 0, &res);
-	if (ret < 0) {
-		dev_err(edac->dev, "no memory controller reg address %d\n", ret);
-		goto err_group;
-	}
-	ctx.reg_base = devm_ioremap_resource(edac->dev, &res);
+	ctx.channel_id = mc_id;
+	ctx.reg_base = devm_ioremap_resource(edac->dev, res);
 	if (IS_ERR(ctx.reg_base)) {
 		dev_err(edac->dev, "unable to map memory controller reg address\n");
 		ret = PTR_ERR(ctx.reg_base);
-		goto err_group;
-	}
-
-	ret = of_property_read_u32(np, "memory-controller", &ctx.channel_id);
-	if (ret < 0) {
-		dev_err(edac->dev, "no memory-controller property\n");
-		ret = -EINVAL;
 		goto err_group;
 	}
 
@@ -868,24 +857,62 @@ static int phytium_edac_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, edac);
 	INIT_LIST_HEAD(&edac->mc_list);
 
-	if (of_device_is_compatible(np, "phytium,pd1904-edac"))
-		edac->mc_reg_version = MC_REG_VERSION_1;
-	else
-		edac->mc_reg_version = MC_REG_VERSION_2;
+	if (has_acpi_companion(&pdev->dev)) {
+		ret = device_property_read_u32(&pdev->dev, "mc_version",
+				&edac->mc_reg_version);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to read mc_version: %d\n", ret);
+			goto out;
+		}
 
-	edac->error_info =
-	  (const struct ras_error_info **)of_device_get_match_data(&pdev->dev);
+		for (i = 0; ; i ++) {
+			res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+			if (!res)
+				break;
 
-	edac->num_err_group = of_address_count(pdev->dev.of_node);
-	
-	/* memory controller reg */
-	for_each_child_of_node(pdev->dev.of_node, child) {
-		if (!of_device_is_available(child))
-			continue;
-		if (of_device_is_compatible(child, "phytium,edac-mc")) {
-			ret = phytium_edac_mc_add(edac, child);
+			ret = phytium_edac_mc_add(edac, res, i);
 			if (ret < 0)
 				goto out;
+		}
+	} else {
+		if (of_device_is_compatible(np, "phytium,pd1904-edac"))
+			edac->mc_reg_version = MC_REG_VERSION_1;
+		else
+			edac->mc_reg_version = MC_REG_VERSION_2;
+
+		edac->error_info = (const struct ras_error_info **)
+					of_device_get_match_data(&pdev->dev);
+
+		edac->num_err_group = of_address_count(pdev->dev.of_node);
+		
+		/* memory controller reg */
+		for_each_child_of_node(pdev->dev.of_node, child) {
+			struct resource resource_mc;
+			int mc_id = 0;
+			if (!of_device_is_available(child))
+				continue;
+			if (of_device_is_compatible(child, "phytium,edac-mc")) {
+
+				ret = of_address_to_resource(child, 0,
+						&resource_mc);
+				if (ret < 0) {
+					dev_err(edac->dev, "no memory controller reg address %d\n", ret);
+					goto out;
+				}
+
+				ret = of_property_read_u32(child,
+							   "memory-controller",
+							   &mc_id);
+				if (ret < 0) {
+					dev_err(edac->dev, "no memory-controller property\n");
+					goto out;
+				}
+
+				ret = phytium_edac_mc_add(edac, &resource_mc,
+							  mc_id);
+				if (ret < 0)
+					goto out;
+			}
 		}
 	}
 
@@ -980,12 +1007,19 @@ static const struct of_device_id phytium_edac_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, phytium_edac_of_match);
 
+static const struct acpi_device_id phytium_edac_acpi_ids[] = {
+	{"PHYT0073", 0},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, phytium_edac_acpi_ids);
+
 static struct platform_driver phytium_edac_driver = {
 	.probe = phytium_edac_probe,
 	.remove = phytium_edac_remove,
 	.driver = {
 		.name = "phytium-edac",
 		.of_match_table = phytium_edac_of_match,
+		.acpi_match_table = phytium_edac_acpi_ids,
 	},
 };
 
