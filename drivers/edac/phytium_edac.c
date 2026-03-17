@@ -407,7 +407,7 @@ static ssize_t phytium_edac_inject_ctrl_write(struct file *filp,
 	unsigned int error_id = 0;
 	unsigned int error_num = 0;
 	struct phytium_edac *edac = filp->private_data;
-	char str[255];
+	char str[256];
 	char *p_str = str;
 	char *tmp = NULL;
 
@@ -477,8 +477,10 @@ static void phytium_edac_create_debugfs_nodes(struct phytium_edac *edac)
 		return;
 	}
 
-	edac_debugfs_create_file("error_inject_ctrl", S_IWUSR, edac->dfs, edac,
-				 &phytium_edac_debug_inject_fops[0]);
+	if (!edac_debugfs_create_file("error_inject_ctrl", 0x0200, edac->dfs, edac,
+				      &phytium_edac_debug_inject_fops[0]))
+		debugfs_remove_recursive(edac->dfs);
+
 }
 
 static int phytium_edac_device_add(struct phytium_edac *edac)
@@ -490,8 +492,10 @@ static int phytium_edac_device_add(struct phytium_edac *edac)
 			sizeof(struct edac_device_ctl_info),
 			"ras", 1, "soc", 1, 0, NULL,
 			0, edac_device_alloc_index());
-	if (!edac_dev)
+	if (!edac_dev) {
 		res = -ENOMEM;
+		goto out;
+	}
 
 	edac_dev->dev = edac->dev;
 	edac_dev->mod_name = EDAC_MOD_STR;
@@ -511,7 +515,10 @@ static int phytium_edac_device_add(struct phytium_edac *edac)
 	return 0;
 
 err_free:
+	debugfs_remove_recursive(edac->dfs);
 	edac_device_free_ctl_info(edac_dev);
+
+out:
 	return res;
 }
 
@@ -851,6 +858,13 @@ out:
 	return ret;
 }
 
+static int phytium_edac_mc_remove(struct phytium_edac_mc_ctx *ctx)
+{
+	edac_mc_del_mc(&ctx->mci->dev);
+	edac_mc_free(ctx->mci);
+	return 0;
+}
+
 static int phytium_edac_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -936,7 +950,7 @@ static int phytium_edac_probe(struct platform_device *pdev)
 				sizeof(*edac->ras_base), GFP_KERNEL);
 		if (!edac->ras_base) {
 			ret = -ENOMEM;
-			goto out;
+			goto err_free_mc;
 		}
 	}
 
@@ -946,7 +960,7 @@ static int phytium_edac_probe(struct platform_device *pdev)
 		if (IS_ERR(edac->ras_base[i])) {
 			dev_err(&pdev->dev, "no resource address\n");
 			ret = PTR_ERR(edac->ras_base[i]);
-			goto out;
+			goto err_free_mc;
 		}
 	}
 
@@ -955,7 +969,7 @@ static int phytium_edac_probe(struct platform_device *pdev)
 	ret = phytium_edac_device_add(edac);
 	if (ret) {
 		dev_err(&pdev->dev, "can't add edac device");
-		goto out;
+		goto err_free_mc;
 	}
 
 	phytium_ras_setup(edac);
@@ -964,7 +978,7 @@ static int phytium_edac_probe(struct platform_device *pdev)
 	if (irq_cnt < 0 && edac->num_err_group > 0) {
 		dev_err(&pdev->dev, "no irq resource\n");
 		ret = -EINVAL;
-		goto out;
+		goto err_free_edac;
 	}
 
 	for (i = 0; i < irq_cnt; i++) {
@@ -972,7 +986,7 @@ static int phytium_edac_probe(struct platform_device *pdev)
 		if (irq < 0) {
 			dev_err(&pdev->dev, "invalid irq resource\n");
 			ret = -EINVAL;
-			goto out;
+			goto err_free_edac;
 		}
 		ret = devm_request_irq(&pdev->dev, irq,
 					  phytium_edac_isr, IRQF_SHARED,
@@ -980,19 +994,25 @@ static int phytium_edac_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(&pdev->dev,
 				"could not request irq %d\n", irq);
-			goto out;
+			goto err_free_edac;
 		}
+	}
+
+	return ret;
+
+err_free_edac:
+	phytium_edac_device_remove(edac);
+
+err_free_mc:
+	{
+		struct phytium_edac_mc_ctx *mc;
+		struct phytium_edac_mc_ctx *temp_mc;
+		list_for_each_entry_safe(mc, temp_mc, &edac->mc_list, next)
+			phytium_edac_mc_remove(mc);
 	}
 
 out:
 	return ret;
-}
-
-static int phytium_edac_mc_remove(struct phytium_edac_mc_ctx *ctx)
-{
-	edac_mc_del_mc(&ctx->mci->dev);
-	edac_mc_free(ctx->mci);
-	return 0;
 }
 
 static int phytium_edac_remove(struct platform_device *pdev)
