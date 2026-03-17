@@ -379,6 +379,7 @@ int phytium_gpio_get_direction(struct gpio_chip *gc, unsigned int offset)
 }
 EXPORT_SYMBOL_GPL(phytium_gpio_get_direction);
 
+#ifdef CONFIG_PM_SLEEP
 int phytium_gpio_irq_set_wake(struct irq_data *d, unsigned int enable)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
@@ -412,6 +413,7 @@ int phytium_gpio_irq_set_wake(struct irq_data *d, unsigned int enable)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(phytium_gpio_irq_set_wake);
+#endif
 
 int phytium_gpio_irq_set_affinity(struct irq_data *d, const struct cpumask *mask_val, bool force)
 {
