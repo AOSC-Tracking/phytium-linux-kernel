@@ -22,7 +22,9 @@ static const struct irq_chip phytium_gpio_irq_chip = {
 	.irq_enable		= phytium_gpio_irq_enable,
 	.irq_disable		= phytium_gpio_irq_disable,
 	.irq_set_affinity	= phytium_gpio_irq_set_affinity,
-	.irq_set_wake		= phytium_gpio_irq_set_wake,
+#ifdef CONFIG_PM_SLEEP
+ 	.irq_set_wake		= phytium_gpio_irq_set_wake,
+#endif
 	.flags			= IRQCHIP_IMMUTABLE,
 	GPIOCHIP_IRQ_RESOURCE_HELPERS,
 };
