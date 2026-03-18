@@ -250,6 +250,9 @@ struct ftd330_drm_private {
 	struct dc_hw_fb scanout_buffer[DISPLAY_NUM];
 	bool in_drm_panic;
 
+	bool in_s3_suspend;
+	bool in_s4_suspend;
+
 	struct phytium_pm_domains dev_pm;
 };
 
