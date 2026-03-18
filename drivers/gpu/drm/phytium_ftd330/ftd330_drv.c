@@ -486,6 +486,10 @@ static int ftd330_do_suspend(struct device *dev,  bool is_s3)
 	struct ftd330_drm_private *priv = drm->dev_private;
 	struct device *dc_dev = priv->dc_dev;
 
+	priv->in_s3_suspend = is_s3;
+	priv->in_s4_suspend = !is_s3;
+
+	phytium_dp_cancel_train_retry_work(drm, true);
 	phytium_dp_hpd_irq_setup(drm, false, false);
 	phytium_dplp_deinit(priv);
 	cancel_work_sync(&priv->hotplug_work);
@@ -619,6 +623,8 @@ static int ftd330_do_resume(struct device *dev, bool is_s3)
 		goto err_ret;
 	}
 	phytium_dplp_init(priv);
+	priv->in_s3_suspend = false;
+	priv->in_s4_suspend = false;
 	phytium_dp_hpd_irq_setup(drm, true, true);
 
 err_ret:
@@ -841,6 +847,7 @@ static void ftd330_pci_remove(struct pci_dev *pdev)
 {
 	struct drm_device *dev = dev_drm;
 
+	phytium_dp_cancel_train_retry_work(dev, true);
 	drm_dev_unregister(dev);
 
 	phytium_drm_device_deinit(dev);
@@ -868,6 +875,7 @@ static void phytium_pci_shutdown(struct pci_dev *pdev)
 	struct ftd330_dc *dc = dev_get_drvdata(dev);
 	struct drm_device *drm_dev = dc->hw.drm_dev;
 
+	phytium_dp_cancel_train_retry_work(drm_dev, true);
 	 drm_atomic_helper_shutdown(drm_dev);
 }
 
@@ -1068,6 +1076,7 @@ static int ftd330_drm_platform_remove(struct platform_device *pdev)
 	struct drm_device *dev = dev_drm;
 	struct ftd330_drm_private *priv = dev->dev_private;
 
+	phytium_dp_cancel_train_retry_work(dev, true);
 #ifdef CONFIG_PHYTIUM_FBDEV_ON
         phytium_drm_fbdev_fini(dev);
 #endif
@@ -1113,6 +1122,7 @@ static void phytium_platform_shutdown(struct platform_device *pdev)
 	struct ftd330_dc *dc = dev_get_drvdata(dev);
 	struct drm_device *drm_dev = dc->hw.drm_dev;
 
+	phytium_dp_cancel_train_retry_work(drm_dev, true);
 	 drm_atomic_helper_shutdown(drm_dev);
 }
 

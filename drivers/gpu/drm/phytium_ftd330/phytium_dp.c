@@ -2439,14 +2439,42 @@ static void phytium_dp_train_retry_work_fn(struct work_struct *work)
 {
 	struct phytium_dp_device *phytium_dp = train_retry_to_dp_device(work);
 	struct drm_connector *connector;
+	struct drm_device *drm_dev = phytium_dp->dev;
+	struct ftd330_drm_private *priv = drm_dev->dev_private;
 
-	connector = &phytium_dp->connector;
-	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id, connector->name);
-	mutex_lock(&connector->dev->mode_config.mutex);
-	drm_connector_set_link_status_property(connector, DRM_MODE_LINK_STATUS_BAD);
-	mutex_unlock(&connector->dev->mode_config.mutex);
-	drm_kms_helper_hotplug_event(connector->dev);
+	if (!priv->in_s3_suspend && !priv->in_s4_suspend) {
+		connector = &phytium_dp->connector;
+		DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id, connector->name);
+		mutex_lock(&connector->dev->mode_config.mutex);
+		drm_connector_set_link_status_property(connector, DRM_MODE_LINK_STATUS_BAD);
+		mutex_unlock(&connector->dev->mode_config.mutex);
+		drm_kms_helper_hotplug_event(connector->dev);
+	}
 }
+
+void phytium_dp_cancel_train_retry_work(struct drm_device *drm_dev, bool reset_count)
+{
+#ifdef CONFIG_PHYTIUM_LANE_TRAIN
+	struct ftd330_drm_private *priv;
+	struct phytium_dp_device *phytium_dp;
+	int i;
+
+	if (!drm_dev)
+		return;
+
+	priv = drm_dev->dev_private;
+	for (i = DISPLAY_0; i < DISPLAY_NUM; i++) {
+		phytium_dp = priv->phytium_dp[i];
+		if (!phytium_dp)
+			continue;
+
+		cancel_work_sync(&phytium_dp->train_retry_work);
+		if (reset_count)
+			phytium_dp->train_retry_count = 0;
+	}
+#endif
+}
+
 
 /* return index of rate in rates array, or -1 if not found */
 static int phytium_dp_rate_index(const int *rates, int len, int rate)
@@ -3587,6 +3615,10 @@ phytium_connector_destroy(struct drm_connector *connector)
 	struct ftd330_drm_private *priv = dev->dev_private;
 
 	cancel_work_sync(&priv->hotplug_work);
+#ifdef CONFIG_PHYTIUM_LANE_TRAIN
+	cancel_work_sync(&phytium_dp->train_retry_work);
+	phytium_dp->train_retry_count = 0;
+#endif
 	if (phytium_dp->is_edp) {
 #ifdef CONFIG_PHYTIUM_PSR
 		if (phytium_dp->psr.psr_work_init) {
@@ -4227,7 +4259,6 @@ static int phytium_encoder_atomic_check(struct drm_encoder *encoder,
 {
 	struct drm_connector *connector = conn_state->connector;
 	struct phytium_dp_device *phytium_dp = connector_to_dp_device(connector);
-	struct drm_display_info *info = &connector->display_info;
 	struct phytium_display_mode *phytium_mode = NULL;
 	struct ftd330_crtc_state *ftd330_crtc_state = to_ftd330_crtc_state(crtc_state);
 	struct drm_display_mode *mode = &crtc_state->adjusted_mode;

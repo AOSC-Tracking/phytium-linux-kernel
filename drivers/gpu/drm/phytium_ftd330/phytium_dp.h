@@ -356,6 +356,7 @@ void phytium_edp_power_on(struct phytium_dp_device *phytium_dp);
 void phytium_edp_power_off(struct phytium_dp_device *phytium_dp);
 int phytium_dp_resume(struct drm_device *drm_dev);
 int phytium_dp_suspend(struct drm_device *drm_dev);
+void phytium_dp_cancel_train_retry_work(struct drm_device *drm_dev, bool reset_count);
 void phytium_dp_hpd_irq_setup(struct drm_device *dev, bool enable, bool handle_irq);
 irqreturn_t phytium_dp_hpd_irq_handler(int irq, void *data);
 irqreturn_t phytium_dp_power_on_irq_handler(int irq, void *data);
