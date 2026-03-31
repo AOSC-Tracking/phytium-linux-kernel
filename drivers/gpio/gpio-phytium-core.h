@@ -88,6 +88,8 @@ void phytium_gpio_irq_print_chip(struct irq_data *data, struct seq_file *p);
 void phytium_gpio_irq_enable(struct irq_data *d);
 void phytium_gpio_irq_disable(struct irq_data *d);
 void phytium_gpio_irq_handler(struct irq_desc *desc);
+#ifdef CONFIG_PM_SLEEP
 int phytium_gpio_irq_set_wake(struct irq_data *d, unsigned int enable);
+#endif
 int phytium_gpio_irq_set_affinity(struct irq_data *d, const struct cpumask *mask_val, bool force);
 #endif
