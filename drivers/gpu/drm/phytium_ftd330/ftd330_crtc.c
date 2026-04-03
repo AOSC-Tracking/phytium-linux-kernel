@@ -908,7 +908,7 @@ int ftd330_drm_atomic_helper_page_flip(struct drm_crtc *crtc,
         if (!dc)
                 return -EINVAL;
 
-	crtc_index = drm_crtc_index(crtc);
+	crtc_index = phytium_display_virtual_to_physical(dc->hw.pipe_mask, drm_crtc_index(crtc));
 	if (!is_dc_powered(&dc->hw, (crtc_index? 1 : 0))) {
 		DRM_ERROR("dc power down,pageflip skip\n");
 		return -EINVAL;
