@@ -2565,6 +2565,11 @@ void phytium_drm_device_deinit(struct drm_device *drm_dev)
 		kfree(bios_info->panels);
 		bios_info->panels = NULL;
 	}
+
+	if (bios_info->branches) {
+		kfree(bios_info->branches);
+		bios_info->branches = NULL;
+	}
 }
 
 

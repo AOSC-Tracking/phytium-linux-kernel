@@ -103,6 +103,14 @@ struct bios_panel_info {
 	bool valid;
 };
 
+struct bios_branch_info {
+	unsigned char branch_id[6];
+	u8 max_lane_count;
+	u8 max_link_rate;
+	int num_link_rate;
+	bool valid;
+};
+
 struct bios_table_info {
 	void __iomem *para_table_base;
 	struct dp_bios_phy_matrix dp_bios_phy_val;
@@ -125,6 +133,8 @@ struct bios_table_info {
 
 	struct bios_panel_info *panels;
 	u32 panel_count;
+	u32 branch_count;
+	struct bios_branch_info *branches;
 };
 
 struct phytium_device_info {

@@ -937,13 +937,16 @@ static void phytium_dp_set_common_rates(struct phytium_dp_device *phytium_dp)
 
 static void
 phytium_dp_set_bios_common_rates_lanes(struct phytium_dp_device *phytium_dp, 
-										struct edid *edid)
+								struct edid *edid, unsigned char *branch_id)
 {
 	struct drm_device *dev =  phytium_dp->dev;
 	struct ftd330_drm_private *priv = dev->dev_private;
 	struct bios_table_info *bios_info = &priv->info.bios_info;
 	int i = 0;
+	bool edid_matched = false;
+	int num_link_rate, lane_count;
 
+	/* Try to match by panel_id from EDID first */
 	if (edid && drm_edid_is_valid(edid)) {
 		uint32_t panel_id = edid_extract_panel_id(edid);
 		for (i = 0; i < bios_info->panel_count; i++){
@@ -967,8 +970,56 @@ phytium_dp_set_bios_common_rates_lanes(struct phytium_dp_device *phytium_dp,
 				phytium_dp->common_max_lane_count =
 					min(phytium_dp->common_max_lane_count,
 						(int)bios_info->panels[i].max_lane_count);
-				DRM_DEBUG_KMS("After parsing ACPI, the max common rate is %d"
+				DRM_DEBUG_KMS("DP-%d: After parsing bios edid info,"
+							"the max common rate is %d"
 							"and the common lane count is %d.\n",
+							phytium_dp->port,
+							phytium_dp->common_rates[phytium_dp->num_common_rates-1],
+							phytium_dp->common_max_lane_count);
+				edid_matched = true;
+				break;
+			}
+		}
+	}
+
+	DRM_DEBUG_KMS("dp-%d try to match bios branch_id with dpcd id: "
+				"0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x.\n",
+				phytium_dp->port, branch_id[0], branch_id[1],
+				branch_id[2], branch_id[3], branch_id[4], branch_id[5]);
+	if (branch_id && bios_info->branch_count > 0) {
+		for (i = 0; i < bios_info->branch_count; i++) {
+			if (bios_info->branches[i].valid &&
+				memcmp(bios_info->branches[i].branch_id, branch_id, 6) == 0) {
+				num_link_rate = bios_info->branches[i].num_link_rate;
+				lane_count = bios_info->branches[i].max_lane_count;
+
+				if (edid_matched) {
+					num_link_rate = min(num_link_rate, phytium_dp->num_common_rates);
+					lane_count = min(lane_count, phytium_dp->common_max_lane_count);
+					pr_info("DP-%d: After matching with both panel_id and branch_id,"
+								"the max common rate is %d "
+								"and the common lane count is %d.\n",
+								phytium_dp->port, phytium_dp->common_rates[num_link_rate-1],
+								lane_count);
+				}
+				phytium_dp->num_common_rates =
+					get_common_rates(phytium_dp->common_rates,
+					phytium_dp->num_common_rates,
+					phytium_dp->sink_rates,
+					num_link_rate,
+					phytium_dp->common_rates);
+				if (WARN_ON(phytium_dp->num_common_rates == 0)) {
+					phytium_dp->common_rates[0] = 162000;
+					phytium_dp->num_common_rates = 1;
+				}
+
+				phytium_dp->common_max_lane_count =
+					min(phytium_dp->common_max_lane_count,
+						lane_count);
+				pr_info("DP-%d: After parsing bios branch info,"
+							"the max common rate is %d "
+							"and the common lane count is %d.\n",
+							phytium_dp->port,
 							phytium_dp->common_rates[phytium_dp->num_common_rates-1],
 							phytium_dp->common_max_lane_count);
 				break;
@@ -1025,7 +1076,7 @@ static void phytium_set_train_link_rate_lane_count(struct phytium_dp_device *phy
 		phytium_dp->common_max_lane_count <= 0)
 		return;
 
-	phytium_dp_set_bios_common_rates_lanes(phytium_dp, edid);
+	phytium_dp_set_bios_common_rates_lanes(phytium_dp, edid, phytium_dp->branch_id);
 	index = phytium_dp->num_common_rates-1;
 	phytium_dp->max_link_rate = phytium_dp->common_rates[index];
 	phytium_dp->max_link_lane_count = phytium_dp->common_max_lane_count;
@@ -1042,6 +1093,7 @@ static bool phytium_dp_get_dpcd(struct phytium_dp_device *phytium_dp)
 	int ret;
 	unsigned char sink_count = 0;
 
+	memset(phytium_dp->branch_id, 0, sizeof(phytium_dp->branch_id));
 	/* get dpcd capability,but don't check data error; so check revision */
 	ret = drm_dp_dpcd_read(&phytium_dp->aux, 0x00, phytium_dp->dpcd,
 			       sizeof(phytium_dp->dpcd));
@@ -1095,6 +1147,11 @@ static bool phytium_dp_get_dpcd(struct phytium_dp_device *phytium_dp)
 	if (ret < 0) {
 		DRM_ERROR("get DPCD DFP fail\n");
 		return false;
+	}
+
+	ret = drm_dp_downstream_id(&phytium_dp->aux, phytium_dp->branch_id);
+	if (ret < 0) {
+		DRM_ERROR("get DPCD branch id fail\n");
 	}
 
 	return true;
@@ -4955,7 +5012,7 @@ get_panel_info:
 			phytium_dp->custom_panel_id = edid_extract_panel_id(phytium_dp->edp_edid);
 		}
 		phytium_dp_detect_dpcd(phytium_dp);
-		phytium_dp_set_bios_common_rates_lanes(phytium_dp, phytium_dp->edp_edid);
+		phytium_dp_set_bios_common_rates_lanes(phytium_dp, phytium_dp->edp_edid, phytium_dp->branch_id);
 		ret = drm_dp_dpcd_read(&phytium_dp->aux, DP_EDP_DPCD_REV,
 					phytium_dp->edp_dpcd, sizeof(phytium_dp->edp_dpcd));
 		if (ret < 0)

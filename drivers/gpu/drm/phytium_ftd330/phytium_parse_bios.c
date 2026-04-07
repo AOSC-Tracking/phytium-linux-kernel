@@ -459,6 +459,91 @@ static int parse_bios_panel_info_content(void __iomem *start, u32 id,
 	return ret;
 }
 
+static int parse_bios_branch_info_content(void __iomem *start, u32 id,
+									struct bios_table_info *bios_info,
+									struct para_header *header,
+									bool *next_content_valid) {
+	int ret = 0;
+	u32 table_count;
+	int i;
+	u32 base_offset = 4;
+
+	table_count = readl(start);
+	if (table_count == 0) {
+		pr_info("ID 0x%x table count is 0\n", id);
+		return ret;
+	}
+
+	bios_info->branch_count = table_count;
+
+	if (bios_info->branches) {
+		kfree(bios_info->branches);
+		bios_info->branches = NULL;
+	}
+
+	bios_info->branches = kzalloc(sizeof(struct bios_branch_info) * table_count, GFP_KERNEL);
+	if (!bios_info->branches) {
+		pr_err("Failed to allocate memory for bios_info->branches\n");
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < table_count; i++) {
+		unsigned char branch_id[6];
+
+		void __iomem *entry_base = start + base_offset + i * 16; // 每个结构16字节
+
+		// 读取dpcd信息
+		memcpy_fromio(&branch_id, entry_base, 6);
+		memcpy(bios_info->branches[i].branch_id, branch_id, 6);
+
+		// 读取最大速率和lane数
+		bios_info->branches[i].max_lane_count = readb(entry_base + 6);
+		bios_info->branches[i].max_link_rate = readb(entry_base + 7);
+
+#if PARASE_DEBUG
+	pr_info("Parsing Capability ID: 0x%x\n", id);
+	pr_info("bios_info->branches[%d].branch_id = %02x:%02x:%02x:%02x:%02x:%02x,"
+			"max_lane_count = %d, max_link_rate = 0x%x\n",
+			i, bios_info->branches[i].branch_id[0], bios_info->branches[i].branch_id[1],
+			bios_info->branches[i].branch_id[2], bios_info->branches[i].branch_id[3],
+			bios_info->branches[i].branch_id[4], bios_info->branches[i].branch_id[5],
+			bios_info->branches[i].max_lane_count, bios_info->branches[i].max_link_rate);
+#endif
+		switch (bios_info->branches[i].max_link_rate) {
+			case 0x1e:
+				bios_info->branches[i].num_link_rate = 4;
+				break;
+			case 0x14:
+				bios_info->branches[i].num_link_rate = 3;
+				break;
+			case 0xa:
+				bios_info->branches[i].num_link_rate = 2;
+				break;
+			case 0x6:
+				bios_info->branches[i].num_link_rate = 1;
+				break;
+			default:
+				pr_warn("Unknown link rate %u, abort\n",
+						bios_info->branches[i].max_link_rate);
+				return -EINVAL;
+		}
+		switch (bios_info->branches[i].max_lane_count)
+		{
+		case 1:
+		case 2:
+		case 4:
+			break;
+		default:
+			pr_warn("Unsupport lane count %d, abort\n",
+						bios_info->branches[i].max_lane_count);
+				return -EINVAL;
+		}
+
+		bios_info->branches[i].valid = true;
+	}
+	return ret;
+}
+
 static int parse_bios_para_content(void __iomem *start,
 									struct bios_table_info *bios_info,
 									struct para_header *header,
@@ -496,6 +581,10 @@ static int parse_bios_para_content(void __iomem *start,
 		case PANEL_INFO:
 			content_start = start + 12;
 			return parse_bios_panel_info_content(content_start, id, bios_info,
+											header, next_content_valid);
+		case BRANCH_INFO:
+			content_start = start + 12;
+			return parse_bios_branch_info_content(content_start, id, bios_info,
 											header, next_content_valid);
 		default:
 			pr_err("Unsupported Capability ID: 0x%x\n", id);
