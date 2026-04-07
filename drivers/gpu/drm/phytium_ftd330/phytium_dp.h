@@ -181,6 +181,7 @@ struct phytium_dp_device {
 	unsigned char dpcd[DP_RECEIVER_CAP_SIZE];
 	uint8_t edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
 	uint8_t psr_dpcd[EDP_PSR_RECEIVER_CAP_SIZE];
+	unsigned char branch_id[6];
 	unsigned char downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
 	unsigned char sink_count;
 	int freq;

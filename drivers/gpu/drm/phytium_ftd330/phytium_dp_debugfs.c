@@ -308,6 +308,9 @@ static const struct dpcd_block phytium_dpcd_debug[] = {
 	{ .offset = 0x300, .size = 3},
 	{ .offset = 0x340, .size = 10 },
 	{ .offset = 0x350, .size = 10 },
+	/* Branch device info*/
+	{ .offset = DP_BRANCH_ID, .size = 6 },
+	{ .offset = DP_DP13_DPCD_REV, .size = DP_RECEIVER_CAP_SIZE }
 };
 
 static loff_t phytium_dpcd_llseek(struct file *file, loff_t offset, int whence)
@@ -1194,6 +1197,22 @@ static int phytium_custom_para_info_show(struct seq_file *m, void *data)
 				bios_info->panels[i].max_link_rate, bios_info->panels[i].max_lane_count);
 		}
 	}
+	seq_puts(m, "\n");
+
+	if (bios_info->branch_count) {
+		seq_puts(m, "branch compatibility information:\n");
+		for (i = 0; i < bios_info->branch_count; i++) {
+			seq_printf(m, "branch id 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x.\n"
+				"table valid is %d\n"
+				"max link rate is 0x%x, max lane count is %d\n",
+				bios_info->branches[i].branch_id[0], bios_info->branches[i].branch_id[1],
+				bios_info->branches[i].branch_id[2], bios_info->branches[i].branch_id[3],
+				bios_info->branches[i].branch_id[4], bios_info->branches[i].branch_id[5],
+				bios_info->branches[i].valid,
+				bios_info->branches[i].max_link_rate, bios_info->branches[i].max_lane_count);
+		}
+	}
+
 	return 0;
 }
 
