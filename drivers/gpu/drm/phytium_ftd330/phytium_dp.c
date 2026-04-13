@@ -3911,7 +3911,7 @@ void phytium_edp_delay_on_work_func(struct work_struct *work)
 
 	if (!phytium_dp->is_edp)
 		return;
-	
+
 	phytium_dp_hw_disable_video(phytium_dp);
 
 	success = phytium_edp_panel_poweron(phytium_dp);
@@ -4088,13 +4088,13 @@ static void phytium_encoder_enable(struct drm_encoder *encoder)
 		return;
 	}
 
-	phytium_dp_hw_disable_video(phytium_dp);
-
 	if (phytium_dp->is_edp) {
 		if (phytium_dp->edp_delay_on_work_pending) {
 			cancel_delayed_work_sync(&phytium_dp->edp_delay_on_work);
 			phytium_dp->edp_delay_on_work_pending = false;
 		}
+		phytium_dp_hw_disable_video(phytium_dp);
+
 		success = phytium_edp_panel_poweron(phytium_dp);
 		/* If success is false, it indicates that the panel
 		 * has already been powered on, and can try to
@@ -4107,6 +4107,7 @@ static void phytium_encoder_enable(struct drm_encoder *encoder)
 		mdelay(2);
 		phytium_dp_fast_link_train_detect(phytium_dp);
 	} else {
+		phytium_dp_hw_disable_video(phytium_dp);
 		phytium_dp_adjust_link_train_parameter(phytium_dp);
 		ret = phytium_dp_start_link_train(phytium_dp, true);
 		if (phytium_dp->custom_delay_ms)
@@ -5100,15 +5101,21 @@ void phytium_dp_disable_before_init(struct ftd330_drm_private *priv)
 {
 	int i = 0;
 	u32 group_offset = 0;
+	u32 backlight_power_value = 0;
 
 	for (i = DISPLAY_0; i < DISPLAY_NUM; i++) {
 		group_offset = PHYTIUM_FTD330_DP_REG_OFFSET +
                                           i*PHYTIUM_FTD330_DP_REG_INTERVAL;
 
-		if (!(priv->info.edp_mask & BIT(i))) {
-			phytium_writel_reg(priv, SST_MST_SOURCE_0_DISABLE,
-	                          group_offset, PHYTIUM_DP_VIDEO_STREAM_ENABLE);
+		if (priv->info.edp_mask & BIT(i)) {
+			backlight_power_value = phytium_readl_reg(priv, group_offset, EDP_BACKLIGHT_CONTROL);
+			backlight_power_value &= ~BIT(1);
+			phytium_writel_reg(priv, backlight_power_value, group_offset, EDP_BACKLIGHT_CONTROL);
+			mdelay(50);
 		}
+
+		phytium_writel_reg(priv, SST_MST_SOURCE_0_DISABLE,
+			                group_offset, PHYTIUM_DP_VIDEO_STREAM_ENABLE);
 	}
 }
 
