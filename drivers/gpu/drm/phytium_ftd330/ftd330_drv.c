@@ -689,8 +689,8 @@ void phytium_display_disable_before_init(struct ftd330_drm_private *priv)
         struct device *dev = &pdev->dev;
         struct ftd330_dc *dc = dev_get_drvdata(dev);
 
-	phytium_dc_disable_before_init(&dc->hw);
 	phytium_dp_disable_before_init(priv);
+	phytium_dc_disable_before_init(&dc->hw);
 }
 
 
