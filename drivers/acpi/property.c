@@ -1303,7 +1303,7 @@ acpi_get_next_present_subnode(const struct fwnode_handle *fwnode,
 	do {
 		child = acpi_get_next_subnode(fwnode, child);
 	} while (is_acpi_device_node(child) &&
-		 !acpi_device_is_present(to_acpi_device_node(child)));
+		 !acpi_dev_ready_for_enumeration(to_acpi_device_node(child)));
 
 	return child;
 }
