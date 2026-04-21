@@ -23,7 +23,6 @@ void xen_copy_trap_info(struct trap_info *traps);
 
 DECLARE_PER_CPU_ALIGNED(struct vcpu_info, xen_vcpu_info);
 DECLARE_PER_CPU(unsigned long, xen_cr3);
-DECLARE_PER_CPU(unsigned long, xen_current_cr3);
 
 extern struct start_info *xen_start_info;
 extern struct shared_info xen_dummy_shared_info;
@@ -180,5 +179,14 @@ static inline void xen_hvm_post_suspend(int suspend_cancelled) {}
 #define EXTRA_MEM_RATIO		(10)
 
 void xen_add_extra_mem(unsigned long start_pfn, unsigned long n_pfns);
+
+#ifdef CONFIG_XEN_PV
+void xen_hypercall_pv(void);
+#endif
+void xen_hypercall_hvm(void);
+void xen_hypercall_amd(void);
+void xen_hypercall_intel(void);
+void xen_hypercall_setfunc(void);
+void *__xen_hypercall_setfunc(void);
 
 #endif /* XEN_OPS_H */
