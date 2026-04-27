@@ -1037,11 +1037,13 @@ static void macb_mac_link_up(struct phylink_config *config,
 {
 	struct net_device *ndev = to_net_dev(config->dev);
 	struct macb *bp = netdev_priv(ndev);
+	struct macb_dma_desc *tx_desc = NULL;
 	struct macb_queue *queue;
 	unsigned long flags;
 	unsigned int q;
 	u32 ctrl;
 	int err;
+	int i;
 
 	spin_lock_irqsave(&bp->lock, flags);
 
@@ -1076,9 +1078,17 @@ static void macb_mac_link_up(struct phylink_config *config,
 		bp->duplex = duplex;
 
 		gem_shuffle_rx_rings(bp);
+		macb_init_buffers(bp);
+
 		for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
+			for (i = 0; i < bp->tx_ring_size; i++) {
+				tx_desc = macb_tx_desc(queue, i);
+				tx_desc->ctrl = MACB_BIT(TX_USED);
+			}
+			tx_desc->ctrl |= MACB_BIT(TX_WRAP);
 			queue->tx_head = 0;
 			queue->tx_tail = 0;
+
 			queue_writel(queue, IER,
 				     bp->rx_intr_mask | MACB_TX_INT_FLAGS | MACB_BIT(HRESP));
 		}
