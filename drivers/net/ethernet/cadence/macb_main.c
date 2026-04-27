@@ -41,6 +41,7 @@
 #include <linux/firmware/xlnx-zynqmp.h>
 #include <linux/acpi.h>
 #include <net/ncsi.h>
+#include <linux/gcd.h>
 #include "macb.h"
 
 /* This structure is only used for MACB on SiFive FU540 devices */
@@ -946,6 +947,88 @@ static void phytium_gem2p0_sel_clk(struct macb *bp, int speed)
 							gem_readl(bp, HS_MAC_CONFIG)));
 }
 
+/* Use juggling algorithm to left rotate rx ring and rx skb array */
+static void gem_shuffle_rx_one_ring(struct macb_queue *queue)
+{
+	unsigned int tail, ring_size, desc_size;
+	struct macb_dma_desc *desc_curr, *desc_next;
+	unsigned int i, cycles, shift, curr, next;
+	struct macb *bp = queue->bp;
+	unsigned char desc[24];
+	struct sk_buff *tmp_skb;
+
+	desc_size = macb_dma_desc_get_size(bp);
+
+	if (WARN_ON_ONCE(desc_size > ARRAY_SIZE(desc)))
+		return;
+
+	ring_size = bp->rx_ring_size;
+	tail = queue->rx_tail;
+
+	if (!(tail % ring_size))
+		return;
+
+	shift = tail % ring_size;
+	cycles = gcd(ring_size, shift);
+
+	for (i = 0; i < cycles; i++) {
+		memcpy(&desc, macb_rx_desc(queue, i), desc_size);
+		tmp_skb = queue->rx_skbuff[i];
+
+		curr = i;
+		next = (curr + shift) % ring_size;
+
+		while (next != i) {
+			desc_curr = macb_rx_desc(queue, curr);
+			desc_next = macb_rx_desc(queue, next);
+
+			memcpy(desc_curr, desc_next, desc_size);
+
+			desc_curr->ctrl = 0;
+			dma_wmb();
+			desc_curr->addr &= ~MACB_BIT(RX_USED);
+
+			if (next == ring_size - 1)
+				desc_curr->addr &= ~MACB_BIT(RX_WRAP);
+			if (curr == ring_size - 1)
+				desc_curr->addr |= MACB_BIT(RX_WRAP);
+
+			queue->rx_skbuff[curr] = queue->rx_skbuff[next];
+
+			curr = next;
+			next = (curr + shift) % ring_size;
+		}
+
+		desc_curr = macb_rx_desc(queue, curr);
+		memcpy(desc_curr, &desc, desc_size);
+
+		desc_curr->ctrl = 0;
+		dma_wmb();
+		desc_curr->addr &= ~MACB_BIT(RX_USED);
+
+		if (i == ring_size - 1)
+			desc_curr->addr &= ~MACB_BIT(RX_WRAP);
+		if (curr == ring_size - 1)
+			desc_curr->addr |= MACB_BIT(RX_WRAP);
+		queue->rx_skbuff[curr] = tmp_skb;
+	}
+	queue->rx_tail = 0;
+	queue->rx_prepared_head = bp->rx_buffer_size - 1;
+	/* Make descriptor updates visible to hardware */
+	wmb();
+	return;
+}
+
+/* Rotate the queue so that the tail is at index 0 */
+static void gem_shuffle_rx_rings(struct macb *bp)
+{
+	struct macb_queue *queue;
+	int q;
+
+	for (q = 0, queue = bp->queues; q < bp->num_queues; q++, queue++)
+		gem_shuffle_rx_one_ring(queue);
+}
+
 static void macb_mac_link_up(struct phylink_config *config,
 			     struct phy_device *phy,
 			     unsigned int mode, phy_interface_t interface,
@@ -992,6 +1075,7 @@ static void macb_mac_link_up(struct phylink_config *config,
 		bp->speed = speed;
 		bp->duplex = duplex;
 
+		gem_shuffle_rx_rings(bp);
 		for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
 			queue->tx_head = 0;
 			queue->tx_tail = 0;
