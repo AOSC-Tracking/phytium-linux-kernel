@@ -4241,6 +4241,11 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 		goto status_in_total;
 	}
 
+	if ((mode->hdisplay == 1920) && (mode->vdisplay == 1080) && (drm_mode_vrefresh(mode) == 24)) {
+		ret = MODE_BAD_HVALUE;
+		goto status_in_total;
+	}
+
 	if ((mode->hdisplay == 2560) && (mode->vdisplay == 1440)) {
 		if (drm_mode_vrefresh(mode) > 120) {
 			ret = MODE_HBLANK_NARROW;
