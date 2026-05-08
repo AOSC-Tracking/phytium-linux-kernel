@@ -452,6 +452,13 @@ static void phytium_fbdev_async_task(void *data, async_cookie_t cookie)
         struct drm_device *drm_dev = priv->drm_dev;
 #ifndef CONFIG_PHYTIUM_DCDP_EMULATOR
 	int i = 0;
+
+	/* before power off DP,we should firstly
+	*  set phy to low power state.
+	*/
+	phytium_dp_phy_power_request_off(priv);
+
+
 #ifdef CONFIG_PHYTIUM_POWER_OPERATION
         if(!(priv->info.edp_mask & BIT(DISPLAY_0))) {
                 phytium_display_power_request(priv, false, DISPLAY_0);

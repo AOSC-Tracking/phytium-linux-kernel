@@ -384,6 +384,7 @@ void phytium_dp_hw_disable_video(struct phytium_dp_device *phytium_dp);
 void phytium_dp_adjust_link_train_parameter(struct phytium_dp_device *phytium_dp);
 void phytium_dp_hw_config_video(struct phytium_dp_device *phytium_dp);
 void phytium_dp_hw_enable_video(struct phytium_dp_device *phytium_dp);
+void phytium_dp_phy_power_request_off(struct ftd330_drm_private *priv);
 #ifndef CONFIG_PHYTIUM_DCDP_EMULATOR
 void phytium_edp_backlight_on(struct phytium_dp_device *phytium_dp);
 void phytium_edp_backlight_off(struct phytium_dp_device *phytium_dp);
