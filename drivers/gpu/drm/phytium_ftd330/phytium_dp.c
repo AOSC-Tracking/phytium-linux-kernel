@@ -3541,6 +3541,23 @@ bool phytium_dp_fast_link_train(struct phytium_dp_device *phytium_dp)
 }
 #endif
 
+void phytium_dp_phy_power_request_off(struct ftd330_drm_private *priv)
+{
+	int i = 0;
+	struct phytium_dp_device *phytium_dp = NULL;
+
+	for (i = 0;i < priv->info.total_pipes;i++) {
+		phytium_dp = priv->phytium_dp[i];
+		if (!phytium_dp->is_edp) {
+			phytium_dp->funcs->dp_hw_config_phy_power(phytium_dp, false);
+		}
+	}
+
+	return;
+
+}
+
+
 static enum drm_connector_status
 phytium_connector_detect(struct drm_connector *connector, bool force)
 {
