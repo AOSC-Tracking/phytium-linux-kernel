@@ -31,7 +31,7 @@
 #include <linux/acpi_dma.h>
 #include "phytium-gdmac.h"
 
-#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.3"
+#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.5"
 
 static inline struct phytium_gdma_device *to_gdma_device(struct dma_chan *chan)
 {
