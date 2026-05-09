@@ -130,7 +130,7 @@ static void phytium_gdma_disable(const struct phytium_gdma_device *gdma)
 
 	dev_dbg(gdma->dev, "gdma disable\n");
 	val &= ~DMA_CTL_EN;
-	phytium_gdma_write(gdma, DMA_CTL, !DMA_CTL_EN);
+	phytium_gdma_write(gdma, DMA_CTL, val);
 }
 
 static void phytium_gdma_enable(const struct phytium_gdma_device *gdma)
@@ -483,6 +483,7 @@ static int phytium_gdma_terminate_all(struct dma_chan *chan)
 
 	if (gdma_chan->desc) {
 		vchan_terminate_vdesc(&gdma_chan->desc->vdesc);
+		phytium_gdma_vdesc_free(&gdma_chan->desc->vdesc);
 		gdma_chan->desc = NULL;
 		phytium_chan_disable(gdma_chan);
 		phytium_chan_reset(gdma_chan);
@@ -767,7 +768,7 @@ static struct dma_chan *phytium_gdma_of_xlate(struct of_phandle_args *dma_spec,
 
 	channel_id = dma_spec->args[0];
 
-	if (channel_id > gdma->dma_channels) {
+	if (channel_id >= gdma->dma_channels) {
 		dev_err(dev, "bad channel %d\n", channel_id);
 		return NULL;
 	}
