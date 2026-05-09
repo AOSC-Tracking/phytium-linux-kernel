@@ -132,7 +132,7 @@ static void phytium_gdma_disable(const struct phytium_gdma_device *gdma)
 
 	dev_dbg(gdma->dev, "gdma disable\n");
 	val &= ~DMA_CTL_EN;
-	phytium_gdma_write(gdma, DMA_CTL, !DMA_CTL_EN);
+	phytium_gdma_write(gdma, DMA_CTL, val);
 }
 
 static void phytium_gdma_enable(const struct phytium_gdma_device *gdma)
@@ -485,6 +485,7 @@ static int phytium_gdma_terminate_all(struct dma_chan *chan)
 
 	if (gdma_chan->desc) {
 		vchan_terminate_vdesc(&gdma_chan->desc->vdesc);
+		phytium_gdma_vdesc_free(&gdma_chan->desc->vdesc);
 		gdma_chan->desc = NULL;
 		phytium_chan_disable(gdma_chan);
 		phytium_chan_reset(gdma_chan);
@@ -769,7 +770,7 @@ static struct dma_chan *phytium_gdma_of_xlate(struct of_phandle_args *dma_spec,
 
 	channel_id = dma_spec->args[0];
 
-	if (channel_id > gdma->dma_channels) {
+	if (channel_id >= gdma->dma_channels) {
 		dev_err(dev, "bad channel %d\n", channel_id);
 		return NULL;
 	}
@@ -801,7 +802,7 @@ static struct dma_chan *phytium_gdma_acpi_xlate(struct acpi_dma_spec *dma_spec,
 	}
 
 	chan = &gdma->chan[channel_id];
-	c = &chan->vchan.chan;
+	c = dma_get_slave_channel(&chan->vchan.chan);
 	if (!c) {
 		dev_err(dev, "no more channels available\n");
 		return NULL;
@@ -977,7 +978,10 @@ static int phytium_gdma_remove(struct platform_device *pdev)
 	struct phytium_gdma_chan *chan = NULL;
 	int i = 0;
 
-	of_dma_controller_free(pdev->dev.of_node);
+	if (has_acpi_companion(&pdev->dev))
+		acpi_dma_controller_free(&pdev->dev);
+	else
+		of_dma_controller_free(pdev->dev.of_node);
 	dma_async_device_unregister(&gdma->dma_dev);
 
 	for (i = 0; i < gdma->dma_channels; i++) {
