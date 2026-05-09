@@ -29,7 +29,7 @@
 #include <asm/barrier.h>
 #include "phytium-ddmac.h"
 
-#define DDMA_DRIVER_VERSION "1.1.1"
+#define DDMA_DRIVER_VERSION "1.1.2"
 static inline struct phytium_ddma_device *to_ddma_device(struct dma_chan *chan)
 {
 	return container_of(chan->device, struct phytium_ddma_device, dma_dev);
