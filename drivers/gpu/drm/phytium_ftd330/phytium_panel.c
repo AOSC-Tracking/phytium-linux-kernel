@@ -623,6 +623,7 @@ static bool
 phytium_dp_aux_supports_hdr_backlight(struct phytium_dp_device *phytium_dp)
 {
 	struct phytium_edp_backlight_info *phytium_bl_info = &phytium_dp->panel.phytium_bl_info;
+	struct drm_connector *connector = &phytium_dp->connector;
 	u8 tcon_cap[4];
 	int ret;
 
@@ -645,6 +646,21 @@ phytium_dp_aux_supports_hdr_backlight(struct phytium_dp_device *phytium_dp)
 #if BL_DEBUG
 		pr_info("Panel doesn't support HDR backlight control, tcon version %d < 1\n", tcon_cap[0]);
 #endif
+		return false;
+	}
+	/*
+	 * If we don't have HDR static metadata there is no way to
+	 * runtime detect used range for nits based control. For now
+	 * do not use Intel proprietary eDP backlight control if we
+	 * don't have this data in panel EDID. In case we find panel
+	 * which supports only nits based control, but doesn't provide
+	 * HDR static metadata we need to start maintaining table of
+	 * ranges for such panels.
+	 */
+	if (!(connector->hdr_sink_metadata.hdmi_type1.metadata_type &
+	      BIT(HDMI_STATIC_METADATA_TYPE1))) {
+		DRM_INFO("Panel is missing HDR static metadata."
+				  "Possible support for Intel HDR backlight interface is not used.\n");
 		return false;
 	}
 
