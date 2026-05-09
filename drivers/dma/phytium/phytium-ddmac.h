@@ -47,6 +47,8 @@
 #define DMA_CTL_EN              BIT(0)
 #define DMA_CTL_SRST            BIT(1)
 
+#define DMA_CHALX_DONE(id)	BIT(id * 4)
+
 #define DMA_CHAL_SEL(id, x)     (min_t(unsigned int, x, 0x7F) << (id * 8))
 #define DMA_CHAL_SEL_EN(id)     BIT(id * 8 + 7)
 
@@ -121,7 +123,7 @@ struct phytium_ddma_chan {
 	struct dma_slave_config dma_config;
 	bool busy;
 	bool is_used;
-	bool is_pasued;
+	bool is_paused;
 	u32 next_sg;
 	struct phytium_ddma_sg_req *current_sg;
 	dma_addr_t paddr;
