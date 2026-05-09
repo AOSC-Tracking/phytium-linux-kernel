@@ -84,7 +84,7 @@ static inline u32 phytium_chan_ioread32(const struct phytium_ddma_chan *chan,
 static void phytium_ddma_disable(const struct phytium_ddma_device *ddma)
 {
 	dev_dbg(ddma->dev, "ddma disable\n");
-	phytium_ddma_iowrite32(ddma, DMA_CTL, !DMA_CTL_EN);
+	phytium_ddma_iowrite32(ddma, DMA_CTL, 0);
 }
 
 static void phytium_ddma_enable(const struct phytium_ddma_device *ddma)
@@ -129,11 +129,7 @@ static void phytium_ddma_irq_enable(const struct phytium_ddma_device *ddma)
 
 static u32 phytium_ddma_irq_read(const struct phytium_ddma_device *ddma)
 {
-	u32 val = 0;
-
-	val = phytium_ddma_ioread32(ddma, DMA_STAT);
-
-	return val;
+	return phytium_ddma_ioread32(ddma, DMA_STAT);
 }
 
 static void phytium_chan_irq_disable(struct phytium_ddma_chan *chan)
@@ -165,24 +161,15 @@ static void phytium_chan_irq_clear(struct phytium_ddma_chan *chan)
 	phytium_ddma_iowrite32(chan_to_ddma(chan), DMA_STAT, val);
 }
 
-static int phytium_chan_disable(struct phytium_ddma_chan *chan)
+static void phytium_chan_disable(struct phytium_ddma_chan *chan)
 {
 	u32 val = 0;
-	int ret = 0;
-	u32 value1;
 
 	dev_dbg(chan_to_dev(chan), "channel %d disable\n", chan->id);
 	val = phytium_chan_ioread32(chan, DMA_CHALX_CTL);
-	value1 = val |= DMA_CHAL_EN;
-	if (value1) {
-		val &= ~DMA_CHAL_EN;
-		phytium_chan_iowrite32(chan, DMA_CHALX_CTL, val);
-
-		ret = readl_relaxed_poll_timeout_atomic(
-			chan->base + DMA_CHALX_CTL, val, !(val & DMA_CHAL_EN),
-			0, 100000);
-	}
-	return ret;
+	
+	val &= ~DMA_CHAL_EN;
+	phytium_chan_iowrite32(chan, DMA_CHALX_CTL, val);
 }
 
 static void phytium_chan_enable(struct phytium_ddma_chan *chan)
@@ -229,13 +216,12 @@ static void phytium_ddma_vdesc_free(struct virt_dma_desc *vd)
 static int phytium_chan_pause(struct dma_chan *chan)
 {
 	struct phytium_ddma_chan *pchan = to_ddma_chan(chan);
-	int ret = 0;
 
-	ret = phytium_chan_disable(pchan);
+	phytium_chan_disable(pchan);
 	pchan->busy = false;
-	pchan->is_pasued = true;
+	pchan->is_paused = true;
 
-	return ret;
+	return 0;
 }
 
 static int phytium_chan_resume(struct dma_chan *chan)
@@ -243,7 +229,7 @@ static int phytium_chan_resume(struct dma_chan *chan)
 	struct phytium_ddma_chan *pchan = to_ddma_chan(chan);
 
 	phytium_chan_enable(pchan);
-	pchan->is_pasued = false;
+	pchan->is_paused = false;
 
 	return 0;
 }
@@ -338,7 +324,6 @@ static void phytium_chan_xfer_done(struct phytium_ddma_chan *chan)
 static void phytium_dma_hw_init(struct phytium_ddma_device *ddma)
 {
 	u32 i = 0;
-	int ret = 0;
 
 	phytium_ddma_disable(ddma);
 	phytium_ddma_reset(ddma);
@@ -347,9 +332,7 @@ static void phytium_dma_hw_init(struct phytium_ddma_device *ddma)
 
 	for (i = 0; i < ddma->dma_channels; i++) {
 		phytium_chan_irq_disable(&ddma->chan[i]);
-		ret = phytium_chan_disable(&ddma->chan[i]);
-		if (ret)
-			dev_err(ddma->dev, "can't disable channel %d\n", i);
+		phytium_chan_disable(&ddma->chan[i]);
 	}
 }
 
@@ -360,7 +343,8 @@ static size_t phytium_ddma_desc_residue(struct phytium_ddma_chan *chan)
 	int i = 0;
 
 	trans_cnt = phytium_chan_ioread32(chan, DMA_CHALX_TRANS_CNT);
-	residue = chan->current_sg->len - trans_cnt;
+	residue = trans_cnt >= chan->current_sg->len ? 0 :
+		  (chan->current_sg->len - trans_cnt);
 
 	for (i = chan->next_sg; i < chan->desc->num_sgs; i++)
 		residue += chan->desc->sg_req[i].len;
@@ -390,7 +374,7 @@ static enum dma_status phytium_ddma_tx_status(struct dma_chan *chan,
 	dma_set_residue(txstate, residue);
 	spin_unlock_irqrestore(&pchan->vchan.lock, flags);
 
-	if (pchan->is_pasued && ret == DMA_IN_PROGRESS)
+	if (pchan->is_paused && ret == DMA_IN_PROGRESS)
 		ret = DMA_PAUSED;
 
 	return ret;
@@ -467,11 +451,7 @@ static int phytium_ddma_alloc_chan_resources(struct dma_chan *chan)
 	}
 
 	/* prepare channel */
-	ret = phytium_chan_disable(pchan);
-	if (ret) {
-		dev_err(ddma->dev, "can't disable channel %d\n", pchan->id);
-		goto out;
-	}
+	phytium_chan_disable(pchan);
 	phytium_chan_reset(pchan);
 	phytium_chan_irq_clear(pchan);
 
@@ -488,6 +468,13 @@ static int phytium_ddma_alloc_chan_resources(struct dma_chan *chan)
 	if (!pchan->buf) {
 		ret = -EBUSY;
 		dev_err(ddma->dev, "failed to alloc dma memory\n");
+		/* rollback channel bind on allocation failure */
+		spin_lock_irqsave(&chan_to_ddma(pchan)->lock, flags);
+		bind_status &= ~BIT(pchan->id);
+		phytium_ddma_iowrite32(ddma, DMA_CHAL_BIND, bind_status);
+		pchan->is_used = false;
+		spin_unlock_irqrestore(&chan_to_ddma(pchan)->lock, flags);
+		goto out;
 	}
 
 	dev_info(ddma->dev, "alloc channel %d\n", pchan->id);
@@ -533,6 +520,7 @@ static int phytium_ddma_slave_config(struct dma_chan *chan,
 	struct phytium_ddma_chan *pchan = to_ddma_chan(chan);
 	u32 chal_cfg = 0;
 	u32 req_mode = 0;
+	u32 value = 0;
 	const u32 timeout = 0xffff;
 	unsigned long flag = 0;
 
@@ -564,9 +552,11 @@ static int phytium_ddma_slave_config(struct dma_chan *chan,
 	spin_unlock_irqrestore(&chan_to_ddma(pchan)->lock, flag);
 
 	/* set channel mode */
+	value = phytium_chan_ioread32(pchan, DMA_CHALX_CTL);
 	req_mode = (config->direction == DMA_DEV_TO_MEM) ? DMA_RX_REQ :
 							   DMA_TX_REQ;
-	phytium_chan_iowrite32(pchan, DMA_CHALX_CTL, req_mode << 2);
+	value |= req_mode << 2;
+	phytium_chan_iowrite32(pchan, DMA_CHALX_CTL, value);
 
 	/* set channel timeout */
 	phytium_chan_iowrite32(pchan, DMA_CHALX_TIMEOUT_CNT,
@@ -586,7 +576,6 @@ phytium_ddma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 	struct phytium_ddma_desc *desc = NULL;
 	struct scatterlist *sg = NULL;
 	int i = 0;
-	char *tmp;
 
 	if (unlikely(!is_slave_direction(direction))) {
 		dev_err(ddma->dev, "invalid dma direction\n");
@@ -604,7 +593,6 @@ phytium_ddma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 
 	/* set sg list */
 	for_each_sg(sgl, sg, sg_len, i) {
-		tmp = phys_to_virt(sg_dma_address(sg));
 		desc->sg_req[i].direction = direction;
 
 		switch (direction) {
@@ -629,6 +617,7 @@ phytium_ddma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 			break;
 
 		default:
+			kfree(desc);
 			return NULL;
 		}
 	}
@@ -653,7 +642,7 @@ static irqreturn_t phytium_dma_interrupt(int irq, void *dev_id)
 
 	/* Poll, clear and process every chanel interrupt status */
 	for (i = 0; i < ddma->dma_channels; i++) {
-		if (!(irq_status & BIT(i * 4)))
+		if (!(irq_status & DMA_CHALX_DONE(i)))
 			continue;
 
 		chan = &ddma->chan[i];
@@ -676,7 +665,7 @@ static struct dma_chan *phytium_ddma_of_xlate(struct of_phandle_args *dma_spec,
 
 	channel_id = dma_spec->args[0];
 
-	if (channel_id > ddma->dma_channels) {
+	if (channel_id >= ddma->dma_channels) {
 		dev_err(dev, "bad channel %d\n", channel_id);
 		return NULL;
 	}
@@ -740,7 +729,7 @@ static int phytium_ddma_probe(struct platform_device *pdev)
 		nr_channels = DDMA_MAX_NR_PCHANNELS;
 	}
 
-	ddma->dma_channels = DDMA_MAX_NR_PCHANNELS;
+	ddma->dma_channels = nr_channels;
 
 	ret = devm_request_irq(&pdev->dev, ddma->irq, phytium_dma_interrupt,
 			       IRQF_SHARED, dev_name(&pdev->dev), ddma);
