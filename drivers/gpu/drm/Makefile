@@ -126,3 +126,4 @@ obj-$(CONFIG_DRM_MCDE) += mcde/
 obj-$(CONFIG_DRM_TIDSS) += tidss/
 obj-y			+= xlnx/
 obj-$(CONFIG_DRM_PHYTIUM) += phytium/
+obj-$(CONFIG_DRM_PHYTIUM_FTD330) += phytium_ftd330/
