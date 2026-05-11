@@ -108,3 +108,4 @@ obj-$(CONFIG_DRM_PL111) += pl111/
 obj-$(CONFIG_DRM_TVE200) += tve200/
 obj-$(CONFIG_DRM_PHYTIUM) += phytium/
 obj-$(CONFIG_DRM_XEN) += xen/
+obj-$(CONFIG_DRM_PHYTIUM_FTD330) += phytium_ftd330/
