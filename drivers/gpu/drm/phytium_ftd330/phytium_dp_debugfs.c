@@ -813,6 +813,9 @@ phytium_psr_control(struct file *filp,
 	if (len >= sizeof(tmp))
 		return -EINVAL;
 
+	if (!priv->info.bios_psr_is_enable)
+		return len;
+
 	memset(tmp, 0, sizeof(tmp));
 	if (copy_from_user(tmp, ubuf, len))
 		return -EFAULT;
