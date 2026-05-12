@@ -1350,7 +1350,7 @@ void set_load_weight(struct task_struct *p, bool update_load)
 	 * weight
 	 */
 	if (update_load && p->sched_class->reweight_task) {
-		p->sched_class->reweight_task(task_rq(p), p, prio);
+		p->sched_class->reweight_task(task_rq(p), p, &lw);
 	} else
 		p->se.load = lw;
 }
