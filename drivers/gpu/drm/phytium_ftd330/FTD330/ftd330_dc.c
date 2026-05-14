@@ -257,12 +257,16 @@ static inline u8 to_ftd330_yuv_gamut(u32 color_space)
 	return gamut;
 }
 
-static inline u8 to_ftd330_tile_mode(u64 modifier)
+static inline u8 to_ftd330_tile_mode(u32 format, u64 modifier)
 {
-	if (modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED)
-		return DRM_FORMAT_MOD_FTD330_SUPER_TILED_XMAJOR_8X4;
-	else
+	if (modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED) {
+		if (format == DRM_FORMAT_RGB565)
+			return DRM_FORMAT_MOD_FTD330_SUPER_TILED_XMAJOR;
+		else
+			return DRM_FORMAT_MOD_FTD330_SUPER_TILED_XMAJOR_8X4;
+	} else {
 		return (u8)(modifier & DRM_FORMAT_MOD_FTD330_NORM_MODE_MASK);
+	}
 }
 
 static inline u8 to_ftd330_display_id(struct ftd330_dc *dc, struct drm_crtc *crtc)
@@ -738,7 +742,7 @@ static void update_fb(struct ftd330_plane *plane, u8 display_id, struct dc_hw_fb
 
 	fb->width = drm_fb->width;
 	fb->height = drm_fb->height;
-	fb->tile_mode = to_ftd330_tile_mode(drm_fb->modifier);
+	fb->tile_mode = to_ftd330_tile_mode(drm_fb->format->format, drm_fb->modifier);
 	fb->rotation = to_ftd330_rotation(state->rotation);
 	fb->yuv_gamut = to_ftd330_yuv_gamut(state->color_encoding);
 	fb->zpos = state->zpos;
