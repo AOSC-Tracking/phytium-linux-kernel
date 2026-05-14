@@ -125,8 +125,12 @@ static void update_fb_format(struct dc_dec_fb *dec_fb)
 	u8 tile_mod = fourcc_mod_ftd330_get_tile_mode(drm_fb->modifier);
 	u8 norm_mod = DRM_FORMAT_MOD_FTD330_LINEAR;
 
-	if (drm_fb->modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC)
-		tile_mod = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X4;
+	if (drm_fb->modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC) {
+		if (drm_fb->format->format == DRM_FORMAT_RGB565)
+			tile_mod = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X8_XMAJOR;
+		else
+			tile_mod = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X4;
+	}
 	switch (tile_mod) {
 	case DRM_FORMAT_MOD_FTD330_DEC_RASTER_32X1:
 		norm_mod = DRM_FORMAT_MOD_FTD330_TILE_32X1;
@@ -185,10 +189,14 @@ static void drm_phy_get_align_size(uint32_t *width, uint32_t *height, uint32_t f
 	uint32_t ori_width = *width;
 	uint32_t ori_height = *height;
 
-	if (mod == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC)
-		tile_mode = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X4;
-	else
+	if (mod == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC) {
+		if (format == DRM_FORMAT_RGB565)
+			tile_mode = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X8_XMAJOR;
+		else
+			tile_mode = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X4;
+	} else {
 		tile_mode = fourcc_mod_ftd330_get_tile_mode(mod);
+	}
 
 	/*alignment requirements for dec400 sub-IP*/
 	switch (tile_mode) {
@@ -236,10 +244,15 @@ static void _stream_config(struct dc_dec_fb *dec_fb, struct dc_dec_stream *strea
     }
 #endif
 	stream->main_base_addr = dec_fb->addr[index];
-	if (drm_fb->modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC)
-		stream->tile_mode = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X4;
-	else
+	if (drm_fb->modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC) {
+		if (drm_fb->format->format == DRM_FORMAT_RGB565)
+			stream->tile_mode = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X8_XMAJOR;
+		else
+			stream->tile_mode = DRM_FORMAT_MOD_FTD330_DEC_TILE_8X4;
+	} else {
 		stream->tile_mode = fourcc_mod_ftd330_get_tile_mode(drm_fb->modifier);
+	}
+
 	if ((fourcc_mod_ftd330_get_align_mode(drm_fb->modifier) == DRM_FORMAT_MOD_FTD330_DEC_ALIGN_32) ||
 		drm_fb->modifier == DRM_FORMAT_MOD_PHYTIUM_SUPER_TILED_FC) {
 		stream->align_mode = DEC_ALIGN_32;
