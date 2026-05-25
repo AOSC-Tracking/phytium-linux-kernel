@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0
-ccflags-y := -I $(src)
+ccflags-y := -I $(srctree)/$(src)
 ifeq ($(CONFIG_PHYTIUM_CHIP_9x00), y)
-ccflags-y += -I $(src)/9x00
+ccflags-y += -I $(srctree)/$(src)/9x00
 else ifeq ($(CONFIG_PHYTIUM_CHIP_FTD330), y)
-ccflags-y += -I $(src)/FTD330
+ccflags-y += -I $(srctree)/$(src)/FTD330
 else
-ccflags-y += -I $(src)/FTD330
+ccflags-y += -I $(srctree)/$(src)/FTD330
 endif
 #ccflags-y += -Wall  -Wextra
 
