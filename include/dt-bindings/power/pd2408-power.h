@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * power macros for Phytium pd408 SoC
+ * power macros for Phytium pd2408 SoC
  *
  * Copyright (c) 2024-2025 Phytium Technology Co., Ltd.
  */
