@@ -1032,7 +1032,7 @@ static void update_cursor_plane(struct ftd330_dc *dc, struct ftd330_plane *plane
 	struct dc_hw_cursor cursor;
 	struct drm_crtc *crtc = state->crtc;
 	struct drm_display_mode *mode = &crtc->state->adjusted_mode;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 90))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0))
 	int orig_hotx = state->hotspot_x;
 	int orig_hoty = state->hotspot_y;
 #elif defined(CONFIG_KYLIN_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
