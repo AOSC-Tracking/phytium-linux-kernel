@@ -1077,7 +1077,7 @@ static bool update_deadline(struct cfs_rq *cfs_rq, struct sched_entity *se, bool
 	/*
 	 * The task has consumed its request, reschedule.
 	 */
-	if (cfs_rq->nr_running < 2)
+	if (cfs_rq->nr_queued < 2)
 		return false;
 
 	if (!IS_ENABLED(CONFIG_PREEMPT_BUILD_AUTO) || sched_feat(FORCE_NEED_RESCHED)) {
