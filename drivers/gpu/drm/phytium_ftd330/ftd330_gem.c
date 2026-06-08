@@ -17,6 +17,10 @@
 static const struct drm_gem_object_funcs ftd330_gem_default_funcs;
 #endif
 
+/* DC MMU always uses 4K pages for mapping, regardless of kernel page size */
+#define FTD330_ALLOC_PAGE_SHIFT 12
+#define FTD330_ALLOC_PAGE_SIZE  (1 << FTD330_ALLOC_PAGE_SHIFT)
+
 #define VRAM_POOL_ALLOC_ORDER 12
 
 static void nonseq_free(struct page **pages, unsigned int nr_page)
@@ -63,7 +67,7 @@ static int get_pages(unsigned int nr_page, struct ftd330_gem_object *ftd330_obj)
 
 	do {
 		pages = NULL;
-		order = get_order(num_page * PAGE_SIZE);
+		order = get_order(num_page * FTD330_ALLOC_PAGE_SIZE);
 		num_page = 1 << order;
 
 		if ((num_page + page_count > nr_page) || (order >= MAX_ORDER)) {
@@ -126,7 +130,7 @@ static int ftd330_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 	if (!is_iommu_enabled(dev))
 		ftd330_obj->dma_attrs |= DMA_ATTR_FORCE_CONTIGUOUS;
 
-	nr_pages = ftd330_obj->size >> PAGE_SHIFT;
+	nr_pages = ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT;
 
 	ftd330_obj->pages = kvmalloc_array(nr_pages, sizeof(struct page *), GFP_KERNEL | __GFP_ZERO);
 	if (!ftd330_obj->pages) {
@@ -247,18 +251,18 @@ static void ftd330_gem_free_buf(struct ftd330_gem_object *ftd330_obj)
 		return;
 	}
 
-	nr_pages = ftd330_obj->size >> PAGE_SHIFT;
+	nr_pages = ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT;
 	dc_mmu_unmap_memory_and_flush(dev, priv->mmu, (u32)ftd330_obj->iova, nr_pages);
 #endif
 
 	if (!ftd330_obj->get_pages) {
 #ifdef CONFIG_X86
-		set_memory_wb((unsigned long)(ftd330_obj->cookie), ftd330_obj->size >> PAGE_SHIFT);
+		set_memory_wb((unsigned long)(ftd330_obj->cookie), ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT);
 #endif
 		dma_free_attrs(to_dma_dev(dev), ftd330_obj->size, ftd330_obj->cookie,
 			       (dma_addr_t)ftd330_obj->dma_addr, ftd330_obj->dma_attrs);
 	} else {
-		put_pages(ftd330_obj->size >> PAGE_SHIFT, ftd330_obj);
+		put_pages(ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT, ftd330_obj);
 	}
 }
 
@@ -273,7 +277,7 @@ static void _ftd330_mmu_free_buf(struct ftd330_gem_object *ftd330_obj)
 		DRM_DEV_ERROR(dev->dev, "invalid mmu.\n");
 		return;
 	}
-	nr_pages = ftd330_obj->size >> PAGE_SHIFT;
+	nr_pages = ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT;
 	dc_mmu_unmap_memory_and_flush(dev, priv->mmu, (u32)ftd330_obj->iova, nr_pages);
 }
 #endif
@@ -308,7 +312,7 @@ static int phytium_gem_alloc_buf(struct ftd330_gem_object *ftd330_obj)
 	if (!is_iommu_enabled(dev))
 		ftd330_obj->dma_attrs |= DMA_ATTR_FORCE_CONTIGUOUS;
 
-	nr_pages = ftd330_obj->size >> PAGE_SHIFT;
+	nr_pages = ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT;
 
 	ftd330_obj->pages = kvmalloc_array(nr_pages, sizeof(struct page *), GFP_KERNEL | __GFP_ZERO);
 	if (!ftd330_obj->pages) {
@@ -417,13 +421,13 @@ static void phytium_gem_free_buf(struct ftd330_gem_object *ftd330_obj)
 		return;
 	}
 
-	nr_pages = ftd330_obj->size >> PAGE_SHIFT;
+	nr_pages = ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT;
 	dc_mmu_unmap_memory_and_flush(dev, priv->mmu, (u32)ftd330_obj->iova, nr_pages);
 #endif
 	if (!ftd330_obj->get_pages)
 		gen_pool_free(priv->mem_pool, (unsigned long)ftd330_obj->cookie, ftd330_obj->size);
 	else
-		put_pages(ftd330_obj->size >> PAGE_SHIFT, ftd330_obj);
+		put_pages(ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT, ftd330_obj);
 
 }
 
@@ -704,9 +708,9 @@ struct sg_table *ftd330_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	struct ftd330_gem_object *ftd330_obj = to_ftd330_gem_object(obj);
 
 #if KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE
-	return drm_prime_pages_to_sg(obj->dev, ftd330_obj->pages, ftd330_obj->size >> PAGE_SHIFT);
+	return drm_prime_pages_to_sg(obj->dev, ftd330_obj->pages, ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT);
 #else
-	return drm_prime_pages_to_sg(ftd330_obj->pages, ftd330_obj->size >> PAGE_SHIFT);
+	return drm_prime_pages_to_sg(ftd330_obj->pages, ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT);
 #endif
 }
 
@@ -826,7 +830,7 @@ struct drm_gem_object *ftd330_gem_prime_import_sg_table(struct drm_device *dev,
 			goto err;
 		}
 
-		if (sg_dma_len(s) & (PAGE_SIZE - 1)) {
+		if (sg_dma_len(s) & (FTD330_ALLOC_PAGE_SIZE - 1)) {
 			ret = -EINVAL;
 			goto err;
 		}
@@ -839,7 +843,7 @@ struct drm_gem_object *ftd330_gem_prime_import_sg_table(struct drm_device *dev,
 	}
 #endif
 
-	npages = ftd330_obj->size >> PAGE_SHIFT;
+	npages = ftd330_obj->size >> FTD330_ALLOC_PAGE_SHIFT;
 	ftd330_obj->pages = kvmalloc_array(npages, sizeof(struct page *), GFP_KERNEL);
 	if (!ftd330_obj->pages) {
 		ret = -ENOMEM;
