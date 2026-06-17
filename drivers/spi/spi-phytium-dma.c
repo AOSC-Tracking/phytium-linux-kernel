@@ -146,9 +146,15 @@ static int phytium_spi_dma_wait(struct phytium_spi *fts, unsigned int len,
 {
 	unsigned long long ms;
 
+	if (!speed) {
+		dev_warn(&fts->master->cur_msg->spi->dev,
+			 "effective_speed_hz is 0, skip timeout bound\n");
+		speed = 1;
+	}
+
 	ms = len * MSEC_PER_SEC * BITS_PER_BYTE;
 	do_div(ms, speed);
-	ms += ms + 200;
+	ms += 200;
 
 	if (ms > UINT_MAX)
 		ms = UINT_MAX;

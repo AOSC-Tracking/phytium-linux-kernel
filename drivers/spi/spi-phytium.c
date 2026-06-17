@@ -251,6 +251,8 @@ static int phytium_spi_transfer_one(struct spi_master *master,
 		spi_set_clk(fts, chip->clk_div);
 	}
 
+	transfer->effective_speed_hz = fts->current_freq;
+
 	if (transfer->bits_per_word == 8) {
 		fts->n_bytes = 1;
 	} else if (transfer->bits_per_word == 16) {
