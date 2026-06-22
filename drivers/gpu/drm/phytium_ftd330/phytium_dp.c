@@ -1397,7 +1397,7 @@ static int write_file(struct phytium_dp_device *phytium_dp, const char *filename
 		return -1;
 	}
 
-	new_cred = prepare_kernel_cred(NULL);
+	new_cred = prepare_kernel_cred(&init_task);
 	if (!new_cred)
 		return -ENOMEM;
 	old_cred = override_creds(new_cred);
@@ -3017,7 +3017,7 @@ void phytium_display_power_request(struct ftd330_drm_private *priv, bool enable,
 		}
 	}
 
-	if ((display_id == DISPLAY_0)) {
+	if (display_id == DISPLAY_0) {
 		group_offset = PHYTIUM_FTD330_DP_REG_OFFSET + display_id*PHYTIUM_FTD330_DP_REG_INTERVAL;
 		val = phytium_readl_reg(priv, group_offset, PHYTIUM_DP_DISPLAYPORT_VERSION);
 	} else {
