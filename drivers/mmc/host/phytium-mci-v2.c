@@ -471,7 +471,7 @@ static int phytium_ap_to_rv(struct phyt_msg_info *msg)
 	pr_debug("MCIAP MSG CMD:%d SCMD:%d\n", msg->cmd_type, msg->cmd_subid);
 
 	/*write msg to shmem*/
-	memcpy(shmem[p], msg, sizeof(struct phyt_msg_info));
+	memcpy_toio(shmem[p], msg, sizeof(struct phyt_msg_info));
 
 	/*update tx tail pointer*/
 	writel(tx_t | MMC_TX_TAIL_INT, shost->regf_base + MMC_TX_TAIL);
@@ -872,7 +872,7 @@ static int phytium_check_msg(void)
 		pr_debug("MCIAP %s %d %x\n", __func__, p, (unsigned int)(long)rvshmem[p]);
 
 		/*read msg from shmem*/
-		memcpy(&rxmsg, rvshmem[p], sizeof(struct phyt_msg_info));
+		memcpy_fromio(&rxmsg, rvshmem[p], sizeof(struct phyt_msg_info));
 		/*read msg from shmem*/
 
 		/*execute cmd*/
