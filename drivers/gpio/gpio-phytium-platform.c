@@ -57,6 +57,9 @@ static int phytium_gpio_probe(struct platform_device *pdev)
 	device_for_each_child_node(dev, fwnode) {
 		int idx;
 
+		if (!fwnode_property_present(fwnode, "reg"))
+			continue;
+
 		if (fwnode_property_read_u32(fwnode, "reg", &idx) ||
 		    idx >= MAX_NPORTS) {
 			dev_err(dev, "missing/invalid port index\n");
