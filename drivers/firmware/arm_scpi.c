@@ -240,6 +240,7 @@ struct scpi_chan {
 	struct scpi_xfer *xfers;
 	spinlock_t rx_lock; /* locking for the rx pending list */
 	struct mutex xfers_lock;
+	struct mutex send_lock; /* serialize send + wait window */
 	u8 token;
 };
 
@@ -506,7 +507,19 @@ static int scpi_send_message(u8 idx, void *tx_buf, unsigned int tx_len,
 	msg->rx_len = rx_len;
 	reinit_completion(&msg->done);
 
+	/*
+	 * Serialize the entire send + wait window. mbox_send_message is
+	 * non-blocking in the mailbox layer, and the mailbox controller
+	 * has its own queue. Without this lock, multiple senders can
+	 * stack multiple xfers in the mailbox and the per-xfer
+	 * wait_for_completion_timeout() clocks would tick in parallel,
+	 * causing spurious -ETIMEDOUT even when the underlying
+	 * transaction completes within MAX_RX_TIMEOUT. Inspired by
+	 * upstream commit 0892dab575ba7 (arm_scmi mailbox).
+	 */
+	mutex_lock(&scpi_chan->send_lock);
 	ret = mbox_send_message(scpi_chan->chan, msg);
+
 	if (ret < 0 || !rx_buf)
 		goto out;
 
@@ -520,6 +533,7 @@ out:
 		scpi_process_cmd(scpi_chan, msg->cmd);
 
 	put_scpi_xfer(msg, scpi_chan);
+	mutex_unlock(&scpi_chan->send_lock);
 	/* SCPI error codes > 0, translate them to Linux scale*/
 	return ret > 0 ? scpi_to_linux_errno(ret) : ret;
 }
@@ -977,6 +991,7 @@ static int scpi_probe(struct platform_device *pdev)
 		INIT_LIST_HEAD(&pchan->xfers_list);
 		spin_lock_init(&pchan->rx_lock);
 		mutex_init(&pchan->xfers_lock);
+		mutex_init(&pchan->send_lock);
 
 		ret = scpi_alloc_xfer_list(dev, pchan);
 		if (!ret) {
