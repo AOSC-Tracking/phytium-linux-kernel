@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL
+// SPDX-License-Identifier: GPL-2.0
 /* DMABUF NPU system heap exporter
  *
  * Copyright (C) 2023 Phytium Technology Co., Ltd.
