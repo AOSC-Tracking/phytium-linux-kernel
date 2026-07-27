@@ -1312,7 +1312,7 @@ static int gem_rx(struct macb_queue *queue, int budget)
 				   "not whole frame pointed by descriptor\n");
 			bp->dev->stats.rx_dropped++;
 			queue->stats.rx_dropped++;
-			break;
+			continue;
 		}
 
 		len = ctrl & bp->rx_frm_len_mask;
