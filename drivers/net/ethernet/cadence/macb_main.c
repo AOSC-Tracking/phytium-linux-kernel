@@ -1671,7 +1671,7 @@ static int gem_rx(struct macb_queue *queue, struct napi_struct *napi,
 				   "not whole frame pointed by descriptor\n");
 			bp->dev->stats.rx_dropped++;
 			queue->stats.rx_dropped++;
-			break;
+			continue;
 		}
 		skb = queue->rx_skbuff[entry];
 		if (unlikely(!skb)) {
